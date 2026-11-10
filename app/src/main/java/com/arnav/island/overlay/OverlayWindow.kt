@@ -34,37 +34,15 @@ class OverlayWindow(private val context: Context, private val view: View) {
     val bounds: Rect get() = current
 
     /**
-     * When the Dynamic Island expands across the status bar header, temporarily takes focus with
-     * [WindowManager.LayoutParams.FLAG_FULLSCREEN] + [WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM]
-     * and hides [android.view.WindowInsets.Type.statusBars] so SystemUI hides the status bar icons
-     * underneath the Dynamic Island (without disrupting the soft keyboard in underlying apps).
+     * Preserves header status bar icons (Wi-Fi, battery, clock, etc.) at all times.
+     * Dynamic Island renders on top via TYPE_APPLICATION_OVERLAY without hiding system bars.
      */
     @Suppress("DEPRECATION")
     fun setSuppressStatusBar(suppress: Boolean) {
-        if (suppressingStatusBar == suppress) return
-        suppressingStatusBar = suppress
-        if (suppress) {
-            params.flags = (params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()) or
-                WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM or
-                WindowManager.LayoutParams.FLAG_FULLSCREEN
-            view.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-        } else {
-            params.flags = (params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) and
-                WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM.inv() and
-                WindowManager.LayoutParams.FLAG_FULLSCREEN.inv()
-            view.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
-        }
-        if (attached) {
-            try {
-                wm.updateViewLayout(view, params)
-                applyInsetsSuppression()
-                // Also re-apply after WindowManagerService finishes relayout & focus assignment
-                view.post { applyInsetsSuppression() }
-            } catch (e: RuntimeException) {
-                Diagnostics.w(TAG, "setSuppressStatusBar failed", e)
+        suppressingStatusBar = false
+        if (attached && Build.VERSION.SDK_INT >= 30) {
+            runCatching {
+                view.windowInsetsController?.show(android.view.WindowInsets.Type.statusBars())
             }
         }
     }
@@ -72,12 +50,8 @@ class OverlayWindow(private val context: Context, private val view: View) {
     fun applyInsetsSuppression() {
         if (!attached) return
         if (Build.VERSION.SDK_INT >= 30) {
-            val controller = view.windowInsetsController ?: return
-            if (suppressingStatusBar) {
-                controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                controller.hide(android.view.WindowInsets.Type.statusBars())
-            } else {
-                controller.show(android.view.WindowInsets.Type.statusBars())
+            runCatching {
+                view.windowInsetsController?.show(android.view.WindowInsets.Type.statusBars())
             }
         }
     }

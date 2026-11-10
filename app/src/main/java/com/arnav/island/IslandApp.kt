@@ -21,6 +21,7 @@ class IslandApp : Application() {
             }
         }
         Diagnostics.installCrashHandler(this)
+        com.arnav.island.overlay.StatusBarCleanup.cleanProtectedIconsFromSystem(this)
         graph = AppGraph(this)
         IslandOverlayService.ensureChannel(this)
         TimerNotifications.ensureChannel(this)
