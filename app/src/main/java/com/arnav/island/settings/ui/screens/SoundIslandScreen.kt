@@ -113,6 +113,20 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                         Thread { VolumeSuppressor.restore(context) }.start()
                     },
                 )
+                SettingRow(
+                    title = "Bật 'Sử dụng phím âm lượng cho media' (Samsung)",
+                    subtitle = "Mở Cài đặt Âm thanh One UI -> Đảm bảo bật tính năng này để phím cứng luôn chỉnh Media, đồng bộ 100% hai thanh",
+                    icon = Icons.Rounded.Tune,
+                    iconColor = BadgeColors.Cyan,
+                    onClick = {
+                        runCatching {
+                            val intent = android.content.Intent(android.provider.Settings.ACTION_SOUND_SETTINGS).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        }
+                    },
+                )
                 if (!hasShizuku) {
                     SettingRow(
                         title = "Kích hoạt Shizuku trên điện thoại (30s)",

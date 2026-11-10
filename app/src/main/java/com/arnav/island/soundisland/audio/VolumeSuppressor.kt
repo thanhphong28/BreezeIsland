@@ -74,6 +74,10 @@ object VolumeSuppressor {
             runShizukuShell(
                 "settings put system volume_keys_control_media 1; " +
                 "settings put secure volume_keys_control_media 1; " +
+                "settings put system use_volume_keys_for_media 1; " +
+                "settings put secure use_volume_keys_for_media 1; " +
+                "settings put system volume_keys_control_ring_stream 0; " +
+                "settings put system volume_key_handling 1; " +
                 "settings put global hidden_api_policy 1; " +
                 "settings put global hidden_api_policy_p_apps 1"
             )

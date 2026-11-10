@@ -146,10 +146,49 @@ class SoundIslandController(
         }
     )
 
+    private val lastObservedStreamVolumes = java.util.concurrent.ConcurrentHashMap<Int, Int>()
+
     private fun connectVolumeSuppressor() {
-        VolumeSuppressor.onVolumeChangedCallback = { _, _ ->
-            val streamInfo = volumeManager.getStreamInfo(TARGET_STREAM)
-            handleVolumeTrigger(streamInfo.current, streamInfo.max, streamInfo.fraction)
+        val audio = context.getSystemService(android.media.AudioManager::class.java)
+        audio?.let {
+            lastObservedStreamVolumes[android.media.AudioManager.STREAM_RING] = it.getStreamVolume(android.media.AudioManager.STREAM_RING)
+            lastObservedStreamVolumes[android.media.AudioManager.STREAM_NOTIFICATION] = it.getStreamVolume(android.media.AudioManager.STREAM_NOTIFICATION)
+            lastObservedStreamVolumes[android.media.AudioManager.STREAM_SYSTEM] = it.getStreamVolume(android.media.AudioManager.STREAM_SYSTEM)
+        }
+
+        VolumeSuppressor.onVolumeChangedCallback = { streamType, _ ->
+            if (streamType == TARGET_STREAM) {
+                val streamInfo = volumeManager.getStreamInfo(TARGET_STREAM)
+                handleVolumeTrigger(streamInfo.current, streamInfo.max, streamInfo.fraction)
+            } else {
+                // When no music is playing, Samsung One UI routes hardware volume buttons to Ring/Notification.
+                // We detect the button direction (Raise vs Lower), route it to Media (STREAM_MUSIC),
+                // and restore the Ring volume so phone ringer is never accidentally altered!
+                val currentVol = audio?.getStreamVolume(streamType) ?: -1
+                val prevVol = lastObservedStreamVolumes[streamType] ?: currentVol
+                lastObservedStreamVolumes[streamType] = currentVol
+
+                val direction = when {
+                    currentVol > prevVol -> android.media.AudioManager.ADJUST_RAISE
+                    currentVol < prevVol -> android.media.AudioManager.ADJUST_LOWER
+                    else -> {
+                        val max = audio?.getStreamMaxVolume(streamType) ?: 15
+                        if (currentVol >= max) android.media.AudioManager.ADJUST_LOWER else android.media.AudioManager.ADJUST_RAISE
+                    }
+                }
+
+                // Adjust Media volume!
+                volumeManager.adjustVolume(TARGET_STREAM, direction)
+
+                // Revert non-media stream so ringtone volume remains unchanged
+                if (prevVol != -1 && currentVol != prevVol && audio != null) {
+                    audio.setStreamVolume(streamType, prevVol, 0)
+                    lastObservedStreamVolumes[streamType] = prevVol
+                }
+
+                val mediaInfo = volumeManager.getStreamInfo(TARGET_STREAM)
+                handleVolumeTrigger(mediaInfo.current, mediaInfo.max, mediaInfo.fraction)
+            }
         }
     }
 

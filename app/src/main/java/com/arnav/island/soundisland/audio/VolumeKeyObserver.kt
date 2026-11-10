@@ -41,7 +41,10 @@ class VolumeKeyObserver(
             if (streamType == AudioManager.STREAM_MUSIC) {
                 val streamInfo = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
                 val resolvedVolume = if (newVolume >= 0) newVolume else streamInfo.current
-                onVolumeChanged(resolvedVolume, streamInfo.max, streamInfo.fraction)
+                val frac = if (streamInfo.max > streamInfo.min) {
+                    ((resolvedVolume - streamInfo.min).toFloat() / (streamInfo.max - streamInfo.min)).coerceIn(0f, 1f)
+                } else 0f
+                onVolumeChanged(resolvedVolume, streamInfo.max, frac)
             } else {
                 // When no music is playing, Samsung's default hardware key routing may fall back to
                 // Ring/Notification/System. We redirect this hardware key step to STREAM_MUSIC (Media)
