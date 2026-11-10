@@ -91,13 +91,17 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                     iconColor = BadgeColors.Cyan,
                     onCheckedChange = { checked ->
                         if (checked && !hasShizuku) {
-                            OnPhoneGranter.openOrInstallShizuku(context)
+                            if (OnPhoneGranter.isShizukuRunning()) {
+                                runCatching { rikka.shizuku.Shizuku.requestPermission(2805) }
+                            } else {
+                                OnPhoneGranter.openOrInstallShizuku(context)
+                            }
                         } else {
                             ui.update { it.copy(soundIslandSuppressStock = checked) }
                             if (checked) {
-                                Thread { VolumeSuppressor.suppress() }.start()
+                                Thread { VolumeSuppressor.suppress(context) }.start()
                             } else {
-                                Thread { VolumeSuppressor.restore() }.start()
+                                Thread { VolumeSuppressor.restore(context) }.start()
                             }
                         }
                     },
@@ -108,7 +112,13 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                         subtitle = "Wireless Debugging -> Pair with code on your phone to unlock full volume panel replacement",
                         icon = Icons.Rounded.Security,
                         iconColor = BadgeColors.Blue,
-                        onClick = { OnPhoneGranter.openOrInstallShizuku(context) },
+                        onClick = {
+                            if (OnPhoneGranter.isShizukuRunning()) {
+                                runCatching { rikka.shizuku.Shizuku.requestPermission(2805) }
+                            } else {
+                                OnPhoneGranter.openOrInstallShizuku(context)
+                            }
+                        },
                     )
                 }
             }

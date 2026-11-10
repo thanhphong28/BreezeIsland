@@ -103,7 +103,7 @@ class SoundIslandController(
             volumeObserver.start()
             updateOverlayVerticalPosition()
             if (s.soundIslandSuppressStock && VolumeSuppressor.canUseShizuku()) {
-                Thread { VolumeSuppressor.suppress() }.start()
+                Thread { VolumeSuppressor.suppress(context) }.start()
             }
         }
     }
@@ -123,9 +123,9 @@ class SoundIslandController(
             volumeObserver.start()
             updateOverlayVerticalPosition()
             if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed && VolumeSuppressor.canUseShizuku()) {
-                Thread { VolumeSuppressor.suppress() }.start()
+                Thread { VolumeSuppressor.suppress(context) }.start()
             } else if (!s.soundIslandSuppressStock && VolumeSuppressor.isSuppressed) {
-                Thread { VolumeSuppressor.restore() }.start()
+                Thread { VolumeSuppressor.restore(context) }.start()
             }
         } else {
             stop()
