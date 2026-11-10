@@ -19,14 +19,14 @@
 
 ## ⬇ Download & Install (Tải và Cài đặt)
 
-### [👉 Download Latest APK (`BreezeIsland-ZFlip5.apk`)](https://github.com/thanhphong28/BreezeIsland/releases/latest)
+### [👉 Download Latest APK (`BreezeIsland.apk`)](https://github.com/thanhphong28/BreezeIsland/releases/latest/download/BreezeIsland.apk)
 
 Direct APK links from the [**Releases**](https://github.com/thanhphong28/BreezeIsland/releases) page:
 - **Latest Release Page**: [`https://github.com/thanhphong28/BreezeIsland/releases/latest`](https://github.com/thanhphong28/BreezeIsland/releases/latest)
-- **Direct APK Download**: [`https://github.com/thanhphong28/BreezeIsland/releases/latest/download/BreezeIsland-ZFlip5.apk`](https://github.com/thanhphong28/BreezeIsland/releases/latest/download/BreezeIsland-ZFlip5.apk)
+- **Direct APK Download**: [`https://github.com/thanhphong28/BreezeIsland/releases/latest/download/BreezeIsland.apk`](https://github.com/thanhphong28/BreezeIsland/releases/latest/download/BreezeIsland.apk)
 
 ### First-Time Setup on Samsung Galaxy Z Flip 5 (One UI 9)
-1. Download `BreezeIsland-ZFlip5.apk` on your phone and install it (you only need to install it manually **once**!).
+1. Download `BreezeIsland.apk` on your phone and install it (you only need to install it manually **once**!).
 2. Open **BreezeIsland**. You can switch the app language between **Tiếng Việt** and **English** at the top right or in **Settings → System → Language**.
 3. Follow the guided onboarding steps:
    - Grant **Display over other apps** (*Hiển thị trên các ứng dụng khác*).
@@ -81,7 +81,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\openjdk\jdk-21.0.8"
 
 ### Publishing a New Update to Your Phone via GitHub Releases
 1. Bump `versionCode` and `versionName` (e.g. `1.3.0`) in `app/build.gradle.kts`.
-2. Commit and push a tag (e.g. `git tag v1.3.0 && git push origin main --tags`), or run `gh release create v1.3.0 BreezeIsland-ZFlip5.apk`.
+2. Commit and push a tag (e.g. `git tag v1.3.0 && git push origin main --tags`), or run `gh release create v1.3.0 BreezeIsland.apk`.
 3. On your Galaxy Z Flip 5, open **BreezeIsland → Kiểm tra cập nhật (Check for updates)** and tap **Tải & Cập nhật ngay**!
 
 ---

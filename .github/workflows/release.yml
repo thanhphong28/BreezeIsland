@@ -42,14 +42,10 @@ jobs:
       - name: Test and build Release APK
         run: bash ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" --no-daemon testDebugUnitTest assembleRelease
 
-      - name: Collect APKs
+      - name: Collect APK
         run: |
-          version="${TAG#v}"
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/BreezeIsland-v$version.apk"
-          cp app/build/outputs/apk/release/app-release.apk "dist/BreezeIsland-ZFlip5.apk"
-          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
-          cat dist/SHA256SUMS.txt
+          cp app/build/outputs/apk/release/app-release.apk "dist/BreezeIsland.apk"
 
       - name: Publish GitHub Release
         env:
@@ -57,9 +53,9 @@ jobs:
         run: |
           notes="docs/releases/$TAG.md"
           if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --clobber
+            gh release upload "$TAG" "dist/BreezeIsland.apk" --clobber
           elif [ -f "$notes" ]; then
-            gh release create "$TAG" dist/* --title "BreezeIsland ${TAG}" --notes-file "$notes"
+            gh release create "$TAG" "dist/BreezeIsland.apk" --title "BreezeIsland ${TAG}" --notes-file "$notes"
           else
-            gh release create "$TAG" dist/* --title "BreezeIsland ${TAG}" --generate-notes
+            gh release create "$TAG" "dist/BreezeIsland.apk" --title "BreezeIsland ${TAG}" --generate-notes
           fi
