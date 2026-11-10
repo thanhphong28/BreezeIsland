@@ -32,28 +32,57 @@ object VolumeSuppressor {
     var isSuppressed: Boolean = false
         private set
 
+    /** Native Samsung SystemUI IVolumeController captured before registering our proxy. */
+    private var originalSystemUiController: IVolumeController? = null
+
     /** Callback invoked directly across Binder IPC on every hardware volume key press. */
     var onVolumeChangedCallback: ((streamType: Int, flags: Int) -> Unit)? = null
 
     /**
-     * Real compiled AIDL Stub implementing IVolumeController.
-     * When registered with AudioService, it absorbs volume change dispatches silently,
-     * suppressing Samsung SystemUI's on-screen VolumeDialog.
+     * Real compiled AIDL Stub implementing IVolumeController as a Smart Proxy.
+     * When registered with AudioService:
+     *  1. Intercepts volume key dispatches and notifies Breeze Sound Island immediately.
+     *  2. FORWARDS the volume change to Samsung SystemUI WITHOUT AudioManager.FLAG_SHOW_UI.
+     *     - SystemUI updates its internal stream volume state and keeps the Control Center (Quick Settings) slider 100% in sync!
+     *     - Dragging the Control Center slider works smoothly without snapping back!
+     *     - SystemUI's floating on-screen volume dialog is NEVER SHOWN because FLAG_SHOW_UI is stripped!
      */
     private val silentController = object : IVolumeController.Stub() {
-        override fun displaySafeVolumeWarning(flags: Int) {}
+        override fun displaySafeVolumeWarning(flags: Int) {
+            runCatching { originalSystemUiController?.displaySafeVolumeWarning(flags) }
+        }
 
         override fun volumeChanged(streamType: Int, flags: Int) {
             onVolumeChangedCallback?.let { cb ->
                 mainHandler.post { cb(streamType, flags) }
             }
+
+            // Forward to Samsung SystemUI WITHOUT AudioManager.FLAG_SHOW_UI!
+            val strippedFlags = flags and android.media.AudioManager.FLAG_SHOW_UI.inv()
+            runCatching {
+                originalSystemUiController?.volumeChanged(streamType, strippedFlags)
+            }
         }
 
-        override fun masterMuteChanged(flags: Int) {}
-        override fun setLayoutDirection(layoutDirection: Int) {}
-        override fun dismiss() {}
-        override fun setA11yMode(a11yMode: Int) {}
-        override fun displayCsdWarning(csdWarning: Int, displayDurationMs: Int) {}
+        override fun masterMuteChanged(flags: Int) {
+            runCatching { originalSystemUiController?.masterMuteChanged(flags) }
+        }
+
+        override fun setLayoutDirection(layoutDirection: Int) {
+            runCatching { originalSystemUiController?.setLayoutDirection(layoutDirection) }
+        }
+
+        override fun dismiss() {
+            runCatching { originalSystemUiController?.dismiss() }
+        }
+
+        override fun setA11yMode(a11yMode: Int) {
+            runCatching { originalSystemUiController?.setA11yMode(a11yMode) }
+        }
+
+        override fun displayCsdWarning(csdWarning: Int, displayDurationMs: Int) {
+            runCatching { originalSystemUiController?.displayCsdWarning(csdWarning, displayDurationMs) }
+        }
     }
 
     fun canUseShizuku(): Boolean = try {
@@ -131,10 +160,39 @@ object VolumeSuppressor {
                 return false
             }
 
+            // Capture native Samsung SystemUI IVolumeController before replacing it
+            val getVolumeControllerMethod = iAudioServiceClass.methods.firstOrNull { it.name == "getVolumeController" }
+            var existingController = getVolumeControllerMethod?.invoke(audioService)
+            var binder = when (existingController) {
+                is IBinder -> existingController
+                is IVolumeController -> existingController.asBinder()
+                else -> null
+            }
+
+            if (binder == null || binder == silentController.asBinder()) {
+                // If SystemUI was not currently registered as controller, briefly reset and let SystemUI register
+                setVolumeControllerMethod.invoke(audioService, *arrayOf<Any?>(null))
+                runShizukuShell("am crash com.android.systemui; am force-stop com.android.systemui")
+                Thread.sleep(700L)
+                existingController = getVolumeControllerMethod?.invoke(audioService)
+                binder = when (existingController) {
+                    is IBinder -> existingController
+                    is IVolumeController -> existingController.asBinder()
+                    else -> null
+                }
+            }
+
+            if (binder != null && binder != silentController.asBinder()) {
+                originalSystemUiController = IVolumeController.Stub.asInterface(binder)
+                Log.i(TAG, "Successfully captured native Samsung SystemUI IVolumeController: $originalSystemUiController")
+            } else {
+                Log.w(TAG, "Could not capture native SystemUI controller, proceeding with silent proxy")
+            }
+
             setVolumeControllerMethod.invoke(audioService, silentController)
             isSuppressed = true
-            Log.i(TAG, "Successfully suppressed Samsung volume panel via Shizuku!")
-            toast(context, "Đã ẩn hoàn toàn thanh âm lượng mặc định Samsung ngoài màn hình!")
+            Log.i(TAG, "Successfully suppressed Samsung volume panel via Shizuku smart proxy!")
+            toast(context, "Đã ẩn thanh âm lượng mặc định Samsung & Giữ nguyên Trung tâm điều khiển!")
             true
         } catch (t: Throwable) {
             Diagnostics.w(TAG, "Failed to suppress volume panel via Shizuku", t)
@@ -164,7 +222,12 @@ object VolumeSuppressor {
                 val iAudioServiceClass = Class.forName("android.media.IAudioService")
                 val setVolumeControllerMethod = iAudioServiceClass.methods.firstOrNull { it.name == "setVolumeController" }
 
-                setVolumeControllerMethod?.invoke(audioService, *arrayOf<Any?>(null))
+                if (originalSystemUiController != null) {
+                    setVolumeControllerMethod?.invoke(audioService, originalSystemUiController)
+                } else {
+                    setVolumeControllerMethod?.invoke(audioService, *arrayOf<Any?>(null))
+                }
+                originalSystemUiController = null
             }
             // Crash/stop SystemUI so Android watchdog immediately restarts it fresh and re-registers stock VolumeDialog
             val cmd = "am crash com.android.systemui; am force-stop com.android.systemui"
