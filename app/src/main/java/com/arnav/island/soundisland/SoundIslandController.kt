@@ -82,12 +82,13 @@ class SoundIslandController(
         val now = System.currentTimeMillis()
         val elapsed = now - lastVolumePressTime
 
-        // Debounce rapid duplicate callbacks arriving within 35ms (e.g. both Proxy Controller and BroadcastReceiver)
+        // Debounce rapid duplicate callbacks arriving within 35ms
         if (elapsed < 35L) return
         lastVolumePressTime = now
 
-        if (!isShowing) {
-            // First press from hidden state: ALWAYS open in minimal stick mode!
+        val wasClosedOrClosing = !isShowing || view.slideSpring.target == 0f
+        if (wasClosedOrClosing) {
+            // First press from hidden or closing state: ALWAYS open in minimal stick mode!
             consecutivePressCount = 1
             handler.removeCallbacks(shrinkRunnable)
             view.expandSpring.snapTo(0f)
@@ -145,32 +146,16 @@ class SoundIslandController(
         }
     )
 
-    private fun connectVolumeSuppressor() {
-        VolumeSuppressor.onVolumeChangedCallback = { _, _ ->
-            val streamInfo = volumeManager.getStreamInfo(TARGET_STREAM)
-            handleVolumeTrigger(streamInfo.current, streamInfo.max, streamInfo.fraction)
-        }
-    }
-
     fun start() {
         if (settingsFn().soundIslandEnabled) {
             val s = settingsFn()
             overlay.updateEdge(s.soundIslandEdge)
             view.edge = s.soundIslandEdge
             volumeObserver.start()
-            connectVolumeSuppressor()
             updateOverlayVerticalPosition()
             if (VolumeSuppressor.canUseShizuku()) {
                 Thread {
-                    // Tell Android & Samsung One UI to always route volume keys to Media
-                    VolumeSuppressor.runShizukuShell(
-                        "settings put system volume_keys_control_media 1; settings put secure volume_keys_control_media 1"
-                    )
-                    if (s.soundIslandSuppressStock) {
-                        VolumeSuppressor.suppress(context)
-                    } else if (VolumeSuppressor.isSuppressed) {
-                        VolumeSuppressor.restore(context)
-                    }
+                    VolumeSuppressor.setupMediaKeyRouting(context)
                 }.start()
             }
         }
@@ -179,7 +164,6 @@ class SoundIslandController(
     fun stop() {
         handler.removeCallbacks(dismissRunnable)
         handler.removeCallbacks(shrinkRunnable)
-        VolumeSuppressor.onVolumeChangedCallback = null
         volumeObserver.stop()
         overlay.setTouchable(false)
         overlay.detach()
@@ -191,25 +175,14 @@ class SoundIslandController(
         view.edge = s.soundIslandEdge
         if (s.soundIslandEnabled) {
             volumeObserver.start()
-            connectVolumeSuppressor()
             updateOverlayVerticalPosition()
             if (VolumeSuppressor.canUseShizuku()) {
                 Thread {
-                    VolumeSuppressor.runShizukuShell(
-                        "settings put system volume_keys_control_media 1; settings put secure volume_keys_control_media 1"
-                    )
-                    if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed) {
-                        VolumeSuppressor.suppress(context)
-                    } else if (!s.soundIslandSuppressStock && VolumeSuppressor.isSuppressed) {
-                        VolumeSuppressor.restore(context)
-                    }
+                    VolumeSuppressor.setupMediaKeyRouting(context)
                 }.start()
             }
         } else {
             stop()
-            if (VolumeSuppressor.isSuppressed) {
-                Thread { VolumeSuppressor.restore(context) }.start()
-            }
         }
     }
 
@@ -265,8 +238,9 @@ class SoundIslandController(
         handler.removeCallbacks(shrinkRunnable)
         consecutivePressCount = 0
         view.setExpanded(false)
+        view.expandSpring.snapTo(0f)
         overlay.setTouchable(false)
-        view.updateState(currentVisualState().copy(slideProgress = 0f), animateSlide = true)
+        view.updateState(currentVisualState().copy(slideProgress = 0f, expandProgress = 0f), animateSlide = true)
     }
 
     fun dismissNow() {

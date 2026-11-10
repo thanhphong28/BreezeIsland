@@ -57,11 +57,7 @@ class VolumeKeyObserver(
                     if (direction != null) {
                         volumeManager.adjustVolume(AudioManager.STREAM_MUSIC, direction)
                     }
-                    // Restore previous volume on the non-music stream so ringtone is not inadvertently altered
-                    if (prevVolume >= 0 && newVolume >= 0 && newVolume != prevVolume) {
-                        volumeManager.setVolume(streamType, prevVolume)
-                    }
-                    // Fetch the updated STREAM_MUSIC info and notify onVolumeChanged immediately!
+                    // Immediately fetch updated STREAM_MUSIC info and notify onVolumeChanged!
                     val mediaInfo = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
                     onVolumeChanged(mediaInfo.current, mediaInfo.max, mediaInfo.fraction)
                 }

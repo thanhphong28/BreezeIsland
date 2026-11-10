@@ -37,12 +37,12 @@ class SoundIslandView(
     private val choreographer = Choreographer.getInstance()
 
     // Motion physics springs: Liquid Glass, smooth damped motion with bouncy launch
-    val slideLaunchSpec = SpringSpec(0.30f, 0.54f)
-    val slideRetractSpec = SpringSpec(0.22f, 0.92f)
+    val slideLaunchSpec = SpringSpec(0.28f, 0.52f)
+    val slideRetractSpec = SpringSpec(0.20f, 0.88f)
     val slideSpring = Spring(0f, slideLaunchSpec, restThreshold = 0.002f)
     val volumeSpring = Spring(0.5f, SpringSpec(0.18f, 0.80f), restThreshold = 0.001f)
-    val expandSpring = Spring(0f, SpringSpec(0.26f, 0.82f), restThreshold = 0.002f)
-    val ringerPopSpring = Spring(1f, SpringSpec(0.22f, 0.50f), restThreshold = 0.002f)
+    val expandSpring = Spring(0f, SpringSpec(0.24f, 0.80f), restThreshold = 0.002f)
+    val ringerPopSpring = Spring(1f, SpringSpec(0.20f, 0.46f), restThreshold = 0.002f)
 
     var visualState = SoundIslandVisualState()
         private set
@@ -91,9 +91,10 @@ class SoundIslandView(
                 if (wasClosed) {
                     slideSpring.snapTo(0f)
                     slideSpring.animateTo(1f, slideLaunchSpec)
-                    slideSpring.impulse(0.35f)
+                    slideSpring.impulse(2.4f)
                 } else {
                     slideSpring.animateTo(state.slideProgress, slideLaunchSpec)
+                    slideSpring.impulse(0.35f)
                 }
             } else {
                 slideSpring.animateTo(0f, slideRetractSpec)
@@ -152,7 +153,7 @@ class SoundIslandView(
             requestFrame()
         } else {
             lastFrameNanos = 0L
-            if (slideSpring.target == 0f && slideSpring.value <= 0.02f) {
+            if (slideSpring.target == 0f && slideSpring.value <= 0.04f) {
                 onDismissFinished()
             }
         }

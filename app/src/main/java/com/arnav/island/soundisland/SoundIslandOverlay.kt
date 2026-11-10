@@ -27,8 +27,8 @@ class SoundIslandOverlay(
     var edge: ScreenEdge = initialEdge
         private set
 
-    private val windowWidth = dp(96f).toInt()
-    private val windowHeight = dp(210f).toInt()
+    private val windowWidth = dp(110f).toInt()
+    private val windowHeight = dp(240f).toInt()
 
     private val params = WindowManager.LayoutParams(
         windowWidth,
