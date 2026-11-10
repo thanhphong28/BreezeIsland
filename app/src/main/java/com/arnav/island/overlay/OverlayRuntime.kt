@@ -136,6 +136,11 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         rebuildGeometry(immediate = true)
         applyRenderSettings()
         view.touchExtension = rc.geometry.touchExtension
+        view.onWindowFocusChangedCallback = { hasFocus ->
+            if (hasFocus && window.suppressingStatusBar) {
+                window.applyInsetsSuppression()
+            }
+        }
 
         // Start around the compact pill; the bounds policy takes over from the first frame.
         ensureWindowAttached()
@@ -315,11 +320,11 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         updateTilt()
     }
 
-    /** True while a banner or card is heading below the visible status bar (pill toasts don't). */
+    /** True while a banner, expanded card, or stack is covering the status bar header. */
     private fun coversStatusBar(): Boolean {
         val scene = view.scene
         val card = scene.state is IslandState.Toast || scene.state.isLarge
-        return card && (statusBarVisible.value || window.suppressingStatusBar) && scene.target.bottom > rc.geometry.statusBandBottom + rc.dp(8f)
+        return card && (statusBarVisible.value || window.suppressingStatusBar)
     }
 
     /** Synchronizes status bar ongoing-chip and seamless-card blacklists with the live island state. */
@@ -380,6 +385,11 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         val measurement = geometryEngine.measure()
         rc.geometry = geometryEngine.build(settings, measurement)
         view.touchExtension = rc.geometry.touchExtension
+        view.onWindowFocusChangedCallback = { hasFocus ->
+            if (hasFocus && window.suppressingStatusBar) {
+                window.applyInsetsSuppression()
+            }
+        }
         val g = rc.geometry
         graph.runtime.update {
             it.copy(

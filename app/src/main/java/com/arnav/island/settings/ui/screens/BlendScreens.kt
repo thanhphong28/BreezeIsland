@@ -79,6 +79,7 @@ import com.arnav.island.core.AppGraph
 import com.arnav.island.events.test.TestEvents
 import com.arnav.island.overlay.StatusBarCleanup
 import com.arnav.island.overlay.SystemPopups
+import com.arnav.island.permissions.OnPhoneGranter
 import com.arnav.island.permissions.Permissions
 import com.arnav.island.settings.ui.Dest
 import com.arnav.island.settings.ui.Ui
@@ -138,12 +139,34 @@ fun BlendScreen(s: IslandSettings, ui: Ui) {
                 footer = "Granting \"Modify system settings\" lets BreezeIsland automatically set One UI's status bar notification icons to None (simple_status_bar = 0). Turning off Now Bar → Media player removes One UI 9's duplicate [▷ Song] pill.",
             ) {
                 SettingRow(
+                    "Grant top-most header control (1 tap on phone)",
+                    if (granted) "Granted · Full header & status bar control active on phone" else "Tap to grant directly on your phone (via system switch or Shizuku)",
+                    Icons.Rounded.Layers,
+                    if (granted) BadgeColors.Green else BadgeColors.Indigo,
+                    onClick = {
+                        OnPhoneGranter.grantOnPhone(context) {
+                            granted = StatusBarCleanup.canWrite(context)
+                            writeSystem = StatusBarCleanup.canWriteSystem(context)
+                        }
+                    },
+                )
+                SettingRow(
                     "Modify system settings",
                     if (writeSystem) "Granted · One UI status bar notification icons hidden" else "Tap to grant directly on your phone",
                     Icons.Rounded.LockOpen,
                     if (writeSystem) BadgeColors.Green else BadgeColors.Blue,
                     onClick = { ui.open(Permissions.writeSettingsIntent(context)) },
                 )
+                if (!granted) {
+                    NavRow(
+                        "Open Shizuku on phone (optional 1-tap full mask)",
+                        "Activate WRITE_SECURE_SETTINGS on phone without a computer",
+                        Icons.Rounded.PhoneAndroid,
+                        BadgeColors.Cyan,
+                    ) {
+                        OnPhoneGranter.openOrInstallShizuku(context)
+                    }
+                }
                 NavRow(
                     "Turn off One UI 9 Live Media chip",
                     "Lock screen & AOD → Now bar → Live notifications → turn off Media player",

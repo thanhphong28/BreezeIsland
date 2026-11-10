@@ -62,6 +62,13 @@ data class GeometryConfig(
     val cornerRoundness: Float = 1f,
     val touchExtensionDp: Float = 14f,
     val edgeMarginDp: Float = 10f,
+    /**
+     * When true, buds the Split island droplet to the LEFT of the main pill (into the open space
+     * between the clock and the camera) instead of the right (where One UI places Work Profile,
+     * Mute, Wi-Fi, Signal and Battery icons), and keeps the compact pill's right edge inside the
+     * clean header corridor.
+     */
+    val splitBubbleOnLeft: Boolean = false,
 )
 
 /** A rounded shape on screen, in pixels. */
@@ -123,6 +130,8 @@ class IslandGeometry(
 
     val compactWidth: Float = if (config.compactWidthDp > 0f) {
         dp(config.compactWidthDp)
+    } else if (config.splitBubbleOnLeft) {
+        (screen.widthPx * 0.355f).coerceIn(dp(126f), dp(136f))
     } else {
         (screen.widthPx * 0.40f).coerceIn(dp(144f), dp(176f))
     }.coerceIn(holeRadius * 2f + dp(48f), maxWidth)
@@ -170,7 +179,17 @@ class IslandGeometry(
         IdleStyle.HIDDEN -> ShapeFrame(anchorX, cameraY, 0f, 0f, 0f)
     }
 
-    fun compactFrame(widthPx: Float = compactWidth): ShapeFrame = placed(widthPx, compactHeight)
+    fun compactFrame(widthPx: Float = compactWidth): ShapeFrame {
+        val frame = placed(widthPx, compactHeight)
+        if (!config.splitBubbleOnLeft || config.compactWidthDp > 0f || !screen.isPortrait) return frame
+        // Keep the right edge of the compact pill clear of One UI's right-side system icon cluster (🏢 🔇 🛜 📶 🔋).
+        val maxRight = (anchorX + dp(58f)).coerceAtMost(screen.widthPx * 0.66f)
+        val overflowRight = frame.right - maxRight
+        if (overflowRight <= 0f) return frame
+        val minCenterX = (anchorX - frame.width / 2f + holeRadius + dp(28f))
+        val shiftedCx = (frame.centerX - overflowRight).coerceAtLeast(minCenterX)
+        return frame.copy(centerX = shiftedCx)
+    }
 
     fun frameFor(widthPx: Float, heightPx: Float): ShapeFrame = placed(widthPx, heightPx)
 
@@ -180,15 +199,27 @@ class IslandGeometry(
         val gap = dp(SPLIT_GAP_DP)
         val mainWidth = max(compactWidth * 0.8f, holeRadius * 2f + dp(64f))
         val main = placed(mainWidth, compactHeight)
+        if (config.splitBubbleOnLeft && screen.isPortrait) {
+            var bubbleCenter = main.left - gap - bubble / 2f
+            val minCenter = max(edgeMargin + bubble / 2f, screen.widthPx * 0.14f + bubble / 2f)
+            if (bubbleCenter < minCenter) bubbleCenter = minCenter
+            return main to ShapeFrame(bubbleCenter, main.top, bubble, bubble, bubble / 2f)
+        }
         var bubbleCenter = main.right + gap + bubble / 2f
         val overflow = bubbleCenter + bubble / 2f - (screen.widthPx - edgeMargin)
         if (overflow > 0f) bubbleCenter -= overflow
         return main to ShapeFrame(bubbleCenter, main.top, bubble, bubble, bubble / 2f)
     }
 
-    /** Where the main pill's right cap starts in split mode, used by the liquid "bud" effect. */
-    fun splitBudOrigin(main: ShapeFrame): ShapeFrame =
-        ShapeFrame(main.right - main.height / 2f, main.top, main.height * 0.6f, main.height * 0.6f, main.height * 0.3f)
+    /** Where the main pill's cap starts in split mode, used by the liquid "bud" effect. */
+    fun splitBudOrigin(main: ShapeFrame): ShapeFrame {
+        val budX = if (config.splitBubbleOnLeft && screen.isPortrait) {
+            main.left + main.height / 2f
+        } else {
+            main.right - main.height / 2f
+        }
+        return ShapeFrame(budX, main.top, main.height * 0.6f, main.height * 0.6f, main.height * 0.3f)
+    }
 
     /** Touchable area for a shape: its bounds plus the configurable extension below it. */
     fun touchRect(frame: ShapeFrame): RectPx = RectPx(

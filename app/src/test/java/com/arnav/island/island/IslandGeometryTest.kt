@@ -75,6 +75,17 @@ class IslandGeometryTest {
     }
 
     @Test
+    fun `one ui corridor mode keeps split bubble on left and right edge clear of header cluster`() {
+        val g = geometry(GeometryConfig(splitBubbleOnLeft = true))
+        val compact = g.compactFrame()
+        val (main, bubble) = g.splitFrames()
+        assertTrue(bubble.right < main.left)
+        assertTrue(bubble.left > screen.widthPx * 0.12f)
+        assertTrue(compact.right <= screen.widthPx * 0.665f)
+        assertTrue(main.right <= screen.widthPx * 0.665f)
+    }
+
+    @Test
     fun `touch rect extends below the island`() {
         val g = geometry(GeometryConfig(touchExtensionDp = 20f))
         val c = g.compactFrame()

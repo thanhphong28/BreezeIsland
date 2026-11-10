@@ -57,16 +57,12 @@ Direct APK links from the [**Releases**](https://github.com/thanhphong28/BreezeI
 
 ---
 
-## 🛠 Optional One-Time ADB Setup for Full Status Bar Control
+## 📱 100% On-Phone Permission Setup (Zero PC Required)
 
-While **Modify system settings** can be granted directly on your phone without a computer, granting `WRITE_SECURE_SETTINGS` once via ADB (or by double-clicking `CaiDat_ZFlip5.bat`) lets BreezeIsland also hide the clock, battery, and One UI heads-up pop-ups automatically when a card opens:
-
-```bash
-adb shell pm grant com.breeze.island android.permission.WRITE_SECURE_SETTINGS
-adb shell appops set com.breeze.island SYSTEM_ALERT_WINDOW allow
-adb shell appops set com.breeze.island WRITE_SETTINGS allow
-adb shell cmd notification allow_listener com.breeze.island/com.arnav.island.events.notification.IslandNotificationListener
-```
+Everything in **BreezeIsland** is designed to be granted directly on your Galaxy Z Flip 5 without a computer:
+1. Open **BreezeIsland → Đồng bộ One UI 9 (Blend with One UI)**.
+2. Tap **Cấp quyền đè lên trên thanh trạng thái (1 chạm trên ĐT)** (*Grant top-most header control*) to grant `Modify system settings` (`WRITE_SETTINGS`) and/or 1-tap on-phone `Shizuku` (`WRITE_SECURE_SETTINGS`) directly on your phone screen.
+3. BreezeIsland automatically places the Compact & Split Island inside the clean header corridor (budding the Split droplet to the left of the camera, away from One UI's right-side Work Profile / Mute / Wi-Fi cluster) and uses focus-synchronized `WindowInsetsController.hide(statusBars())` + `FLAG_ALT_FOCUSABLE_IM` to cover the entire header when expanded.
 
 ---
 

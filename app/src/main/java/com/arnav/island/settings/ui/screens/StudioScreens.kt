@@ -654,10 +654,12 @@ fun CommandRow(context: Context, command: String) {
 @Composable
 fun StatusBarScreen(s: IslandSettings, ui: Ui) {
     val context = LocalContext.current
+    var granted by remember { mutableStateOf(StatusBarCleanup.canWrite(context)) }
     var writeSystem by remember { mutableStateOf(StatusBarCleanup.canWriteSystem(context)) }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        granted = StatusBarCleanup.canWrite(context)
         writeSystem = StatusBarCleanup.canWriteSystem(context)
-        if (writeSystem) StatusBarCleanup.sync(context, s)
+        if (writeSystem || granted) StatusBarCleanup.sync(context, s)
         onPauseOrDispose { }
     }
     val selected = remember(s.statusBarIcons) { s.statusBarIcons.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet() }
@@ -671,9 +673,21 @@ fun StatusBarScreen(s: IslandSettings, ui: Ui) {
                 color = BadgeColors.Blue,
             )
         }
-        if (!writeSystem) {
-            item {
-                Group(title = "Permission") {
+        item {
+            Group(title = "Permission") {
+                SettingRow(
+                    "Grant top-most header control (1 tap on phone)",
+                    if (granted) "Granted · Full header & status bar control active on phone" else "Tap to grant directly on your phone (via system switch or Shizuku)",
+                    Icons.Rounded.Layers,
+                    if (granted) BadgeColors.Green else BadgeColors.Indigo,
+                    onClick = {
+                        com.arnav.island.permissions.OnPhoneGranter.grantOnPhone(context) {
+                            granted = StatusBarCleanup.canWrite(context)
+                            writeSystem = StatusBarCleanup.canWriteSystem(context)
+                        }
+                    },
+                )
+                if (!writeSystem) {
                     SettingRow(
                         "Modify system settings",
                         "Tap to grant directly on your phone",

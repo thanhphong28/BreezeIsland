@@ -52,6 +52,7 @@ class IslandView(
 
     val scene = IslandScene(rc)
     var host: Host? = null
+    var onWindowFocusChangedCallback: ((Boolean) -> Unit)? = null
 
     /** Extra touchable depth below compact shapes (see GeometryConfig.touchExtensionDp). */
     var touchExtension = 0f
@@ -174,6 +175,11 @@ class IslandView(
         super.onAttachedToWindow()
         lastFrameNanos = 0L
         requestFrame()
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        onWindowFocusChangedCallback?.invoke(hasWindowFocus)
     }
 
     override fun onDetachedFromWindow() {

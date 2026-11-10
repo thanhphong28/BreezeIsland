@@ -77,6 +77,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.arnav.island.BuildConfig
 import com.arnav.island.R
 import com.arnav.island.overlay.IslandOverlayService
+import com.arnav.island.permissions.OnPhoneGranter
 import com.arnav.island.permissions.PermissionSnapshot
 import com.arnav.island.permissions.Permissions
 import com.arnav.island.settings.ui.Dest
@@ -216,15 +217,15 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
                 )
             }
         }
-        if (!permissions.writeSettings && !permissions.writeSecureSettings) {
+        if (!permissions.writeSettings || !permissions.writeSecureSettings) {
             item {
                 InfoCard(
                     title = "Prevent One UI status bar overlap",
                     body = "Allow \"Modify system settings\" to automatically hide redundant One UI status bar notification icons, and disable One UI 9's duplicate Media Live Notification chip.",
                     icon = Icons.Rounded.VisibilityOff,
                     color = BadgeColors.Blue,
-                    actionLabel = "Modify settings",
-                    onAction = { ui.open(Permissions.writeSettingsIntent(context)) },
+                    actionLabel = "Grant on phone (1 tap)",
+                    onAction = { OnPhoneGranter.grantOnPhone(context) },
                     secondaryLabel = "One UI Blend",
                     onSecondary = { ui.go(Dest.BLEND) },
                 )

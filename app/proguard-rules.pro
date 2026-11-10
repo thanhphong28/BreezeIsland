@@ -4,3 +4,6 @@
 # Keep line numbers so crash traces from personal release builds stay readable.
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+-keep class rikka.shizuku.** { *; }
+-dontwarn rikka.shizuku.**

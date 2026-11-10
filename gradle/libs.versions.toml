@@ -9,6 +9,7 @@ lifecycle = "2.11.0"
 datastore = "1.2.1"
 coroutines = "1.10.2"
 zxing = "3.5.3"
+shizuku = "13.1.5"
 
 junit = "4.13.2"
 
@@ -31,6 +32,8 @@ androidx-compose-material-icons-extended = { group = "androidx.compose.material"
 
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+shizuku-api = { group = "dev.rikka.shizuku", name = "api", version.ref = "shizuku" }
+shizuku-provider = { group = "dev.rikka.shizuku", name = "provider", version.ref = "shizuku" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 

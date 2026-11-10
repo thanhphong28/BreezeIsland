@@ -232,7 +232,7 @@ data class IslandSettings(
         const val BACKUP_NONE = "<none>"
     }
 
-    fun geometryConfig() = GeometryConfig(
+    fun geometryConfig(splitBubbleOnLeft: Boolean = true) = GeometryConfig(
         offsetXPx = offsetXPx,
         offsetYPx = offsetYPx,
         cameraPaddingDp = cameraPaddingDp,
@@ -244,6 +244,7 @@ data class IslandSettings(
         expandedMaxWidthDp = expandedMaxWidthDp,
         cornerRoundness = cornerRoundness,
         touchExtensionDp = touchExtensionDp,
+        splitBubbleOnLeft = splitBubbleOnLeft,
     )
 
     /**
