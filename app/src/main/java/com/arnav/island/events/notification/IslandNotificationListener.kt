@@ -33,8 +33,10 @@ class IslandNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        // Explicitly clear all listener hints so all notification sounds, vibrations,
+        // and call ringtones always play normally on the device without any delay or silencing.
         runCatching {
-            requestListenerHints(HINT_HOST_DISABLE_NOTIFICATION_EFFECTS or HINT_HOST_DISABLE_CALL_EFFECTS)
+            requestListenerHints(0)
         }
         registerWakeReceiver()
         ensureOverlayRunning()

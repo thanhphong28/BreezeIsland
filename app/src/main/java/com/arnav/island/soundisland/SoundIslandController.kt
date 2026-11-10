@@ -158,15 +158,16 @@ class SoundIslandController(
             lastObservedStreamVolumes[android.media.AudioManager.STREAM_SYSTEM] = it.getStreamVolume(android.media.AudioManager.STREAM_SYSTEM)
         }
 
-        VolumeSuppressor.onVolumeChangedCallback = { streamType, _ ->
+        VolumeSuppressor.onVolumeChangedCallback = { streamType, flags ->
             if (!isInternalAdjustment) {
+                val hasShowUi = (flags and android.media.AudioManager.FLAG_SHOW_UI) != 0
+
                 if (streamType == TARGET_STREAM) {
                     val streamInfo = volumeManager.getStreamInfo(TARGET_STREAM)
                     handleVolumeTrigger(streamInfo.current, streamInfo.max, streamInfo.fraction)
-                } else {
-                    // When no music is playing, Samsung One UI routes hardware volume buttons to Ring/Notification.
-                    // We detect the button direction (Raise vs Lower), route it to Media (STREAM_MUSIC),
-                    // and restore the Ring volume without triggering recursive callbacks!
+                } else if (hasShowUi && streamType == android.media.AudioManager.STREAM_RING) {
+                    // Only redirect if this was a physical volume button press modifying STREAM_RING (when no music is playing).
+                    // NEVER intercept or modify STREAM_NOTIFICATION, so Messenger/Zalo chimes are 100% untouched!
                     val currentVol = audio?.getStreamVolume(streamType) ?: -1
                     val prevVol = lastObservedStreamVolumes[streamType] ?: currentVol
                     lastObservedStreamVolumes[streamType] = currentVol

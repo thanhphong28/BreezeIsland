@@ -76,6 +76,7 @@ class NotificationProcessor(
 
     fun attach(service: NotificationListenerService) {
         listener = service
+        runCatching { service.requestListenerHints(0) }
     }
 
     fun detach() {

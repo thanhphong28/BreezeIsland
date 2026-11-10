@@ -45,10 +45,10 @@ class VolumeKeyObserver(
                     ((resolvedVolume - streamInfo.min).toFloat() / (streamInfo.max - streamInfo.min)).coerceIn(0f, 1f)
                 } else 0f
                 onVolumeChanged(resolvedVolume, streamInfo.max, frac)
-            } else {
+            } else if (streamType == AudioManager.STREAM_RING) {
                 // When no music is playing, Samsung's default hardware key routing may fall back to
-                // Ring/Notification/System. We redirect this hardware key step to STREAM_MUSIC (Media)
-                // just like iOS, and immediately trigger the visual island HUD!
+                // STREAM_RING. We redirect this hardware key step to STREAM_MUSIC (Media)
+                // just like iOS. STREAM_NOTIFICATION is intentionally ignored so notification chimes are untouched!
                 val now = System.currentTimeMillis()
                 if (now - lastRedirectTime > 90L) {
                     lastRedirectTime = now
