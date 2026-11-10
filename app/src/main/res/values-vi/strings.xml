@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BreezeIsland</string>
+    <string name="overlay_service_label">Lớp phủ BreezeIsland</string>
+    <string name="notification_listener_label">BreezeIsland (Nhạc &amp; Thông báo)</string>
+    <string name="tile_island_label">BreezeIsland</string>
+    <string name="tile_timer_label">Hẹn giờ BreezeIsland</string>
+
+    <string name="channel_service_name">Dịch vụ BreezeIsland</string>
+    <string name="channel_service_desc">Giữ cho lớp phủ Dynamic Island luôn hoạt động quanh camera</string>
+    <string name="service_notification_title">BreezeIsland đang hoạt động</string>
+    <string name="service_notification_text">Chạm để mở cài đặt Dynamic Island</string>
+    <string name="service_action_pause">Tạm dừng</string>
+
+    <string name="channel_timer_name">Hẹn giờ</string>
+    <string name="channel_timer_desc">Chuông báo khi bộ hẹn giờ trên BreezeIsland kết thúc</string>
+    <string name="timer_done_title">Đã hết giờ hẹn</string>
+    <string name="timer_action_add_minute">+1 phút</string>
+    <string name="timer_action_stop">Dừng</string>
+
+    <string name="api_permission_label">Hiển thị hoạt động trực tiếp trên BreezeIsland</string>
+    <string name="api_permission_description">Cho phép ứng dụng này hiển thị và cập nhật hoạt động trực tiếp trên BreezeIsland.</string>
+</resources>

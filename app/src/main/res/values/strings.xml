@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BreezeIsland</string>
+    <string name="overlay_service_label">BreezeIsland overlay</string>
+    <string name="notification_listener_label">BreezeIsland live activities</string>
+    <string name="tile_island_label">BreezeIsland</string>
+    <string name="tile_timer_label">BreezeIsland timer</string>
+
+    <string name="channel_service_name">BreezeIsland service</string>
+    <string name="channel_service_desc">Keeps the BreezeIsland Dynamic Island overlay active</string>
+    <string name="service_notification_title">BreezeIsland is active</string>
+    <string name="service_notification_text">Tap to configure your Dynamic Island</string>
+    <string name="service_action_pause">Pause</string>
+
+    <string name="channel_timer_name">Timers</string>
+    <string name="channel_timer_desc">Alerts when a BreezeIsland timer finishes</string>
+    <string name="timer_done_title">Timer finished</string>
+    <string name="timer_action_add_minute">+1 min</string>
+    <string name="timer_action_stop">Stop</string>
+
+    <string name="api_permission_label">Show live activities in BreezeIsland</string>
+    <string name="api_permission_description">Allows this app to post and update custom live activities on BreezeIsland.</string>
+</resources>
