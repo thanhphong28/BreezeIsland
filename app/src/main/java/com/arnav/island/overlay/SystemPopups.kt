@@ -34,6 +34,15 @@ object SystemPopups {
     fun sync(context: Context, s: IslandSettings, islandShowing: Boolean): IslandSettings? {
         val suppress = s.replaceSystemPopups && islandShowing && s.enabled && s.notificationsEnabled
 
+        // Privileged Shizuku path: toggle heads_up_notifications_enabled without killing notification sound/vibration!
+        if (com.arnav.island.soundisland.audio.VolumeSuppressor.canUseShizuku()) {
+            Thread {
+                com.arnav.island.soundisland.audio.VolumeSuppressor.runShizukuShell(
+                    "settings put global $KEY ${if (suppress) 0 else 1}"
+                )
+            }.start()
+        }
+
         // Phone-grantable Settings.System path (No Root / No ADB required)
         if (StatusBarCleanup.canWriteSystem(context)) {
             val cr = context.contentResolver

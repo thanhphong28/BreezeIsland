@@ -715,36 +715,13 @@ class NotificationProcessor(
     }
 
     /**
-     * Suppresses the duplicate One UI system notification banner without Root or ADB by immediately
-     * absorbing/cancelling the system notification once BreezeIsland has captured its content, icons,
-     * and PendingIntent actions into the Dynamic Island.
+     * Prevents duplicate system pop-ups safely without cancelling or destroying the system notification.
+     * We MUST NEVER call cancelNotification() or snoozeNotification() here, as doing so immediately
+     * commands Android's NotificationManager to abort the notification's ringtone sound and vibration!
      */
     private fun absorbSystemNotification(sbn: StatusBarNotification) {
-        val svc = listener ?: return
-        val key = sbn.key
-        absorbedKeys.add(key)
-        try {
-            if (sbn.isClearable) {
-                svc.cancelNotification(key)
-            } else {
-                svc.snoozeNotification(key, settings().notificationDurationMs.coerceAtLeast(5_000L))
-            }
-            // Also dismiss any group summary banner for the same group so One UI doesn't pop up an empty summary.
-            val groupKey = sbn.groupKey
-            if (groupKey != null) {
-                svc.activeNotifications?.forEach { other ->
-                    if (other.packageName == sbn.packageName &&
-                        other.groupKey == groupKey &&
-                        other.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0 &&
-                        other.isClearable
-                    ) {
-                        absorbedKeys.add(other.key)
-                        svc.cancelNotification(other.key)
-                    }
-                }
-            }
-        } catch (_: Exception) {
-        }
+        // Preserved empty: System heads-up pop-up banners are managed cleanly via
+        // SystemPopups (heads_up_notifications_enabled = 0), allowing full native sound & vibration!
     }
 
     private fun shouldSuppressMediaChip(s: IslandSettings, selectedSlots: Set<String>): Boolean =
