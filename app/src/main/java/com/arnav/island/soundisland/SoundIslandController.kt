@@ -77,26 +77,24 @@ class SoundIslandController(
         consecutivePressCount = 1
     }
 
-    private fun handleVolumeTrigger(newVol: Int? = null, maxVol: Int? = null, frac: Float? = null) {
+    private fun handleVolumeTrigger(newVol: Int, maxVol: Int, frac: Float) {
         if (!settingsFn().soundIslandEnabled) return
         val now = System.currentTimeMillis()
         val elapsed = now - lastVolumePressTime
         lastVolumePressTime = now
 
-        // Debounce duplicate broadcasts/IPC callbacks delivered within 60ms
-        val isDuplicate = isShowing && elapsed < 60L
-
         if (!isShowing) {
-            // First open: ALWAYS start fresh in stick (compact) mode
+            // First press from hidden state: ALWAYS open in minimal stick mode!
             consecutivePressCount = 1
             handler.removeCallbacks(shrinkRunnable)
             view.expandSpring.snapTo(0f)
             view.setExpanded(false)
-        } else if (!isDuplicate) {
-            val isHoldingKey = elapsed in 60L..240L
+        } else {
+            // Holding button (repeat rate ~150-200ms) or rapid consecutive clicks (<600ms)
+            val isHoldingKey = elapsed in 60L..250L
             if (elapsed in 60L..600L) {
                 consecutivePressCount++
-            } else {
+            } else if (elapsed > 600L) {
                 consecutivePressCount = 1
             }
 
@@ -105,18 +103,18 @@ class SoundIslandController(
             handler.removeCallbacks(shrinkRunnable)
             if (shouldExpand) {
                 view.setExpanded(true)
-                handler.postDelayed(shrinkRunnable, 1200L)
+                // Auto-shrink back to stick after 1.5s of no button presses (iOS behavior)
+                handler.postDelayed(shrinkRunnable, 1500L)
             }
         }
 
         handler.post {
-            val info = volumeManager.getStreamInfo(TARGET_STREAM)
             show(
                 mode = SoundIslandMode.VOLUME,
                 streamType = TARGET_STREAM,
-                volume = newVol ?: info.current,
-                maxVolume = maxVol ?: info.max,
-                fraction = frac ?: info.fraction,
+                volume = newVol,
+                maxVolume = maxVol,
+                fraction = frac,
             )
         }
     }
@@ -126,10 +124,9 @@ class SoundIslandController(
     }
 
     private fun connectVolumeSuppressor() {
-        VolumeSuppressor.onVolumeChangedCallback = { _, _ ->
-            val info = volumeManager.getStreamInfo(TARGET_STREAM)
-            handleVolumeTrigger(info.current, info.max, info.fraction)
-        }
+        // Intentionally keep onVolumeChangedCallback null: BroadcastReceiver is our
+        // single, atomic source of truth with verified volume indexes.
+        VolumeSuppressor.onVolumeChangedCallback = null
     }
 
     fun start() {
@@ -140,8 +137,14 @@ class SoundIslandController(
             volumeObserver.start()
             connectVolumeSuppressor()
             updateOverlayVerticalPosition()
-            if (s.soundIslandSuppressStock && VolumeSuppressor.canUseShizuku()) {
-                Thread { VolumeSuppressor.suppress(context) }.start()
+            if (VolumeSuppressor.canUseShizuku()) {
+                Thread {
+                    // Tell Android & Samsung One UI to always route volume keys to Media
+                    VolumeSuppressor.runShizukuShell("settings put secure volume_keys_control_media 1")
+                    if (s.soundIslandSuppressStock) {
+                        VolumeSuppressor.suppress(context)
+                    }
+                }.start()
             }
         }
     }

@@ -175,7 +175,7 @@ object VolumeSuppressor {
         }
     }
 
-    private fun runShizukuShell(command: String): Boolean = try {
+    fun runShizukuShell(command: String): Boolean = try {
         val method = Shizuku::class.java.getDeclaredMethod(
             "newProcess",
             Array<String>::class.java,

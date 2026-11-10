@@ -22,6 +22,7 @@ class VolumeKeyObserver(
 ) {
 
     private var registered = false
+    private var lastRedirectTime = 0L
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -38,24 +39,14 @@ class VolumeKeyObserver(
                 val resolvedVolume = if (newVolume >= 0) newVolume else streamInfo.current
                 onVolumeChanged(resolvedVolume, streamInfo.max, streamInfo.fraction)
             } else {
-                // When system routes keys to Ringtone/Notification instead of Media,
-                // redirect hardware button intent to STREAM_MUSIC as requested by user.
-                if (prevVolume != -1 && newVolume != -1) {
-                    val direction = when {
-                        newVolume > prevVolume -> AudioManager.ADJUST_RAISE
-                        newVolume < prevVolume -> AudioManager.ADJUST_LOWER
-                        else -> 0
-                    }
-                    if (direction != 0) {
-                        volumeManager.adjustVolume(AudioManager.STREAM_MUSIC, direction)
-                        // Preserve original ringer volume so it remains unaffected
-                        try {
-                            volumeManager.setVolume(streamType, prevVolume)
-                        } catch (_: Exception) {}
-                    }
+                // When system routes keys to Ring/Notification instead of Media:
+                // Safely redirect hardware key step to STREAM_MUSIC without infinite feedback loops.
+                val now = System.currentTimeMillis()
+                if (now - lastRedirectTime > 180L && prevVolume != -1 && newVolume != -1 && newVolume != prevVolume) {
+                    lastRedirectTime = now
+                    val direction = if (newVolume > prevVolume) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+                    volumeManager.adjustVolume(AudioManager.STREAM_MUSIC, direction)
                 }
-                val mediaInfo = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
-                onVolumeChanged(mediaInfo.current, mediaInfo.max, mediaInfo.fraction)
             }
         }
     }
