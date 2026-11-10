@@ -12,11 +12,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.DoNotDisturb
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material.icons.rounded.Work
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
@@ -49,7 +47,6 @@ import com.arnav.island.storage.IslandSettings
 @Composable
 fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui) {
     val context = LocalContext.current
-    val hasDnd = Permissions.hasDndAccess(context)
     val hasShizuku = VolumeSuppressor.canUseShizuku()
 
     SettingsPage(
@@ -152,11 +149,8 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                     SoundTestChip("Volume Mode", Icons.AutoMirrored.Rounded.VolumeUp) {
                         IslandOverlayService.activeSoundIsland?.showTestVolume()
                     }
-                    SoundTestChip("Silent Mode", Icons.Rounded.NotificationsOff) {
-                        IslandOverlayService.activeSoundIsland?.showTestSilent()
-                    }
-                    SoundTestChip("Work Mode", Icons.Rounded.Work) {
-                        IslandOverlayService.activeSoundIsland?.showTestWork()
+                    SoundTestChip("Ringer Mode", Icons.Rounded.NotificationsOff) {
+                        IslandOverlayService.activeSoundIsland?.showTestRinger()
                     }
                     SoundTestChip("Dismiss", Icons.Rounded.Close) {
                         IslandOverlayService.activeSoundIsland?.hide()
@@ -204,7 +198,7 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
         item {
             InfoCard(
                 title = "Smart Fluid Gestures",
-                body = "• Single press: Appears as a sleek ultra-thin Stick.\n• Hold button or touch slider: Expands into full tactile capsule.\n• Drag Up / Down: Adjusts volume level smoothly.\n• Swipe Inward (Horizontal): Switches seamlessly between Volume, Silent, and Work modes.\n• Tap in Silent Mode: Cycles Ring ↔ Vibrate ↔ Mute.",
+                body = "• Single press: Appears as a sleek ultra-thin Stick.\n• Press > 3 times or hold volume key: Expands into full tactile capsule.\n• Hold touch for ~150ms then drag: Expands and adjusts volume smoothly.\n• Tap on volume bar: Opens Ringer mode instantly without changing volume.\n• Tap in Ringer Mode: Cycles Ring ↔ Vibrate ↔ Mute with bouncy icon animations.\n• Swipe Inward (Horizontal): Switches between Volume and Ringer modes.",
                 icon = Icons.Rounded.Tune,
                 color = BadgeColors.Indigo,
             )
@@ -217,44 +211,6 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                 icon = Icons.Rounded.Tune,
                 color = BadgeColors.Blue,
             )
-        }
-
-        item {
-            Group(title = "Work & Focus Profile") {
-                SwitchRow(
-                    title = "Enable Do Not Disturb (DND)",
-                    subtitle = "Automatically toggle system Do Not Disturb mode when Work profile is active",
-                    checked = settings.soundIslandWorkDnd,
-                    icon = Icons.Rounded.DoNotDisturb,
-                    iconColor = BadgeColors.Indigo,
-                    onCheckedChange = { dnd ->
-                        if (dnd && !hasDnd) {
-                            ui.open(Permissions.dndPolicySettings())
-                        }
-                        ui.update { it.copy(soundIslandWorkDnd = dnd) }
-                    },
-                )
-                if (settings.soundIslandWorkDnd && !hasDnd) {
-                    SettingRow(
-                        title = "Grant DND Policy Access",
-                        subtitle = "Required for BreezeIsland to manage Do Not Disturb state",
-                        icon = Icons.Rounded.Security,
-                        iconColor = BadgeColors.Red,
-                        onClick = { ui.open(Permissions.dndPolicySettings()) },
-                    )
-                }
-                SliderRow(
-                    title = "Work Media Volume",
-                    value = settings.soundIslandWorkMediaVol.toFloat(),
-                    range = 0f..100f,
-                    steps = 19,
-                    onValueChange = { vol ->
-                        ui.update { it.copy(soundIslandWorkMediaVol = vol.toInt()) }
-                    },
-                    format = { "${it.toInt()}%" },
-                    subtitle = "Set ambient music or podcast volume level for focus time",
-                )
-            }
         }
 
         item {

@@ -18,8 +18,7 @@ class SoundIslandView(
     context: Context,
     initialEdge: ScreenEdge = ScreenEdge.RIGHT,
     val onVolumeDrag: (fraction: Float) -> Unit,
-    val onSilentTap: () -> Unit,
-    val onWorkTap: () -> Unit,
+    val onRingerTap: () -> Unit,
     val onModeSwitch: (SoundIslandMode) -> Unit,
     val onUserInteracted: () -> Unit,
     val onDismissRequested: () -> Unit,
@@ -38,9 +37,10 @@ class SoundIslandView(
     private val choreographer = Choreographer.getInstance()
 
     // Motion physics springs: Liquid Glass, smooth damped motion
-    val slideSpring = Spring(0f, SpringSpec(0.44f, 0.82f), restThreshold = 0.002f)
-    val volumeSpring = Spring(0.5f, SpringSpec(0.24f, 0.90f), restThreshold = 0.001f)
-    val expandSpring = Spring(0f, SpringSpec(0.32f, 0.84f), restThreshold = 0.002f)
+    val slideSpring = Spring(0f, SpringSpec(0.36f, 0.82f), restThreshold = 0.002f)
+    val volumeSpring = Spring(0.5f, SpringSpec(0.20f, 0.86f), restThreshold = 0.001f)
+    val expandSpring = Spring(0f, SpringSpec(0.28f, 0.82f), restThreshold = 0.002f)
+    val ringerPopSpring = Spring(1f, SpringSpec(0.22f, 0.50f), restThreshold = 0.002f)
 
     var visualState = SoundIslandVisualState()
         private set
@@ -54,8 +54,19 @@ class SoundIslandView(
     private var trackingTouch = false
     private var downX = 0f
     private var downY = 0f
+    private var downTime = 0L
+    private var isLongPressOrDrag = false
     private var lastReportedLevel = -1
     private var modeSwitchTriggered = false
+
+    private val longPressRunnable = Runnable {
+        if (!trackingTouch) return@Runnable
+        isLongPressOrDrag = true
+        if (visualState.mode == SoundIslandMode.VOLUME) {
+            setExpanded(true)
+            performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        }
+    }
 
     init {
         isHapticFeedbackEnabled = true
@@ -63,19 +74,37 @@ class SoundIslandView(
     }
 
     fun updateState(state: SoundIslandVisualState, animateSlide: Boolean = true) {
-        visualState = state
-        volumeSpring.animateTo(state.volumeFraction)
+        // If not attached yet or slide spring was at rest 0, snap volume immediately so it doesn't jump
+        if (!isAttachedToWindow || (slideSpring.target == 0f && slideSpring.value <= 0.02f)) {
+            volumeSpring.snapTo(state.volumeFraction)
+        } else {
+            volumeSpring.animateTo(state.volumeFraction)
+        }
+
         expandSpring.animateTo(state.expandProgress)
         if (animateSlide) {
             slideSpring.animateTo(state.slideProgress)
         } else {
             slideSpring.snapTo(state.slideProgress)
         }
+
+        visualState = state.copy(
+            volumeFraction = volumeSpring.value,
+            slideProgress = slideSpring.value,
+            expandProgress = expandSpring.value,
+            ringerPopScale = ringerPopSpring.value,
+        )
         requestFrame()
     }
 
     fun setExpanded(expanded: Boolean) {
         expandSpring.animateTo(if (expanded) 1f else 0f)
+        requestFrame()
+    }
+
+    fun triggerRingerPop() {
+        ringerPopSpring.snapTo(0.72f)
+        ringerPopSpring.animateTo(1f)
         requestFrame()
     }
 
@@ -94,11 +123,13 @@ class SoundIslandView(
         if (slideSpring.step(dt)) moving = true
         if (volumeSpring.step(dt)) moving = true
         if (expandSpring.step(dt)) moving = true
+        if (ringerPopSpring.step(dt)) moving = true
 
         visualState = visualState.copy(
             slideProgress = slideSpring.value,
             volumeFraction = volumeSpring.value,
             expandProgress = expandSpring.value,
+            ringerPopScale = ringerPopSpring.value,
         )
 
         invalidate()
@@ -118,6 +149,7 @@ class SoundIslandView(
         val w = width.toFloat()
         val h = height.toFloat()
         val centerY = h / 2f
+
         renderer.draw(
             canvas = canvas,
             state = visualState,
@@ -138,6 +170,10 @@ class SoundIslandView(
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
+                downTime = System.currentTimeMillis()
+                isLongPressOrDrag = false
+                currentGesture = GestureDirection.NONE
+                modeSwitchTriggered = false
 
                 // If user tapped outside the active notch boundary, dismiss immediately
                 val notchW = renderer.dp(if (visualState.mode == SoundIslandMode.VOLUME) 32f + 44f * expandSpring.value else 56f)
@@ -152,16 +188,11 @@ class SoundIslandView(
                 }
 
                 trackingTouch = true
-                currentGesture = GestureDirection.NONE
-                modeSwitchTriggered = false
                 onUserInteracted()
 
-                if (visualState.mode == SoundIslandMode.VOLUME) {
-                    // Instantly expand to full tactile capsule when user touches with finger
-                    expandSpring.animateTo(1f)
-                    requestFrame()
-                    handleVolumeTouch(event.y)
-                }
+                // Schedule long press check (160ms): holding triggers expansion to full capsule
+                removeCallbacks(longPressRunnable)
+                postDelayed(longPressRunnable, 160L)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
@@ -170,40 +201,45 @@ class SoundIslandView(
 
                 val dx = event.x - downX
                 val dy = event.y - downY
+                val absDx = abs(dx)
+                val absDy = abs(dy)
 
                 // Classify gesture direction if not yet decided
                 if (currentGesture == GestureDirection.NONE) {
-                    val absDx = abs(dx)
-                    val absDy = abs(dy)
                     if (absDy > absDx + renderer.dp(4f) && absDy > renderer.dp(6f)) {
                         currentGesture = GestureDirection.VERTICAL_VOLUME
+                        isLongPressOrDrag = true
+                        removeCallbacks(longPressRunnable)
+                        if (visualState.mode == SoundIslandMode.VOLUME) {
+                            setExpanded(true)
+                        }
                     } else if (absDx > absDy + renderer.dp(6f) && absDx > renderer.dp(8f)) {
                         currentGesture = GestureDirection.HORIZONTAL_SWIPE
+                        removeCallbacks(longPressRunnable)
                     }
                 }
 
                 when (currentGesture) {
                     GestureDirection.VERTICAL_VOLUME -> {
-                        // Strict vertical volume drag: NEVER triggers mode change
+                        // Strict vertical volume drag: only active when user holds and drags
                         if (visualState.mode == SoundIslandMode.VOLUME) {
                             handleVolumeTouch(event.y)
                         }
                     }
                     GestureDirection.HORIZONTAL_SWIPE -> {
-                        // Horizontal swipe: used exclusively for mode switching or dismissal
+                        // Horizontal swipe: switch between VOLUME <-> RINGER or dismiss
                         val isSwipeTowardsCenter = if (edge == ScreenEdge.RIGHT) dx < -renderer.dp(24f) else dx > renderer.dp(24f)
                         val isSwipeTowardsBezel = if (edge == ScreenEdge.RIGHT) dx > renderer.dp(20f) else dx < -renderer.dp(20f)
 
                         if (isSwipeTowardsCenter && !modeSwitchTriggered) {
                             modeSwitchTriggered = true
-                            downX = event.x // Reset origin to prevent multiple fires
+                            downX = event.x
                             performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
 
-                            // Cycle modes: VOLUME -> SILENT -> WORK -> VOLUME
-                            val nextMode = when (visualState.mode) {
-                                SoundIslandMode.VOLUME -> SoundIslandMode.SILENT
-                                SoundIslandMode.SILENT -> SoundIslandMode.WORK
-                                SoundIslandMode.WORK -> SoundIslandMode.VOLUME
+                            val nextMode = if (visualState.mode == SoundIslandMode.VOLUME) {
+                                SoundIslandMode.RINGER
+                            } else {
+                                SoundIslandMode.VOLUME
                             }
                             onModeSwitch(nextMode)
                         } else if (isSwipeTowardsBezel) {
@@ -212,44 +248,41 @@ class SoundIslandView(
                         }
                     }
                     GestureDirection.NONE -> {
-                        // In between thresholds, keep updating volume if in volume mode
-                        if (visualState.mode == SoundIslandMode.VOLUME) {
-                            handleVolumeTouch(event.y)
-                        }
+                        // Still holding in place
                     }
                 }
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                removeCallbacks(longPressRunnable)
                 if (!trackingTouch) return false
                 trackingTouch = false
 
-                val dx = event.x - downX
-                val dy = event.y - downY
+                val elapsed = System.currentTimeMillis() - downTime
+                val dx = abs(event.x - downX)
+                val dy = abs(event.y - downY)
+                val isSingleTap = !isLongPressOrDrag && currentGesture == GestureDirection.NONE && dx < renderer.dp(12f) && dy < renderer.dp(12f) && elapsed < 350L
 
-                // Tap detection: minimal movement
-                if (abs(dx) < renderer.dp(12f) && abs(dy) < renderer.dp(12f)) {
-                    when (visualState.mode) {
-                        SoundIslandMode.VOLUME -> {
-                            // Tap on volume: toggle expand
-                            val targetExp = if (expandSpring.target > 0.5f) 0f else 1f
-                            expandSpring.animateTo(targetExp)
-                            requestFrame()
-                        }
-                        SoundIslandMode.SILENT -> {
-                            onSilentTap()
-                            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                        }
-                        SoundIslandMode.WORK -> {
-                            onWorkTap()
-                            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                        }
+                if (isSingleTap) {
+                    // Tap rule from user:
+                    // 1. Tapping on volume does NOT change volume; it opens Ringer mode!
+                    // 2. Tapping on ringer switches the ringer state with pop animation!
+                    if (visualState.mode == SoundIslandMode.VOLUME) {
+                        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        onModeSwitch(SoundIslandMode.RINGER)
+                    } else {
+                        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        triggerRingerPop()
+                        onRingerTap()
                     }
                 }
+
                 currentGesture = GestureDirection.NONE
+                onUserInteracted()
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                removeCallbacks(longPressRunnable)
                 trackingTouch = false
                 currentGesture = GestureDirection.NONE
                 return true
@@ -282,6 +315,7 @@ class SoundIslandView(
     }
 
     override fun onDetachedFromWindow() {
+        removeCallbacks(longPressRunnable)
         choreographer.removeFrameCallback(this)
         frameScheduled = false
         super.onDetachedFromWindow()

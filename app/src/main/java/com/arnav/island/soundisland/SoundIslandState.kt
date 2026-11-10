@@ -4,8 +4,7 @@ import com.arnav.island.soundisland.audio.SilentModeManager
 
 enum class SoundIslandMode {
     VOLUME,
-    SILENT,
-    WORK,
+    RINGER,
 }
 
 data class SoundIslandVisualState(
@@ -14,9 +13,8 @@ data class SoundIslandVisualState(
     val currentVolume: Int = 8,
     val maxVolume: Int = 15,
     val streamType: Int = 3, // STREAM_MUSIC
-    val silentMode: SilentModeManager.Mode = SilentModeManager.Mode.SOUND,
-    val workActive: Boolean = false,
-    val dndActive: Boolean = false,
+    val ringerMode: SilentModeManager.Mode = SilentModeManager.Mode.SOUND,
     val slideProgress: Float = 0f, // 0 = tucked into bezel, 1 = fully out
     val expandProgress: Float = 0f, // 0 = thin stick, 1 = full expanded capsule
+    val ringerPopScale: Float = 1f, // Scale factor for ringer icon bounce animation
 )

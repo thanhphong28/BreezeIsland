@@ -9,13 +9,15 @@ import com.arnav.island.soundisland.audio.VolumeKeyObserver
 import com.arnav.island.soundisland.audio.VolumeManager
 import com.arnav.island.soundisland.audio.VolumeSuppressor
 import com.arnav.island.soundisland.render.ScreenEdge
-import com.arnav.island.soundisland.work.WorkProfileConfig
-import com.arnav.island.soundisland.work.WorkProfileManager
 import com.arnav.island.storage.IslandSettings
 
 /**
  * Main coordinator for Breeze Sound Island.
- * Connects audio and focus state changes with the Liquid Glass edge overlay.
+ * Connects hardware volume buttons and ringer state with the Liquid Glass edge overlay.
+ *
+ * Dedicated strictly to 2 clean modes:
+ *  1. VOLUME: Vertical sleek stick, morphing to tactile capsule on >3 presses or hold/drag.
+ *  2. RINGER: Pure icon-only ringer switcher (Ring ↔ Vibrate ↔ Mute).
  */
 class SoundIslandController(
     private val context: Context,
@@ -25,41 +27,29 @@ class SoundIslandController(
     private val handler = Handler(Looper.getMainLooper())
     val volumeManager = VolumeManager(context)
     val silentManager = SilentModeManager(context)
-    val workManager = WorkProfileManager(context, volumeManager)
+
+    private var lastStreamType = AudioManager.STREAM_MUSIC
+    private var lastVolumePressTime = 0L
+    private var consecutivePressCount = 0
+    private var isShowing = false
 
     private val view: SoundIslandView = SoundIslandView(
         context = context,
         initialEdge = settingsFn().soundIslandEdge,
         onVolumeDrag = { frac ->
-            val info = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
+            val sType = lastStreamType
+            val info = volumeManager.getStreamInfo(sType)
             val newLevel = (frac * info.max).toInt()
-            volumeObserver.recordVolume(AudioManager.STREAM_MUSIC, newLevel)
-            volumeManager.setVolumeFraction(AudioManager.STREAM_MUSIC, frac)
+            volumeObserver.recordVolume(sType, newLevel)
+            volumeManager.setVolumeFraction(sType, frac)
             scheduleAutoDismiss()
         },
-        onSilentTap = {
+        onRingerTap = {
             val newMode = silentManager.toggleNext()
             updateVisualState(
                 currentVisualState().copy(
-                    mode = SoundIslandMode.SILENT,
-                    silentMode = newMode,
-                )
-            )
-            scheduleAutoDismiss()
-        },
-        onWorkTap = {
-            val config = WorkProfileConfig(
-                enableDnd = settingsFn().soundIslandWorkDnd,
-                mediaVolumePercent = settingsFn().soundIslandWorkMediaVol,
-                ringVolumePercent = 0,
-                notificationVolumePercent = 0,
-            )
-            val active = workManager.toggle(config)
-            updateVisualState(
-                currentVisualState().copy(
-                    mode = SoundIslandMode.WORK,
-                    workActive = active,
-                    dndActive = workManager.isDndActive(),
+                    mode = SoundIslandMode.RINGER,
+                    ringerMode = newMode,
                 )
             )
             scheduleAutoDismiss()
@@ -81,20 +71,29 @@ class SoundIslandController(
 
     private var dismissRunnable = Runnable { dismiss() }
     private var shrinkRunnable = Runnable { view.setExpanded(false) }
-    private var lastVolumePressTime = 0L
-    private var isShowing = false
 
     private fun handleVolumeTrigger(streamType: Int, newVol: Int? = null, maxVol: Int? = null, frac: Float? = null) {
         if (!settingsFn().soundIslandEnabled) return
         val now = System.currentTimeMillis()
-        val isConsecutiveOrHold = (now - lastVolumePressTime) < 420L
+        val elapsed = now - lastVolumePressTime
         lastVolumePressTime = now
+
+        // Check if user is holding button (<240ms repeat) or clicking consecutively (<500ms)
+        val isHoldingKey = elapsed in 1L..240L
+        if (elapsed < 500L) {
+            consecutivePressCount++
+        } else {
+            consecutivePressCount = 1
+        }
+
+        // Rule from user: Only expand to capsule when pressed > 3 times or held down
+        val shouldExpand = consecutivePressCount >= 3 || isHoldingKey
 
         handler.post {
             handler.removeCallbacks(shrinkRunnable)
-            if (isConsecutiveOrHold) {
+            if (shouldExpand) {
                 view.setExpanded(true)
-                handler.postDelayed(shrinkRunnable, 1100L)
+                handler.postDelayed(shrinkRunnable, 1200L)
             }
             val info = volumeManager.getStreamInfo(streamType)
             show(
@@ -113,7 +112,8 @@ class SoundIslandController(
 
     private fun connectVolumeSuppressor() {
         VolumeSuppressor.onVolumeChangedCallback = { streamType, _ ->
-            handleVolumeTrigger(streamType)
+            val info = volumeManager.getStreamInfo(streamType)
+            handleVolumeTrigger(streamType, info.current, info.max, info.fraction)
         }
     }
 
@@ -163,7 +163,7 @@ class SoundIslandController(
 
     fun show(
         mode: SoundIslandMode = SoundIslandMode.VOLUME,
-        streamType: Int = AudioManager.STREAM_MUSIC,
+        streamType: Int = lastStreamType,
         volume: Int? = null,
         maxVolume: Int? = null,
         fraction: Float? = null,
@@ -171,6 +171,7 @@ class SoundIslandController(
     ) {
         val s = settingsFn()
         if (!force && !s.soundIslandEnabled) return
+        lastStreamType = streamType
 
         val info = volumeManager.getStreamInfo(streamType)
         val curVol = volume ?: info.current
@@ -183,9 +184,7 @@ class SoundIslandController(
             currentVolume = curVol,
             maxVolume = maxVol,
             streamType = streamType,
-            silentMode = silentManager.currentMode(),
-            workActive = workManager.isActive,
-            dndActive = workManager.isDndActive(),
+            ringerMode = silentManager.currentMode(),
             slideProgress = 1f,
             expandProgress = if (mode != SoundIslandMode.VOLUME) 1f else view.expandSpring.target,
         )
@@ -203,20 +202,17 @@ class SoundIslandController(
     }
 
     fun showTestVolume() {
-        view.setExpanded(true)
         show(SoundIslandMode.VOLUME, force = true)
-        handler.removeCallbacks(shrinkRunnable)
-        handler.postDelayed(shrinkRunnable, 1400L)
     }
-    fun showTestSilent() = show(SoundIslandMode.SILENT, force = true)
-    fun showTestWork() = show(SoundIslandMode.WORK, force = true)
+
+    fun showTestRinger() = show(SoundIslandMode.RINGER, force = true)
+
     fun hide() = dismissNow()
 
     fun dismiss() {
         if (!isShowing) return
         handler.removeCallbacks(shrinkRunnable)
         view.setExpanded(false)
-        // Instantly disable touch input so any taps or swipes immediately pass through
         overlay.setTouchable(false)
         view.updateState(currentVisualState().copy(slideProgress = 0f), animateSlide = true)
     }
