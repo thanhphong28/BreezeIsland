@@ -44,6 +44,7 @@ object StatusBarCleanup {
     val ICONS: Map<String, String> = linkedMapOf(
         "ongoing_activity" to "One UI Live Notification / Media chip",
         "ongoing_call_chip" to "One UI ongoing call chip",
+        "flashlight" to "One UI Flashlight / Now Bar chip",
         "managed_profile" to "Work Profile / Secure Folder",
         "alarm_clock" to "Alarm",
         "volume" to "Sound / vibrate",
@@ -52,8 +53,8 @@ object StatusBarCleanup {
         "headset" to "Headset",
     )
 
-    /** Only One UI duplicate ongoing chips (e.g. Samsung media pill or call chip) */
-    private val ACTIVE_ISLAND_SLOTS = listOf(
+    /** Only One UI duplicate ongoing chips (e.g. Samsung media pill, flashlight chip, or call chip) */
+    val ACTIVE_ISLAND_SLOTS = listOf(
         "ongoing_activity",
         "ongoing_activity_chip",
         "sec_ongoing_activity",
@@ -61,6 +62,12 @@ object StatusBarCleanup {
         "media_ongoing",
         "live_notification",
         "chip",
+        "flashlight",
+        "torch",
+        "sec_flashlight",
+        "sec_torch",
+        "now_bar",
+        "sec_now_bar",
     )
 
     private val SPLIT_RIGHT_SLOTS = ACTIVE_ISLAND_SLOTS

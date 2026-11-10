@@ -91,7 +91,14 @@ class NotificationProcessor(
         val n = sbn.notification ?: return
         val selectedSlots = parseCsv(s.statusBarIcons)
         if (isMedia(n)) {
-            if (shouldSuppressMediaChip(s, selectedSlots)) {
+            // NEVER snooze or cancel media notifications:
+            // Media notifications must remain fully active in the system notification shade
+            // and Quick Settings media player so the user can control playback from the panel.
+            // Duplicate status bar media pills on One UI are cleanly handled via icon_blacklist.
+            return
+        }
+        if (isFlashlightNotification(sbn)) {
+            if (s.torchEnabled) {
                 suppressStatusBarChip(sbn)
             }
             return
@@ -127,9 +134,17 @@ class NotificationProcessor(
         for (sbn in active) {
             if (sbn.packageName == context.packageName) continue
             val n = sbn.notification ?: continue
-            if (isMedia(n) && shouldSuppressMediaChip(s, selectedSlots)) {
-                suppressStatusBarChip(sbn)
-            } else if (s.statusBarCleanup && matchesStatusBarSlot(sbn, selectedSlots)) {
+            if (isMedia(n)) {
+                // Keep media notifications active for the notification panel and Quick Settings player
+                continue
+            }
+            if (isFlashlightNotification(sbn)) {
+                if (s.torchEnabled) {
+                    suppressStatusBarChip(sbn)
+                }
+                continue
+            }
+            if (s.statusBarCleanup && matchesStatusBarSlot(sbn, selectedSlots)) {
                 suppressStatusBarChip(sbn)
             }
         }
@@ -778,7 +793,30 @@ class NotificationProcessor(
         if ("headset" in selectedSlots && (channel.contains("headset") || channel.contains("usb_audio") || tag.contains("headset"))) return true
         if ("nfc" in selectedSlots && (pkg.contains("nfc") || channel.contains("nfc") || tag.contains("nfc"))) return true
         if ("alarm_clock" in selectedSlots && n.fullScreenIntent == null && (pkg.contains("clock") || channel.contains("alarm_upcoming") || tag.contains("upcoming_alarm"))) return true
+        if (("flashlight" in selectedSlots || "torch" in selectedSlots) && isFlashlightNotification(sbn)) return true
         return false
+    }
+
+    fun isFlashlightNotification(sbn: StatusBarNotification): Boolean {
+        val pkg = sbn.packageName.lowercase()
+        val isSystemPkg = pkg == "android" ||
+            pkg.startsWith("com.android.") ||
+            pkg.startsWith("com.samsung.") ||
+            pkg.startsWith("com.sec.") ||
+            pkg.startsWith("com.qualcomm.")
+        if (!isSystemPkg) return false
+        val n = sbn.notification ?: return false
+        val channel = n.channelId.orEmpty().lowercase()
+        val tag = sbn.tag.orEmpty().lowercase()
+        val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.lowercase().orEmpty()
+        val text = n.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.lowercase().orEmpty()
+        val subText = n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.lowercase().orEmpty()
+        val actions = n.actions.orEmpty().mapNotNull { it.title?.toString()?.lowercase() }.joinToString(" ")
+        val meta = "$channel $tag $title $text $subText $actions"
+        return meta.contains("flashlight") ||
+            meta.contains("torch") ||
+            meta.contains("đèn pin") ||
+            meta.contains("đèn flash")
     }
 
     private fun parseCsv(csv: String): Set<String> =

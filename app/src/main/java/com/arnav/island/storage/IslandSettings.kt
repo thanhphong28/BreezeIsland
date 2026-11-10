@@ -222,7 +222,7 @@ data class IslandSettings(
 
     // Status bar cleanup (WRITE_SECURE_SETTINGS + WRITE_SETTINGS on One UI)
     val statusBarCleanup: Boolean = true,
-    val statusBarIcons: String = "ongoing_activity,ongoing_activity_chip,sec_ongoing_activity,ongoing_call_chip,ongoing_privacy_chip,media_ongoing,live_notification,alarm_clock,volume,zen,rotate,headset,bluetooth,hotspot",
+    val statusBarIcons: String = "ongoing_activity,ongoing_activity_chip,sec_ongoing_activity,ongoing_call_chip,ongoing_privacy_chip,media_ongoing,live_notification,flashlight,torch,sec_flashlight,now_bar,alarm_clock,volume,zen,rotate,headset,bluetooth,hotspot",
     val statusBarBackup: String = BACKUP_NONE,
 
     // Breeze Sound Island (Liquid Glass Edge Volume & Focus Island)

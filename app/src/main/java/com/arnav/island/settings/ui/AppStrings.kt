@@ -735,6 +735,7 @@ private val DICT: Map<String, String> = mapOf(
     "Before uninstalling Island, turn this off. If you forget, `adb shell settings delete secure icon_blacklist` brings every icon back." to "Trước khi gỡ cài đặt ứng dụng, hãy tắt mục này để khôi phục mọi icon thanh trạng thái.",
     "One UI Live Notification / Media chip" to "Chip thông báo trực tiếp / Nhạc One UI 9",
     "One UI ongoing call chip" to "Chip cuộc gọi đang diễn ra One UI",
+    "One UI Flashlight / Now Bar chip" to "Chip Đèn pin / Now Bar One UI",
     "Alarm" to "Báo thức",
     "Sound / vibrate" to "Âm thanh / Rung",
     "Headset" to "Tai nghe",
