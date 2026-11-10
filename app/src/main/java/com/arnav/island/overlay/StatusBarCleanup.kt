@@ -173,6 +173,12 @@ object StatusBarCleanup {
                 Settings.System.putInt(cr, "status_bar_show_notification_icon", targetShowIcon)
             }
         }
+        runCatching {
+            val targetNotifCount = if (shouldClean) 0 else 1
+            if (Settings.System.getInt(cr, "status_bar_notif_count", -1) != targetNotifCount) {
+                Settings.System.putInt(cr, "status_bar_notif_count", targetNotifCount)
+            }
+        }
     }
 
     private fun put(context: Context, value: String) {

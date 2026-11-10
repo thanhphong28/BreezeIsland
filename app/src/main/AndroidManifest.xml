@@ -100,6 +100,7 @@
             android:name=".overlay.IslandOverlayService"
             android:enabled="true"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="specialUse"
             android:label="@string/overlay_service_label">
             <property
@@ -140,12 +141,15 @@
         </service>
 
         <receiver
-            android:name=".boot.BootReceiver"
+            android:name=".overlay.BootReceiver"
+            android:directBootAware="true"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>

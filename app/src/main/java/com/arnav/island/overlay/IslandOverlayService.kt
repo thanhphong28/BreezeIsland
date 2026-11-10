@@ -46,13 +46,33 @@ class IslandOverlayService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startInForeground()
         if (intent?.action == ACTION_PAUSE) {
             val graph = (application as IslandApp).graph
             graph.scope.launch { graph.settings.update { it.copy(enabled = false) } }
             stopSelf()
             return START_NOT_STICKY
         }
+        if (!Settings.canDrawOverlays(this)) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        val activeRuntime = runtime
+        if (activeRuntime == null) {
+            runtime = OverlayRuntime(this, (application as IslandApp).graph).also { it.start() }
+            _running.value = true
+        } else {
+            activeRuntime.ensureAlive()
+        }
         return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        val graph = (application as? IslandApp)?.graph ?: return
+        if (graph.settings.state.value.enabled && Settings.canDrawOverlays(this)) {
+            start(this)
+        }
     }
 
     override fun onDestroy() {
@@ -138,7 +158,11 @@ class IslandOverlayService : Service() {
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED -> Unit
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_LOCKED_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            "android.intent.action.QUICKBOOT_POWERON",
+            "com.htc.intent.action.QUICKBOOT_POWERON" -> Unit
             else -> return
         }
         val pending = goAsync()

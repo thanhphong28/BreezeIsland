@@ -90,6 +90,7 @@ data class IslandSettings(
     val cornerRoundness: Float = 1f,
     val touchExtensionDp: Float = 18f,
     val showInLandscape: Boolean = false,
+    val showOnLockScreen: Boolean = true,
 
     // Motion
     val motionPreset: MotionPreset = MotionPreset.NATURAL,

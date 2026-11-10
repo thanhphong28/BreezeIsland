@@ -112,13 +112,13 @@ fun BlendScreen(s: IslandSettings, ui: Ui) {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(StatusBarCleanup.canWrite(context)) }
     var writeSystem by remember { mutableStateOf(StatusBarCleanup.canWriteSystem(context)) }
-    var popupsOn by remember { mutableIntStateOf(SystemPopups.current(context)) }
+    var notifAccess by remember { mutableStateOf(Permissions.hasNotificationAccess(context)) }
     var scale by remember { mutableStateOf(animationScale(context)) }
     LifecycleResumeEffect(Unit) {
         granted = StatusBarCleanup.canWrite(context)
         writeSystem = StatusBarCleanup.canWriteSystem(context)
+        notifAccess = Permissions.hasNotificationAccess(context)
         if (writeSystem) StatusBarCleanup.sync(context, s)
-        popupsOn = SystemPopups.current(context)
         scale = animationScale(context)
         onPauseOrDispose { }
     }
@@ -163,30 +163,37 @@ fun BlendScreen(s: IslandSettings, ui: Ui) {
             }
         }
         item {
-            if (granted) {
-                Group(title = "Advanced ADB integration") {
-                    SettingRow("Secure settings access", "Granted · Seamless status bar & pop-up replacement active", Icons.Rounded.LockOpen, BadgeColors.Green)
-                }
-            } else {
-                Group(title = "Optional: Full Seamless Status Bar (via ADB)", footer = "Run this once from a computer (or LADB / Shizuku) to let BreezeIsland also hide the clock, battery, and One UI heads-up pop-ups automatically.") {
-                    CommandRow(context, StatusBarCleanup.GRANT_COMMAND)
-                }
-            }
-        }
-        item {
             Group(title = "Status bar") {
-                SwitchRow("Seamless status bar", s.seamlessStatusBar && (granted || writeSystem), { v -> ui.update { it.copy(seamlessStatusBar = v) } },
+                SwitchRow(
+                    "Seamless status bar",
+                    s.seamlessStatusBar,
+                    { v ->
+                        ui.update { it.copy(seamlessStatusBar = v) }
+                        if (v && !writeSystem) ui.open(Permissions.writeSettingsIntent(context))
+                    },
                     "Hides conflicting status bar chips while the island is active, and clears the clock & icons while a card is open.",
-                    Icons.Rounded.Layers, BadgeColors.Indigo, enabled = granted || writeSystem)
+                    Icons.Rounded.Layers,
+                    BadgeColors.Indigo,
+                )
                 NavRow("Status bar cleanup", "Hide icons the island already shows", Icons.Rounded.VisibilityOff, BadgeColors.Graphite) { ui.go(Dest.STATUS_BAR) }
             }
         }
         item {
-            val footer = "Right now One UI pop-ups are ${if (popupsOn == 0) "off (BreezeIsland is showing them)" else "on"}. They come back by themselves whenever the island is hidden, the screen is locked or BreezeIsland stops."
+            val footer = "Right now One UI pop-ups are ${if (s.replaceSystemPopups && notifAccess) "off (BreezeIsland is showing them)" else "on"}. They come back by themselves whenever the island is hidden, the screen is locked or BreezeIsland stops."
             Group(title = "Notifications", footer = footer) {
-                SwitchRow("Replace One UI pop-ups", s.replaceSystemPopups && granted, { v -> ui.update { it.copy(replaceSystemPopups = v) } },
+                SwitchRow(
+                    "Replace One UI pop-ups",
+                    s.replaceSystemPopups,
+                    { v ->
+                        ui.update { it.copy(replaceSystemPopups = v) }
+                        if (v && !notifAccess) {
+                            ui.open(Permissions.notificationAccessSettings(context), Permissions.notificationAccessFallback())
+                        }
+                    },
                     "Each notification appears once, in the island, instead of twice",
-                    Icons.Rounded.NotificationsPaused, BadgeColors.Pink, enabled = granted)
+                    Icons.Rounded.NotificationsPaused,
+                    BadgeColors.Pink,
+                )
             }
         }
         item {
@@ -200,7 +207,7 @@ fun BlendScreen(s: IslandSettings, ui: Ui) {
         }
         item {
             Group(title = "Display tips") {
-                if (!s.replaceSystemPopups || !granted) {
+                if (!s.replaceSystemPopups) {
                     NavRow("Brief pop-ups", "Notifications → Notification pop-up style → Brief, so One UI's banner stays small", Icons.Rounded.Notifications, BadgeColors.Orange) {
                         ui.open(notificationSettings(), Intent(Settings.ACTION_SETTINGS))
                     }

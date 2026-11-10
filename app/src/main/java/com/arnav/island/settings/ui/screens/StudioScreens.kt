@@ -654,9 +654,10 @@ fun CommandRow(context: Context, command: String) {
 @Composable
 fun StatusBarScreen(s: IslandSettings, ui: Ui) {
     val context = LocalContext.current
-    var granted by remember { mutableStateOf(StatusBarCleanup.canWrite(context)) }
+    var writeSystem by remember { mutableStateOf(StatusBarCleanup.canWriteSystem(context)) }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
-        granted = StatusBarCleanup.canWrite(context)
+        writeSystem = StatusBarCleanup.canWriteSystem(context)
+        if (writeSystem) StatusBarCleanup.sync(context, s)
         onPauseOrDispose { }
     }
     val selected = remember(s.statusBarIcons) { s.statusBarIcons.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet() }
@@ -664,32 +665,53 @@ fun StatusBarScreen(s: IslandSettings, ui: Ui) {
     SettingsPage("Status bar cleanup", onBack = ui::back) {
         item {
             InfoCard(
-                title = "Experimental",
-                body = "Hides status bar icons the island already shows, using Android's own icon_blacklist setting (the one System UI Tuner uses). It needs a one-time permission granted from a computer; Island cannot grant it to itself. Your previous value is saved and restored when you turn this off.",
+                title = "Phone-only setup (No PC required)",
+                body = "Granting \"Modify system settings\" lets BreezeIsland automatically set One UI's status bar notification icons to None (simple_status_bar = 0). Turning off Now Bar → Media player removes One UI 9's duplicate [▷ Song] pill.",
                 icon = Icons.Rounded.VisibilityOff,
-                color = BadgeColors.Graphite,
+                color = BadgeColors.Blue,
             )
         }
-        if (!granted) {
+        if (!writeSystem) {
             item {
-                Group(title = "One-time setup", footer = "Connect the phone with USB debugging on, then run this once on the computer.") {
-                    CommandRow(context, StatusBarCleanup.GRANT_COMMAND)
+                Group(title = "Permission") {
+                    SettingRow(
+                        "Modify system settings",
+                        "Tap to grant directly on your phone",
+                        Icons.Rounded.VisibilityOff,
+                        BadgeColors.Blue,
+                        onClick = { com.arnav.island.permissions.Permissions.writeSettingsIntent(context).let(ui::open) },
+                    )
                 }
             }
         }
         item {
             Group {
-                SwitchRow("Hide redundant icons", s.statusBarCleanup && granted, { v -> ui.update { it.copy(statusBarCleanup = v) } },
-                    if (granted) "Applies immediately" else "Waiting for the permission above", Icons.Rounded.VisibilityOff, BadgeColors.Graphite, enabled = granted)
+                SwitchRow(
+                    "Hide redundant icons",
+                    s.statusBarCleanup,
+                    { v ->
+                        ui.update { it.copy(statusBarCleanup = v) }
+                        if (v && !writeSystem) {
+                            ui.open(com.arnav.island.permissions.Permissions.writeSettingsIntent(context))
+                        }
+                    },
+                    "Applies immediately",
+                    Icons.Rounded.VisibilityOff,
+                    BadgeColors.Graphite,
+                )
             }
         }
         item {
             Group(title = "Icons", footer = "Before uninstalling Island, turn this off. If you forget, `adb shell settings delete secure icon_blacklist` brings every icon back.") {
                 StatusBarCleanup.ICONS.forEach { (slot, label) ->
-                    SwitchRow(label, slot in selected, { on ->
-                        val next = if (on) selected + slot else selected - slot
-                        ui.update { it.copy(statusBarIcons = StatusBarCleanup.ICONS.keys.filter { k -> k in next }.joinToString(",")) }
-                    }, enabled = granted)
+                    SwitchRow(
+                        label,
+                        slot in selected,
+                        { on ->
+                            val next = if (on) selected + slot else selected - slot
+                            ui.update { it.copy(statusBarIcons = StatusBarCleanup.ICONS.keys.filter { k -> k in next }.joinToString(",")) }
+                        },
+                    )
                 }
             }
         }

@@ -754,4 +754,7 @@ private val DICT: Map<String, String> = mapOf(
     "New in 1.2" to "Tính năng bản 1.2",
     "Glance uses real device state. The reply test opens the real reply sheet; what you type goes nowhere." to "Xem nhanh (Glance) lấy dữ liệu thật của máy. Khung trả lời thử mở giao diện trả lời thật nhưng không gửi tin đi đâu.",
     "Test activities are labelled as tests. The real flashlight, calendar and deliveries appear by themselves." to "Các hoạt động thử được gắn nhãn thử nghiệm. Đèn pin, lịch họp và đơn giao hàng thật sẽ tự động xuất hiện.",
+    "Show on lock screen" to "Hiển thị ngay khi bật màn hình (Màn hình khóa)",
+    "Keep Dynamic Island visible immediately when waking the screen" to "Giữ Dynamic Island luôn hiển thị ngay lập tức khi vừa bật sáng màn hình hoặc mở gập máy",
+    "Permission" to "Quyền hạn",
 )

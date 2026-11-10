@@ -101,17 +101,22 @@ fun EventsScreen(s: IslandSettings, p: PermissionSnapshot, ui: Ui) {
         if (ok) ui.update { it.copy(screenshotPreview = true) }
     }
     fun granted(permission: String) = context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    fun ensureNotifAccess() {
+        if (!p.notificationAccess) {
+            ui.open(Permissions.notificationAccessSettings(context), Permissions.notificationAccessFallback())
+        }
+    }
     SettingsPage("Events", onBack = ui::back) {
         item {
             Group(title = "Live activities") {
-                SwitchRow("Media", s.mediaEnabled, { v -> ui.update { it.copy(mediaEnabled = v) } }, "Now playing from any media app", Icons.Rounded.MusicNote, BadgeColors.Pink, enabled = p.notificationAccess)
-                SwitchRow("Calls", s.callsEnabled, { v -> ui.update { it.copy(callsEnabled = v) } }, "Incoming and ongoing calls", Icons.Rounded.Call, BadgeColors.Green, enabled = p.notificationAccess)
+                SwitchRow("Media", s.mediaEnabled, { v -> ui.update { it.copy(mediaEnabled = v) }; if (v) ensureNotifAccess() }, "Now playing from any media app", Icons.Rounded.MusicNote, BadgeColors.Pink)
+                SwitchRow("Calls", s.callsEnabled, { v -> ui.update { it.copy(callsEnabled = v) }; if (v) ensureNotifAccess() }, "Incoming and ongoing calls", Icons.Rounded.Call, BadgeColors.Green)
                 SwitchRow("Timers", s.timersEnabled, { v -> ui.update { it.copy(timersEnabled = v) } }, null, Icons.Rounded.Timer, BadgeColors.Orange)
                 SwitchRow("Stopwatch", s.stopwatchEnabled, { v -> ui.update { it.copy(stopwatchEnabled = v) } }, null, Icons.Rounded.Timelapse, BadgeColors.Orange)
-                SwitchRow("Navigation", s.navigationEnabled, { v -> ui.update { it.copy(navigationEnabled = v) } }, "Turn-by-turn from navigation apps", Icons.Rounded.Navigation, BadgeColors.Blue, enabled = p.notificationAccess)
-                SwitchRow("Downloads & progress", s.progressEnabled, { v -> ui.update { it.copy(progressEnabled = v) } }, "Any notification that reports progress", Icons.Rounded.Download, BadgeColors.Cyan, enabled = p.notificationAccess)
-                SwitchRow("Deliveries & rides", s.liveUpdatesEnabled, { v -> ui.update { it.copy(liveUpdatesEnabled = v) } },
-                    "Swiggy, Zomato, Uber, Blinkit, Zepto and more, plus any app using Android 16 Live Updates", Icons.Rounded.DeliveryDining, BadgeColors.Orange, enabled = p.notificationAccess)
+                SwitchRow("Navigation", s.navigationEnabled, { v -> ui.update { it.copy(navigationEnabled = v) }; if (v) ensureNotifAccess() }, "Turn-by-turn from navigation apps", Icons.Rounded.Navigation, BadgeColors.Blue)
+                SwitchRow("Downloads & progress", s.progressEnabled, { v -> ui.update { it.copy(progressEnabled = v) }; if (v) ensureNotifAccess() }, "Any notification that reports progress", Icons.Rounded.Download, BadgeColors.Cyan)
+                SwitchRow("Deliveries & rides", s.liveUpdatesEnabled, { v -> ui.update { it.copy(liveUpdatesEnabled = v) }; if (v) ensureNotifAccess() },
+                    "Swiggy, Zomato, Uber, Blinkit, Zepto and more, plus any app using Android 16 Live Updates", Icons.Rounded.DeliveryDining, BadgeColors.Orange)
                 SwitchRow("Flashlight", s.torchEnabled, { v -> ui.update { it.copy(torchEnabled = v) } }, "Brightness slider while the torch is on", Icons.Rounded.FlashlightOn, BadgeColors.Yellow)
                 SwitchRow("Next meeting", s.calendarEnabled, { v ->
                     if (v && !granted(Manifest.permission.READ_CALENDAR)) calendarLauncher.launch(Manifest.permission.READ_CALENDAR)
@@ -121,12 +126,12 @@ fun EventsScreen(s: IslandSettings, p: PermissionSnapshot, ui: Ui) {
                     SliderRow("Show before", s.calendarLeadMinutes.toFloat(), 5f..60f, { v -> ui.update { it.copy(calendarLeadMinutes = v.toInt()) } }, { "${it.toInt()} min" }, steps = 10)
                 }
                 SwitchRow("Screen recording", s.screenRecordEnabled, { v -> ui.update { it.copy(screenRecordEnabled = v) } },
-                    if (Build.VERSION.SDK_INT >= 35) "Red recording indicator" else "Requires Android 15", Icons.Rounded.FiberManualRecord, BadgeColors.Red, enabled = Build.VERSION.SDK_INT >= 35)
+                    "Red recording indicator", Icons.Rounded.FiberManualRecord, BadgeColors.Red)
             }
         }
         item {
             Group(title = "Moments") {
-                SwitchRow("Notifications", s.notificationsEnabled, { v -> ui.update { it.copy(notificationsEnabled = v) } }, null, Icons.Rounded.Notifications, BadgeColors.Red, enabled = p.notificationAccess)
+                SwitchRow("Notifications", s.notificationsEnabled, { v -> ui.update { it.copy(notificationsEnabled = v) }; if (v) ensureNotifAccess() }, null, Icons.Rounded.Notifications, BadgeColors.Red)
                 SwitchRow("Charging", s.chargingEnabled, { v -> ui.update { it.copy(chargingEnabled = v) } }, null, Icons.Rounded.BatteryChargingFull, BadgeColors.Green)
                 SwitchRow("Battery alerts", s.batteryLowEnabled, { v -> ui.update { it.copy(batteryLowEnabled = v) } }, "Low battery and power saving", Icons.Rounded.BatteryAlert, BadgeColors.Yellow)
                 SwitchRow("Bluetooth", s.bluetoothEnabled, { v -> ui.update { it.copy(bluetoothEnabled = v) } }, null, Icons.Rounded.Bluetooth, BadgeColors.Blue)
@@ -225,6 +230,7 @@ fun NotificationsScreen(s: IslandSettings, p: PermissionSnapshot, ui: Ui) {
         item {
             Group(title = "Banners") {
                 SwitchRow("Show notifications", s.notificationsEnabled, { v -> ui.update { it.copy(notificationsEnabled = v) } }, "Only notifications Android would alert for (respects Do Not Disturb)", Icons.Rounded.Notifications, BadgeColors.Red)
+                SwitchRow("Replace One UI pop-ups", s.replaceSystemPopups, { v -> ui.update { it.copy(replaceSystemPopups = v) } }, "Each notification appears once, in the island, instead of twice", Icons.Rounded.NotificationsActive, BadgeColors.Pink)
                 SegmentedRow(NotificationStyle.entries, s.notificationStyle, { it.label }, { v -> ui.update { it.copy(notificationStyle = v) } }, title = "Style")
                 SliderRow("Duration", s.notificationDurationMs / 1000f, 2f..10f, { v -> ui.update { it.copy(notificationDurationMs = (v * 1000).toLong()) } }, { String.format(java.util.Locale.US, "%.1f s", it) })
             }
@@ -318,8 +324,28 @@ fun BluetoothScreen(s: IslandSettings, p: PermissionSnapshot, ui: Ui) {
         }
         item {
             Group(title = "Events") {
-                SwitchRow("Connection animations", s.bluetoothEnabled, { v -> ui.update { it.copy(bluetoothEnabled = v) } }, "Earbuds, headphones, speakers, watches and cars", Icons.Rounded.Bluetooth, BadgeColors.Blue, enabled = granted)
-                SwitchRow("All device types", s.bluetoothAllDevices, { v -> ui.update { it.copy(bluetoothAllDevices = v) } }, "Also keyboards, phones and computers", Icons.Rounded.Apps, BadgeColors.Graphite, enabled = granted && s.bluetoothEnabled)
+                SwitchRow(
+                    "Connection animations",
+                    s.bluetoothEnabled,
+                    { v ->
+                        if (v && !granted && Build.VERSION.SDK_INT >= 31) launcher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        else ui.update { it.copy(bluetoothEnabled = v) }
+                    },
+                    "Earbuds, headphones, speakers, watches and cars",
+                    Icons.Rounded.Bluetooth,
+                    BadgeColors.Blue,
+                )
+                SwitchRow(
+                    "All device types",
+                    s.bluetoothAllDevices,
+                    { v ->
+                        if (v && !granted && Build.VERSION.SDK_INT >= 31) launcher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        else ui.update { it.copy(bluetoothAllDevices = v) }
+                    },
+                    "Also keyboards, phones and computers",
+                    Icons.Rounded.Apps,
+                    BadgeColors.Graphite,
+                )
             }
         }
         item {
@@ -365,7 +391,7 @@ fun PrivacyScreen(s: IslandSettings, ui: Ui) {
         }
         item {
             Group(title = "Lock screen") {
-                SettingRow("Island hides while locked", "It never draws over AOD or the lock screen", Icons.Rounded.PhonelinkLock, BadgeColors.Graphite)
+                SwitchRow("Show on lock screen", s.showOnLockScreen, { v -> ui.update { it.copy(showOnLockScreen = v) } }, "Keep Dynamic Island visible immediately when waking the screen", Icons.Rounded.PhonelinkLock, BadgeColors.Blue)
                 NavRow("Per-app privacy", "Full, app name only or icon only", Icons.Rounded.Lock, BadgeColors.Yellow) { ui.go(Dest.APPS) }
                 NavRow("Permissions", "What Island is allowed to do", Icons.Rounded.Shield, BadgeColors.Green) { ui.go(Dest.ABOUT) }
             }

@@ -138,17 +138,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         view.touchExtension = rc.geometry.touchExtension
 
         // Start around the compact pill; the bounds policy takes over from the first frame.
-        val compact = rc.geometry.compactFrame()
-        val margin = rc.dp(8f)
-        window.attach(
-            Rect(
-                (compact.left - margin).toInt().coerceAtLeast(0),
-                0,
-                (compact.right + margin).toInt(),
-                (compact.bottom + rc.geometry.touchExtension + margin).toInt(),
-            )
-        )
-        windowRect.set(window.bounds)
+        ensureWindowAttached()
         probe.attach()
 
         controller.onBounds = ::onIslandBounds
@@ -212,16 +202,64 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
             }
         }
         scope.launch {
+            var wasInteractive = screen.state.value.interactive
             screen.state.collect { st ->
-                if (!st.interactive) view.pauseRendering()
-                if (st.usable) {
+                if (!st.interactive) {
+                    view.pauseRendering()
+                } else {
+                    if (!Settings.canDrawOverlays(service)) {
+                        service.stopSelf()
+                        return@collect
+                    }
+                    ensureWindowAttached()
+                    if (!wasInteractive) {
+                        rebuildGeometry(immediate = true)
+                        graph.media.refresh()
+                        battery.refresh()
+                        system.refresh()
+                    }
                     applyRenderSettings()
-                    if (!Settings.canDrawOverlays(service)) service.stopSelf()
+                    updateVisibility()
+                    view.resumeRendering()
                 }
+                wasInteractive = st.interactive
                 updateMonitors()
             }
         }
         graph.runtime.update { it.copy(serviceRunning = true, overlayAttached = window.attached) }
+    }
+
+    private fun ensureWindowAttached() {
+        if (window.attached && view.isAttachedToWindow) return
+        if (window.attached && !view.isAttachedToWindow) {
+            window.detach()
+        }
+        val compact = rc.geometry.compactFrame()
+        val margin = rc.dp(8f)
+        window.attach(
+            Rect(
+                (compact.left - margin).toInt().coerceAtLeast(0),
+                0,
+                (compact.right + margin).toInt(),
+                (compact.bottom + rc.geometry.touchExtension + margin).toInt(),
+            )
+        )
+        windowRect.set(window.bounds)
+        probe.attach()
+        graph.runtime.update { it.copy(overlayAttached = window.attached) }
+    }
+
+    /** Ensures the overlay window, media session state, and geometry are alive after screen wake. */
+    fun ensureAlive() {
+        ensureWindowAttached()
+        screen.refresh()
+        rebuildGeometry(immediate = true)
+        graph.media.refresh()
+        battery.refresh()
+        system.refresh()
+        applyRenderSettings()
+        updateVisibility()
+        view.resumeRendering()
     }
 
     fun stop() {
@@ -416,7 +454,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
 
         val reason = when {
             !st.interactive -> "Screen off"
-            st.locked -> "Locked"
+            st.locked && !settings.showOnLockScreen -> "Locked"
             !g.screen.isPortrait && !settings.showInLandscape -> "Landscape"
             calibrating -> null
             rule.visibility == AppVisibility.HIDDEN -> "Hidden in ${graph.apps.label(pkg!!)}"
@@ -429,12 +467,16 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         val minPriority = if (!calibrating && rule.visibility == AppVisibility.IMPORTANT_ONLY) EventPriority.TIMER else null
         val visible = reason == null
         val immediate = !st.interactive
-        if (visible) view.visibility = View.VISIBLE
+        if (visible) {
+            ensureWindowAttached()
+            view.visibility = View.VISIBLE
+        }
         rc.settings = rc.settings.copy(calibrationGuides = calibrating)
         controller.setVisibility(visible, minPriority, immediate)
         if (!visible && immediate) view.visibility = View.GONE
         hiddenReason = reason
         syncStatusBar()
+        if (visible) view.requestFrame()
         graph.runtime.update { it.copy(hiddenReason = reason, foregroundApp = pkg) }
     }
 
@@ -447,8 +489,11 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         val scene = view.scene
         if (settled) syncStatusBar()
         if (settled && scene.state == IslandState.Hidden && scene.isFullyHidden) {
-            view.visibility = View.GONE
+            if (hiddenReason != null) view.visibility = View.GONE
             return
+        }
+        if (hiddenReason == null && view.visibility != View.VISIBLE) {
+            view.visibility = View.VISIBLE
         }
         val marginX = rc.dp(10f) + bounds.width() * 0.05f
         val marginY = rc.dp(8f) + bounds.height() * 0.08f

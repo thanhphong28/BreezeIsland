@@ -46,6 +46,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+import java.util.Collections
+
 /**
  * Turns posted notifications into island events: calls, navigation, progress and regular
  * alerts. Notification content is kept in memory only for as long as the event is on screen.
@@ -60,6 +62,9 @@ class NotificationProcessor(
 ) {
     private var listener: NotificationListenerService? = null
     private val keyguard = context.getSystemService(KeyguardManager::class.java)
+
+    /** Keys cancelled/absorbed by BreezeIsland to prevent duplicate system pop-up banners. */
+    private val absorbedKeys: MutableSet<String> = Collections.synchronizedSet(HashSet())
 
     /** Content hash per notification key, to ignore silent re-posts (LRU, bounded). */
     private val seen = object : LinkedHashMap<String, Int>(64, 0.75f, true) {
@@ -104,6 +109,14 @@ class NotificationProcessor(
             engine.remove(progressId(key))
             val finished = last >= 0.97f && reason != NotificationListenerService.REASON_CANCEL && reason != NotificationListenerService.REASON_USER_STOPPED
             if (finished) postProgressDone(sbn)
+        }
+        // If BreezeIsland absorbed/cancelled the system notification to prevent duplicate One UI pop-ups,
+        // keep the notification alive inside the Dynamic Island for its full duration.
+        if (absorbedKeys.remove(key) ||
+            reason == NotificationListenerService.REASON_LISTENER_CANCEL ||
+            reason == NotificationListenerService.REASON_SNOOZED
+        ) {
+            return
         }
         // Read, cleared or withdrawn elsewhere: stop showing it (and drop any queued copy).
         engine.remove(alertId(key))
@@ -153,14 +166,19 @@ class NotificationProcessor(
     private fun handleAlert(sbn: StatusBarNotification, ranking: Ranking?, s: IslandSettings) {
         val n = sbn.notification
         if (n.flags and (Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE) != 0) return
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        val rule = s.ruleFor(sbn.packageName)
+        if (!rule.notifications) return
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
+            if (s.replaceSystemPopups && sbn.isClearable) {
+                absorbSystemNotification(sbn)
+            }
+            return
+        }
         if (ranking != null) {
             if (ranking.importance < NotificationManager.IMPORTANCE_DEFAULT) return
             if (!ranking.matchesInterruptionFilter()) return
             if (ranking.isSuspended) return
         }
-        val rule = s.ruleFor(sbn.packageName)
-        if (!rule.notifications) return
 
         val content = extractContent(n)
         if (content.title.isBlank() && content.text.isBlank()) return
@@ -207,6 +225,10 @@ class NotificationProcessor(
             if (autoCancel && clearable) cancel(key)
         }
         val onDismiss = IslandAction("notif.dismiss", "Dismiss") { if (clearable) cancel(key) }
+
+        if (s.replaceSystemPopups) {
+            absorbSystemNotification(sbn)
+        }
 
         scope.launch {
             val (largeRef, appRef) = withContext(Dispatchers.Default) {
@@ -654,6 +676,39 @@ class NotificationProcessor(
         try {
             listener?.cancelNotification(key)
         } catch (_: SecurityException) {
+        }
+    }
+
+    /**
+     * Suppresses the duplicate One UI system notification banner without Root or ADB by immediately
+     * absorbing/cancelling the system notification once BreezeIsland has captured its content, icons,
+     * and PendingIntent actions into the Dynamic Island.
+     */
+    private fun absorbSystemNotification(sbn: StatusBarNotification) {
+        val svc = listener ?: return
+        val key = sbn.key
+        absorbedKeys.add(key)
+        try {
+            if (sbn.isClearable) {
+                svc.cancelNotification(key)
+            } else {
+                svc.snoozeNotification(key, settings().notificationDurationMs.coerceAtLeast(5_000L))
+            }
+            // Also dismiss any group summary banner for the same group so One UI doesn't pop up an empty summary.
+            val groupKey = sbn.groupKey
+            if (groupKey != null) {
+                svc.activeNotifications?.forEach { other ->
+                    if (other.packageName == sbn.packageName &&
+                        other.groupKey == groupKey &&
+                        other.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0 &&
+                        other.isClearable
+                    ) {
+                        absorbedKeys.add(other.key)
+                        svc.cancelNotification(other.key)
+                    }
+                }
+            }
+        } catch (_: Exception) {
         }
     }
 

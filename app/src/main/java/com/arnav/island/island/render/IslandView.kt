@@ -105,13 +105,28 @@ class IslandView(
     // ---------------------------------------------------------------------------------------------
 
     fun render(state: IslandState, kind: TransitionKind, immediate: Boolean = false) {
+        if (overlayMode && state != IslandState.Hidden && visibility != VISIBLE) {
+            visibility = VISIBLE
+        }
         scene.setState(state, kind, immediate)
+        invalidate()
         requestFrame()
         reportBounds(settled = false)
     }
 
     fun refreshGeometry(immediate: Boolean) {
         scene.onGeometryChanged(immediate)
+        invalidate()
+        requestFrame()
+        reportBounds(settled = false)
+    }
+
+    fun resumeRendering() {
+        lastFrameNanos = 0L
+        if (overlayMode && scene.state != IslandState.Hidden && visibility != VISIBLE) {
+            visibility = VISIBLE
+        }
+        invalidate()
         requestFrame()
         reportBounds(settled = false)
     }

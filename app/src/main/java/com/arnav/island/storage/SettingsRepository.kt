@@ -183,6 +183,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val cornerRoundness = floatPreferencesKey("corner_roundness")
         val touchExtension = floatPreferencesKey("touch_extension_dp")
         val showInLandscape = booleanPreferencesKey("show_in_landscape")
+        val showOnLockScreen = booleanPreferencesKey("show_on_lock_screen")
 
         val motionPreset = stringPreferencesKey("motion_preset")
         val animationSpeed = floatPreferencesKey("animation_speed")
@@ -197,12 +198,12 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val tiltDepth = booleanPreferencesKey("tilt_depth")
         val soundEffects = booleanPreferencesKey("sound_effects")
         val glance = booleanPreferencesKey("glance_enabled")
-        val statusBarCleanup = booleanPreferencesKey("status_bar_cleanup")
+        val statusBarCleanup = booleanPreferencesKey("status_bar_cleanup_v2")
         val statusBarIcons = stringPreferencesKey("status_bar_icons")
         val statusBarBackup = stringPreferencesKey("status_bar_backup")
         val lastSeenVersion = intPreferencesKey("last_seen_version")
-        val seamlessStatusBar = booleanPreferencesKey("seamless_status_bar")
-        val replaceSystemPopups = booleanPreferencesKey("replace_system_popups")
+        val seamlessStatusBar = booleanPreferencesKey("seamless_status_bar_v2")
+        val replaceSystemPopups = booleanPreferencesKey("replace_system_popups_v2")
         val headsUpBackup = intPreferencesKey("heads_up_backup")
         val followSystemAnimationSpeed = booleanPreferencesKey("follow_system_animation_speed")
         val unlockBloom = booleanPreferencesKey("unlock_bloom")
@@ -314,6 +315,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             cornerRoundness = p[K.cornerRoundness] ?: d.cornerRoundness,
             touchExtensionDp = p[K.touchExtension] ?: d.touchExtensionDp,
             showInLandscape = p[K.showInLandscape] ?: d.showInLandscape,
+            showOnLockScreen = p[K.showOnLockScreen] ?: d.showOnLockScreen,
             motionPreset = p.enum(K.motionPreset, d.motionPreset),
             animationSpeed = p[K.animationSpeed] ?: d.animationSpeed,
             animationIntensity = p[K.animationIntensity] ?: d.animationIntensity,
@@ -427,6 +429,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.cornerRoundness] = s.cornerRoundness
         p[K.touchExtension] = s.touchExtensionDp
         p[K.showInLandscape] = s.showInLandscape
+        p[K.showOnLockScreen] = s.showOnLockScreen
         p[K.motionPreset] = s.motionPreset.name
         p[K.animationSpeed] = s.animationSpeed
         p[K.animationIntensity] = s.animationIntensity
