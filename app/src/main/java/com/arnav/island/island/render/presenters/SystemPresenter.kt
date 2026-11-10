@@ -40,7 +40,7 @@ class SystemPresenter(rc: RenderContext) : Presenter(rc) {
                 val inset = (h - s) / 2f
                 val right = g.cameraExclusionHalfWidth + rc.labelPaint.measureText(text) + inset + dp(6f)
                 val left = g.cameraExclusionHalfWidth + s + inset
-                (maxOf(right, left) * 2f).coerceIn(g.compactWidth, g.expandedWidth) to h
+                (maxOf(right, left) * 2f).coerceIn(g.compactWidth, g.compactWidth + dp(28f)) to h
             }
             else -> super.measure(event, mode)
         }

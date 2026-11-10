@@ -88,7 +88,17 @@ class NotificationProcessor(
         if (!s.enabled) return
         if (sbn.packageName == context.packageName) return
         val n = sbn.notification ?: return
-        if (isMedia(n)) return
+        val selectedSlots = parseCsv(s.statusBarIcons)
+        if (isMedia(n)) {
+            if (shouldSuppressMediaChip(s, selectedSlots)) {
+                suppressStatusBarChip(sbn)
+            }
+            return
+        }
+        if (s.statusBarCleanup && matchesStatusBarSlot(sbn, selectedSlots)) {
+            suppressStatusBarChip(sbn)
+            return
+        }
         val rule = s.ruleFor(sbn.packageName)
 
         when {
@@ -97,6 +107,30 @@ class NotificationProcessor(
             isLiveUpdate(sbn) -> if (s.liveUpdatesEnabled && rule.notifications) handleLiveUpdate(sbn, s)
             hasProgress(n) -> if (s.progressEnabled && rule.notifications) handleProgress(sbn)
             !initialScan -> if (s.notificationsEnabled) handleAlert(sbn, ranking(rankingMap, sbn.key), s)
+        }
+    }
+
+    /**
+     * Immediately scans active status bar notifications and suppresses One UI media chips or
+     * selected status bar icon notifications without requiring Root or ADB.
+     */
+    fun syncStatusBarNotifications(s: IslandSettings = settings()) {
+        if (!s.enabled) return
+        val svc = listener ?: return
+        val active = try {
+            svc.activeNotifications
+        } catch (_: Exception) {
+            null
+        } ?: return
+        val selectedSlots = parseCsv(s.statusBarIcons)
+        for (sbn in active) {
+            if (sbn.packageName == context.packageName) continue
+            val n = sbn.notification ?: continue
+            if (isMedia(n) && shouldSuppressMediaChip(s, selectedSlots)) {
+                suppressStatusBarChip(sbn)
+            } else if (s.statusBarCleanup && matchesStatusBarSlot(sbn, selectedSlots)) {
+                suppressStatusBarChip(sbn)
+            }
         }
     }
 
@@ -196,7 +230,7 @@ class NotificationProcessor(
             ?: n.visibility
         val isPrivate = visibility != Notification.VISIBILITY_PUBLIC
         var privacy = rule.privacy ?: s.notificationPrivacy
-        val reduce = isPrivate && (keyguard.isKeyguardLocked || s.hideSensitiveContent)
+        val reduce = isPrivate && (s.hideSensitiveContent || (keyguard.isKeyguardLocked && !s.showOnLockScreen))
         if (reduce && privacy == NotificationPrivacy.FULL) privacy = NotificationPrivacy.APP_NAME
 
         val priority = when (rule.priority) {
@@ -712,6 +746,66 @@ class NotificationProcessor(
         }
     }
 
+    private fun shouldSuppressMediaChip(s: IslandSettings, selectedSlots: Set<String>): Boolean =
+        s.seamlessStatusBar || (s.statusBarCleanup && "ongoing_activity" in selectedSlots)
+
+    /**
+     * Snoozes or cancels a status bar notification so One UI removes its status bar chip/icon
+     * (e.g., the `[▷ Song]` media chip or system status icons) without Root or ADB.
+     * MediaSessionManager continues reporting active media playback to [com.arnav.island.events.media.MediaSessionMonitor].
+     */
+    private fun suppressStatusBarChip(sbn: StatusBarNotification) {
+        val svc = listener ?: return
+        val key = sbn.key
+        absorbedKeys.add(key)
+        try {
+            svc.snoozeNotification(key, CHIP_SNOOZE_MS)
+        } catch (_: Exception) {
+            runCatching { if (sbn.isClearable) svc.cancelNotification(key) }
+        }
+    }
+
+    /**
+     * Matches system status bar notifications corresponding to the user's selected
+     * `StatusBarCleanup.ICONS` slots (`vpn`, `hotspot`, `data_saver`, `bluetooth`, `zen`,
+     * `volume`, `rotate`, `headset`, `alarm_clock`, `nfc`) so toggling those switches in
+     * BreezeIsland suppresses their status bar notifications without Root or ADB.
+     */
+    private fun matchesStatusBarSlot(sbn: StatusBarNotification, selectedSlots: Set<String>): Boolean {
+        if (selectedSlots.isEmpty()) return false
+        val n = sbn.notification ?: return false
+        if (isCall(n) || NavigationRegistry.providerFor(sbn) != null || isLiveUpdate(sbn) || hasProgress(n)) {
+            return false
+        }
+        val pkg = sbn.packageName.lowercase()
+        val isSystemPkg = pkg == "android" ||
+            pkg.startsWith("com.android.") ||
+            pkg.startsWith("com.samsung.") ||
+            pkg.startsWith("com.sec.") ||
+            pkg.startsWith("com.qualcomm.")
+        if (!isSystemPkg) return false
+
+        val channel = n.channelId.orEmpty().lowercase()
+        val tag = sbn.tag.orEmpty().lowercase()
+        val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.lowercase().orEmpty()
+        val meta = "$pkg $channel $tag $title"
+
+        if ("vpn" in selectedSlots && (pkg.contains("vpndialogs") || channel.contains("vpn") || tag.contains("vpn"))) return true
+        if ("hotspot" in selectedSlots && (meta.contains("hotspot") || meta.contains("tether") || meta.contains("wifi_ap"))) return true
+        if ("data_saver" in selectedSlots && (meta.contains("data_saver") || meta.contains("datasaver") || meta.contains("restrict_background"))) return true
+        if ("bluetooth" in selectedSlots && (pkg.contains("bluetooth") || channel.contains("bluetooth") || tag.contains("bluetooth"))) return true
+        if ("zen" in selectedSlots && (channel.contains("zen") || channel.contains("dnd") || tag.contains("zen") || tag.contains("dnd"))) return true
+        if ("volume" in selectedSlots && (channel.contains("volume") || channel.contains("ringer") || tag.contains("volume"))) return true
+        if ("rotate" in selectedSlots && (channel.contains("rotate") || channel.contains("rotation") || tag.contains("rotate"))) return true
+        if ("headset" in selectedSlots && (channel.contains("headset") || channel.contains("usb_audio") || tag.contains("headset"))) return true
+        if ("nfc" in selectedSlots && (pkg.contains("nfc") || channel.contains("nfc") || tag.contains("nfc"))) return true
+        if ("alarm_clock" in selectedSlots && n.fullScreenIntent == null && (pkg.contains("clock") || channel.contains("alarm_upcoming") || tag.contains("upcoming_alarm"))) return true
+        return false
+    }
+
+    private fun parseCsv(csv: String): Set<String> =
+        csv.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
     /** Loads the large icon (or a person icon) off the main thread. */
     private fun loadLargeIcon(n: Notification, preferred: Icon?, key: String): ImageRef? {
         val icon = preferred ?: n.getLargeIcon() ?: return null
@@ -740,6 +834,7 @@ class NotificationProcessor(
         private const val ICON_PX = 144
         private const val AVATAR_PX = 96
         private const val MAX_SENDERS = 3
+        private const val CHIP_SNOOZE_MS = 3_600_000L
 
         private val DELIVERY_APPS = setOf(
             "in.swiggy.android", "com.application.zomato", "com.ubercab.eats", "com.grofers.customerapp",

@@ -85,12 +85,14 @@ class OverlayWindow(private val context: Context, private val view: View) {
     companion object {
         private const val TAG = "IslandOverlay"
 
+        @Suppress("DEPRECATION")
         fun baseParams(touchable: Boolean): WindowManager.LayoutParams {
             var flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
             if (touchable) {
                 flags = flags or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
             } else {

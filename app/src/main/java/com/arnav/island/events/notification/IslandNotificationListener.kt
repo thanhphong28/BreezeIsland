@@ -27,6 +27,7 @@ class IslandNotificationListener : NotificationListenerService() {
         override fun onReceive(context: Context, intent: Intent) {
             ensureOverlayRunning()
             graph.media.refresh()
+            graph.notifications.syncStatusBarNotifications()
         }
     }
 

@@ -65,13 +65,13 @@ class IslandGeometryTest {
     }
 
     @Test
-    fun `split bubble sits to the right of the main pill`() {
+    fun `split bubble sits to the left of the main pill`() {
         val g = geometry()
         val (main, bubble) = g.splitFrames()
-        assertTrue(bubble.left > main.right)
+        assertTrue(bubble.right < main.left)
         assertEquals(main.top, bubble.top, 0.001f)
         assertEquals(bubble.width, bubble.height, 0.001f)
-        assertTrue(bubble.right <= screen.widthPx - g.edgeMargin + 0.01f)
+        assertTrue(bubble.left >= g.edgeMargin - 0.01f)
     }
 
     @Test

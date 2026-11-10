@@ -40,6 +40,9 @@ object SystemPopups {
             runCatching {
                 Settings.System.putInt(cr, KEY, if (suppress) 0 else 1)
             }
+            runCatching {
+                Settings.System.putInt(cr, "edge_lighting", if (suppress) 0 else 1)
+            }
         }
 
         if (!StatusBarCleanup.canWrite(context)) return null

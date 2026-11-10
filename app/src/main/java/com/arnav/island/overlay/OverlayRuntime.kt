@@ -335,10 +335,11 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
     private fun readAnimationScale(): Float =
         Settings.Global.getFloat(service.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f).takeIf { it > 0f } ?: 1f
 
-    /** Tilt depth only listens while an open card is on screen and the screen is usable. */
+    /** Tilt depth only listens while an open card is on screen and the screen is interactive. */
     private fun updateTilt() {
         tilt.maxOffsetPx = rc.dp(3.5f) * rc.settings.motionIntensity
-        val active = rc.settings.tiltDepth && !rc.settings.motion.reduceMotion && screen.state.value.usable && view.scene.state.isLarge
+        val st = screen.state.value
+        val active = rc.settings.tiltDepth && !rc.settings.motion.reduceMotion && st.interactive && (settings.showOnLockScreen || !st.locked) && view.scene.state.isLarge
         tilt.setActive(active)
     }
 
@@ -447,7 +448,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         val calibrating = graph.calibrating.value
         val pkg = foreground.current.value
         val rule = settings.ruleFor(pkg)
-        val fullscreen = !statusBarVisible.value
+        val fullscreen = !statusBarVisible.value && !st.locked
         rc.statusBarBottom = if (fullscreen) 0f else g.screen.statusBarHeightPx.toFloat()
         val isGame = pkg != null && graph.apps.isGame(pkg)
         val isVideo = pkg != null && graph.apps.isVideo(pkg)
@@ -457,11 +458,10 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
             st.locked && !settings.showOnLockScreen -> "Locked"
             !g.screen.isPortrait && !settings.showInLandscape -> "Landscape"
             calibrating -> null
-            rule.visibility == AppVisibility.HIDDEN -> "Hidden in ${graph.apps.label(pkg!!)}"
-            settings.gameMode && isGame -> "Game mode"
+            !st.locked && rule.visibility == AppVisibility.HIDDEN -> "Hidden in ${graph.apps.label(pkg!!)}"
+            !st.locked && settings.gameMode && isGame -> "Game mode"
             fullscreen && settings.fullscreenMode == FullscreenMode.HIDE_IN_FULLSCREEN -> "Fullscreen"
-            // Without Usage Access the app category is unknown: treat any fullscreen app as media.
-            fullscreen && settings.fullscreenMode == FullscreenMode.HIDE_IN_GAMES_VIDEOS && (isGame || isVideo || pkg == null) -> "Fullscreen media"
+            fullscreen && settings.fullscreenMode == FullscreenMode.HIDE_IN_GAMES_VIDEOS && (isGame || isVideo) -> "Fullscreen media"
             else -> null
         }
         val minPriority = if (!calibrating && rule.visibility == AppVisibility.IMPORTANT_ONLY) EventPriority.TIMER else null

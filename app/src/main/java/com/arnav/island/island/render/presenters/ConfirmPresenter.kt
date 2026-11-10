@@ -34,7 +34,7 @@ class ConfirmPresenter(rc: RenderContext) : Presenter(rc) {
         get() = event.colors.accent.takeIf { it != 0 }?.let(ColorExtractor::legibleOnBlack) ?: IslandColors.GREEN
 
     override fun measure(event: IslandEvent, mode: PresentMode): Pair<Float, Float> =
-        if (mode == PresentMode.TOAST || mode == PresentMode.EXPANDED) mediumWidth to rc.geometry.compactHeight else super.measure(event, mode)
+        if (mode == PresentMode.TOAST || mode == PresentMode.EXPANDED) (rc.geometry.compactWidth + dp(24f)) to rc.geometry.compactHeight else super.measure(event, mode)
 
     override fun onBind(isUpdate: Boolean) {
         payload = event.payload as? ConfirmPayload

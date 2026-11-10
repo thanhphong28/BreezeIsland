@@ -124,7 +124,8 @@ class IslandGeometry(
     val compactWidth: Float = if (config.compactWidthDp > 0f) {
         dp(config.compactWidthDp)
     } else {
-        (screen.widthPx * 0.43f).coerceIn(dp(156f), dp(188f))
+        // Keep compact width tight enough to fit inside the status bar corridor before One UI's right-side icon cluster.
+        (screen.widthPx * 0.295f).coerceIn(dp(106f), dp(114f))
     }.coerceIn(holeRadius * 2f + dp(48f), maxWidth)
 
     val expandedWidth: Float = if (config.expandedMaxWidthDp > 0f) {
@@ -154,7 +155,7 @@ class IslandGeometry(
         max(screen.statusBarHeightPx.toFloat(), max(baseTop + compactHeight, cameraY + holeRadius + dp(4f)))
 
     /** Horizontal zone around the camera that compact content must keep clear of. */
-    val cameraExclusionHalfWidth: Float = holeRadius + dp(7f)
+    val cameraExclusionHalfWidth: Float = holeRadius + dp(5f)
 
     val touchExtension: Float = dp(config.touchExtensionDp)
 
@@ -178,17 +179,21 @@ class IslandGeometry(
     fun splitFrames(): Pair<ShapeFrame, ShapeFrame> {
         val bubble = compactHeight
         val gap = dp(SPLIT_GAP_DP)
-        val mainWidth = max(compactWidth * 0.8f, holeRadius * 2f + dp(64f))
+        val mainWidth = max(compactWidth * 0.94f, holeRadius * 2f + dp(56f))
         val main = placed(mainWidth, compactHeight)
-        var bubbleCenter = main.right + gap + bubble / 2f
-        val overflow = bubbleCenter + bubble / 2f - (screen.widthPx - edgeMargin)
-        if (overflow > 0f) bubbleCenter -= overflow
+        // Place the split satellite bubble on the LEFT of the main pill (in the wide-open status bar
+        // corridor after the clock) so it never collides with right-side status bar icons (Work, Mute, Wi-Fi, Battery).
+        var bubbleCenter = main.left - gap - bubble / 2f
+        val minLeft = edgeMargin + dp(46f)
+        if (bubbleCenter - bubble / 2f < minLeft) {
+            bubbleCenter = minLeft + bubble / 2f
+        }
         return main to ShapeFrame(bubbleCenter, main.top, bubble, bubble, bubble / 2f)
     }
 
-    /** Where the main pill's right cap starts in split mode, used by the liquid "bud" effect. */
+    /** Where the main pill's left cap starts in split mode, used by the liquid "bud" effect. */
     fun splitBudOrigin(main: ShapeFrame): ShapeFrame =
-        ShapeFrame(main.right - main.height / 2f, main.top, main.height * 0.6f, main.height * 0.6f, main.height * 0.3f)
+        ShapeFrame(main.left + main.height / 2f, main.top, main.height * 0.6f, main.height * 0.6f, main.height * 0.3f)
 
     /** Touchable area for a shape: its bounds plus the configurable extension below it. */
     fun touchRect(frame: ShapeFrame): RectPx = RectPx(
@@ -207,7 +212,18 @@ class IslandGeometry(
             baseTop
         }
         val half = w / 2f
-        val cx = if (w <= 0f) anchorX else anchorX.coerceIn(edgeMargin + half, screen.widthPx - edgeMargin - half)
+        var desiredCx = anchorX
+        // For status-bar pills (Compact, Split main, and Pill Toasts), cap the right edge at
+        // anchorX + 48dp so the pill never reaches One UI's right-side system icons (Work, Mute, Wi-Fi, Signal, Battery),
+        // shifting any extra pill width into the open corridor on the left of the camera.
+        val isStatusBarPill = !centerOnCamera && screen.isPortrait && h <= compactHeight + dp(4f) && w <= compactWidth + dp(36f) && config.compactWidthDp <= 0f
+        if (isStatusBarPill) {
+            val safeRightLimit = anchorX + dp(48f)
+            if (desiredCx + half > safeRightLimit) {
+                desiredCx = (safeRightLimit - half).coerceAtLeast(anchorX + cameraExclusionHalfWidth + dp(18f) - half)
+            }
+        }
+        val cx = if (w <= 0f) anchorX else desiredCx.coerceIn(edgeMargin + half, screen.widthPx - edgeMargin - half)
         return ShapeFrame(cx, top, w, h, radiusFor(h))
     }
 

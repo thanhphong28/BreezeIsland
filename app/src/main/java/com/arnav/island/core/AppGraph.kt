@@ -81,6 +81,7 @@ class AppGraph(val app: Application) {
             combine(settings.flow, showing) { s, visible -> s to visible }.collect { (s, visible) ->
                 StatusBarCleanup.sync(app, s)?.let { next -> settings.set { it.copy(statusBarBackup = next.statusBarBackup) } }
                 SystemPopups.sync(app, s, visible)?.let { next -> settings.set { it.copy(headsUpBackup = next.headsUpBackup) } }
+                notifications.syncStatusBarNotifications(s)
             }
         }
     }

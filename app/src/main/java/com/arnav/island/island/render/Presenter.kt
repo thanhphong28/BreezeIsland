@@ -150,21 +150,24 @@ abstract class Presenter(protected val rc: RenderContext) {
 
     /** Top inset below the status-bar band for TOAST/EXPANDED layouts. */
     protected val bandInset: Float
-        get() = (rc.geometry.statusBandBottom - rc.geometry.baseTop).coerceAtLeast(rc.geometry.compactHeight) + dp(6f)
+        get() = (rc.geometry.statusBandBottom - rc.geometry.baseTop).coerceAtLeast(rc.geometry.compactHeight) + dp(10f)
 
     protected val expandedWidth: Float get() = rc.geometry.expandedWidth
     protected val mediumWidth: Float get() = minOf(rc.geometry.expandedWidth, maxOf(rc.geometry.compactWidth + dp(88f), dp(284f)))
 
     /** Square slot size for leading/trailing compact content. */
-    protected fun slot(h: Float): Float = (h - dp(14f)).coerceIn(dp(12f), dp(24f))
+    protected fun slot(h: Float): Float = (h - dp(14f)).coerceIn(dp(12f), dp(22f))
 
-    /** Space available on each side of the camera for compact content. */
-    protected fun sideSpace(w: Float): Float = (w / 2f - rc.geometry.cameraExclusionHalfWidth).coerceAtLeast(0f)
+    /** Space available on the right side of the camera for compact trailing content. */
+    protected fun sideSpace(w: Float): Float {
+        val rightOfCamera = if (rc.cameraXInShape > 0f && rc.cameraXInShape < w) w - rc.cameraXInShape else w / 2f
+        return (rightOfCamera - rc.geometry.cameraExclusionHalfWidth).coerceAtLeast(0f)
+    }
 
     /** Content fades as the pill gets too narrow to hold it (e.g. mid-morph from idle). */
     protected fun compactVisibility(w: Float, h: Float): Float {
-        val needed = rc.geometry.cameraExclusionHalfWidth * 2f + slot(h) * 2f + dp(12f)
-        return ((w - needed) / dp(28f)).coerceIn(0f, 1f)
+        val needed = rc.geometry.cameraExclusionHalfWidth * 2f + slot(h) * 2f + dp(4f)
+        return ((w - needed) / dp(18f)).coerceIn(0f, 1f)
     }
 
     protected fun addTarget(id: String, action: IslandAction?, l: Float, t: Float, r: Float, b: Float, kind: HitKind = HitKind.BUTTON): HitTarget {

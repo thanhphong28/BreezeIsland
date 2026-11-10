@@ -127,6 +127,7 @@ class IslandScene(private val rc: RenderContext) {
     private var bubbleTarget: ShapeFrame? = null
 
     private val shapePath = Path()
+    private val stemPath = Path()
     private val bubblePath = Path()
     private val bridgePath = Path()
     private val ghostPath = Path()
@@ -377,7 +378,12 @@ class IslandScene(private val rc: RenderContext) {
             if (bubbleWanted) {
                 // Re-absorb into the pill.
                 val mainTarget = target
-                bubbleCx.animateTo(mainTarget.right - mainTarget.height / 2f, motion.bubble)
+                val absorbX = if (bubbleCx.value <= mainTarget.centerX) {
+                    mainTarget.left + mainTarget.height / 2f
+                } else {
+                    mainTarget.right - mainTarget.height / 2f
+                }
+                bubbleCx.animateTo(absorbX, motion.bubble)
                 bubbleTop.animateTo(mainTarget.top + mainTarget.height / 2f, motion.bubble)
                 bubbleSize.animateTo(0f, motion.bubble)
             }
@@ -736,7 +742,8 @@ class IslandScene(private val rc: RenderContext) {
         }
         val r1 = radius
         val r2 = bs / 2f
-        val dx = bubbleCx.value - (shapeRect.right - r1)
+        val capX = if (bubbleCx.value <= shapeRect.centerX()) shapeRect.left + r1 else shapeRect.right - r1
+        val dx = bubbleCx.value - capX
         val dy = bubbleTop.value + r2 - (shapeRect.top + r1)
         val d = hypot(dx, dy)
         val linked = d < r1 + r2 + r2 * 2.4f
@@ -874,8 +881,33 @@ class IslandScene(private val rc: RenderContext) {
         drawGlow(canvas, v)
         if (theme == IslandTheme.CUSTOM) drawCustomGlow(canvas, v)
 
-        // Shape.
-        SmoothShapes.roundRect(shapePath, shapeRect.left, shapeRect.top, shapeRect.right, shapeRect.bottom, radius)
+        // Shape: for wide cards (Toast banner, Expanded card, Stack), slide the full-width card
+        // body's top edge down to statusBandBottom so status-bar icons (left clock & right system
+        // icons) never overlap the wide card, while keeping the compact camera pill anchored around
+        // the camera cutout inside the safe center corridor of the status bar.
+        val isWideCard = shapeRect.height() > geometry.compactHeight + rc.dp(8f) &&
+            shapeRect.width() > geometry.compactWidth + rc.dp(32f)
+        val expandT = if (isWideCard) {
+            ((shapeRect.width() - (geometry.compactWidth + rc.dp(32f))) / rc.dp(56f)).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+        val targetCardTop = min(geometry.statusBandBottom, shapeRect.bottom - geometry.compactHeight)
+        val cardTop = lerp(shapeRect.top, max(shapeRect.top, targetCardTop), expandT)
+        val cardRadius = min((shapeRect.bottom - cardTop).coerceAtLeast(1f) / 2f, radius)
+        SmoothShapes.roundRect(shapePath, shapeRect.left, cardTop, shapeRect.right, shapeRect.bottom, cardRadius)
+        val hasCameraStem = cardTop > shapeRect.top + 0.5f
+        if (hasCameraStem) {
+            val stem = geometry.compactFrame()
+            SmoothShapes.roundRect(
+                stemPath,
+                stem.left,
+                shapeRect.top,
+                stem.right,
+                shapeRect.top + geometry.compactHeight,
+                geometry.compactHeight / 2f,
+            )
+        }
         val hasBubble = isBubbleVisible
         bridgePath.rewind()
         if (hasBubble) {
@@ -888,7 +920,7 @@ class IslandScene(private val rc: RenderContext) {
             tmpRect.set(bubbleRect.centerX() - rx, bubbleRect.centerY() - ry, bubbleRect.centerX() + rx, bubbleRect.centerY() + ry)
             bubblePath.addOval(tmpRect, Path.Direction.CW)
             val r1 = radius
-            val x1 = shapeRect.right - r1
+            val x1 = if (bubbleRect.centerX() <= shapeRect.centerX()) shapeRect.left + r1 else shapeRect.right - r1
             val y1 = shapeRect.top + r1
             val r2 = bs / 2f
             val bubbleSpeed = (abs(bubbleCx.velocity) / (1200f * rc.dp(1f))).coerceIn(0f, 1f)
@@ -905,6 +937,7 @@ class IslandScene(private val rc: RenderContext) {
         fillPaint.color = if (translucent) 0xFF0E0F12.toInt() else 0xFF000000.toInt()
         fillPaint.alpha = if (translucent) 255 else (255 * v).toInt().coerceIn(0, 255)
         if (v > 0.001f) {
+            if (hasCameraStem) canvas.drawPath(stemPath, fillPaint)
             canvas.drawPath(shapePath, fillPaint)
             if (hasBubble) {
                 canvas.drawPath(bubblePath, fillPaint)
