@@ -146,16 +146,27 @@ class SoundIslandController(
         }
     )
 
+    private fun connectVolumeSuppressor() {
+        VolumeSuppressor.onVolumeChangedCallback = { _, _ ->
+            val streamInfo = volumeManager.getStreamInfo(TARGET_STREAM)
+            handleVolumeTrigger(streamInfo.current, streamInfo.max, streamInfo.fraction)
+        }
+    }
+
     fun start() {
         if (settingsFn().soundIslandEnabled) {
             val s = settingsFn()
             overlay.updateEdge(s.soundIslandEdge)
             view.edge = s.soundIslandEdge
             volumeObserver.start()
+            connectVolumeSuppressor()
             updateOverlayVerticalPosition()
             if (VolumeSuppressor.canUseShizuku()) {
                 Thread {
                     VolumeSuppressor.setupMediaKeyRouting(context)
+                    if (s.soundIslandSuppressStock) {
+                        VolumeSuppressor.suppress(context)
+                    }
                 }.start()
             }
         }
@@ -164,6 +175,7 @@ class SoundIslandController(
     fun stop() {
         handler.removeCallbacks(dismissRunnable)
         handler.removeCallbacks(shrinkRunnable)
+        VolumeSuppressor.onVolumeChangedCallback = null
         volumeObserver.stop()
         overlay.setTouchable(false)
         overlay.detach()
@@ -175,14 +187,23 @@ class SoundIslandController(
         view.edge = s.soundIslandEdge
         if (s.soundIslandEnabled) {
             volumeObserver.start()
+            connectVolumeSuppressor()
             updateOverlayVerticalPosition()
             if (VolumeSuppressor.canUseShizuku()) {
                 Thread {
                     VolumeSuppressor.setupMediaKeyRouting(context)
+                    if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed) {
+                        VolumeSuppressor.suppress(context)
+                    } else if (!s.soundIslandSuppressStock && VolumeSuppressor.isSuppressed) {
+                        VolumeSuppressor.restore(context)
+                    }
                 }.start()
             }
         } else {
             stop()
+            if (VolumeSuppressor.isSuppressed) {
+                Thread { VolumeSuppressor.restore(context) }.start()
+            }
         }
     }
 

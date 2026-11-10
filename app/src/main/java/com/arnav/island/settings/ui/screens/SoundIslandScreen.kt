@@ -73,32 +73,50 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
 
         item {
             Group(
-                title = "Đồng bộ hệ thống & Trung tâm điều khiển",
-                footer = "Breeze Sound Island liên kết đồng bộ 100% với âm lượng hệ thống. Thanh âm lượng trong Trung tâm điều khiển (Quick Settings) của Samsung hoạt động hoàn toàn bình thường. Không root, không quyền trợ năng, 100% an toàn với ngân hàng & VNeID.",
+                title = "Thay thế thanh âm lượng mặc định Samsung",
+                footer = "Ẩn hoàn toàn thanh âm lượng gốc Samsung ngoài màn hình bằng Shizuku. Không root, không quyền trợ năng, 100% an toàn với ngân hàng & VNeID.",
             ) {
+                SwitchRow(
+                    title = "Ẩn thanh âm lượng Samsung ngoài màn hình",
+                    subtitle = if (hasShizuku) {
+                        "Đang hoạt động · Chỉ duy nhất Breeze Sound Island xuất hiện khi bấm phím âm lượng"
+                    } else {
+                        "Cần kích hoạt Shizuku trên điện thoại (không cần máy tính)"
+                    },
+                    checked = settings.soundIslandSuppressStock && hasShizuku,
+                    icon = Icons.Rounded.Tune,
+                    iconColor = BadgeColors.Cyan,
+                    onCheckedChange = { checked ->
+                        if (checked && !hasShizuku) {
+                            if (OnPhoneGranter.isShizukuRunning()) {
+                                runCatching { rikka.shizuku.Shizuku.requestPermission(2805) }
+                            } else {
+                                OnPhoneGranter.openOrInstallShizuku(context)
+                            }
+                        } else {
+                            ui.update { it.copy(soundIslandSuppressStock = checked) }
+                            if (checked) {
+                                Thread { VolumeSuppressor.suppress(context) }.start()
+                            } else {
+                                Thread { VolumeSuppressor.restore(context) }.start()
+                            }
+                        }
+                    },
+                )
                 SettingRow(
-                    title = "Khôi phục thanh âm lượng & Trung tâm điều khiển Samsung",
-                    subtitle = "Làm mới SystemUI qua Shizuku để đảm bảo thanh âm lượng gốc và Trung tâm điều khiển Samsung hoạt động hoàn hảo 100%",
+                    title = "Khôi phục thanh âm lượng gốc Samsung",
+                    subtitle = "Làm mới và khôi phục thanh âm lượng gốc và Trung tâm điều khiển Samsung về mặc định",
                     icon = Icons.Rounded.Close,
                     iconColor = BadgeColors.Red,
                     onClick = {
+                        ui.update { it.copy(soundIslandSuppressStock = false) }
                         Thread { VolumeSuppressor.restore(context) }.start()
                     },
                 )
-                if (hasShizuku) {
-                    SettingRow(
-                        title = "Ưu tiên điều khiển Media khi bấm phím (chuẩn iOS)",
-                        subtitle = "Kích hoạt định tuyến phím cứng Samsung luôn điều khiển âm lượng Media ngay cả khi tắt nhạc",
-                        icon = Icons.Rounded.Tune,
-                        iconColor = BadgeColors.Cyan,
-                        onClick = {
-                            Thread { VolumeSuppressor.setupMediaKeyRouting(context) }.start()
-                        },
-                    )
-                } else {
+                if (!hasShizuku) {
                     SettingRow(
                         title = "Kích hoạt Shizuku trên điện thoại (30s)",
-                        subtitle = "Gỡ lỗi không dây -> Ghép nối bằng mã để cấp quyền cấu hình hệ thống",
+                        subtitle = "Gỡ lỗi không dây -> Ghép nối bằng mã để kích hoạt tính năng ẩn thanh âm lượng gốc",
                         icon = Icons.Rounded.Security,
                         iconColor = BadgeColors.Blue,
                         onClick = {
