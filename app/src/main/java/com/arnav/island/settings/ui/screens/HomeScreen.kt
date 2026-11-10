@@ -50,6 +50,7 @@ import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Translate
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AssistChip
@@ -234,6 +235,7 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
 
         item {
             Group(title = "Island") {
+                NavRow("Breeze Sound Island (Right Edge)", "Liquid Glass volume, silent & work mode edge notch", Icons.AutoMirrored.Rounded.VolumeUp, BadgeColors.Orange) { ui.go(Dest.SOUND_ISLAND) }
                 NavRow("Blend with One UI 9 (Z Flip5)", "Seamless status bar, Now Bar fix & pop-up replacement", Icons.Rounded.PhoneAndroid, BadgeColors.Blue) { ui.go(Dest.BLEND) }
                 NavRow("Shape & motion", "Size, corners, springs, split island", Icons.Rounded.Crop169, BadgeColors.Graphite) { ui.go(Dest.ISLAND) }
                 NavRow("Camera calibration", "Auto-detect or fine-tune to the pixel", Icons.Rounded.CenterFocusStrong, BadgeColors.Cyan) { ui.go(Dest.CALIBRATION) }

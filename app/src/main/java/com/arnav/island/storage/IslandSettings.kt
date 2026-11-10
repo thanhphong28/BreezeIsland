@@ -224,6 +224,13 @@ data class IslandSettings(
     val statusBarIcons: String = "ongoing_activity,ongoing_activity_chip,sec_ongoing_activity,ongoing_call_chip,ongoing_privacy_chip,media_ongoing,live_notification,alarm_clock,volume,zen,rotate,headset,bluetooth,hotspot",
     val statusBarBackup: String = BACKUP_NONE,
 
+    // Breeze Sound Island (Liquid Glass Edge Volume & Focus Island)
+    val soundIslandEnabled: Boolean = true,
+    val soundIslandYPercent: Float = 0.22f,
+    val soundIslandAutoDismissMs: Long = 1800L,
+    val soundIslandWorkDnd: Boolean = true,
+    val soundIslandWorkMediaVol: Int = 30,
+
     /** versionCode whose "What's new" was last shown. */
     val lastSeenVersion: Int = 0,
 ) {

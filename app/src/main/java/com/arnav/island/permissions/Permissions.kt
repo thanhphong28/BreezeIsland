@@ -66,6 +66,11 @@ object Permissions {
 
     fun notificationAccessFallback() = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
 
+    fun dndPolicySettings() = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+
+    fun hasDndAccess(context: Context): Boolean =
+        context.getSystemService(android.app.NotificationManager::class.java)?.isNotificationPolicyAccessGranted == true
+
     fun usageAccessSettings(context: Context): Intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, pkg(context))
 
     fun usageAccessFallback() = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)

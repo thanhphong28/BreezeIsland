@@ -57,6 +57,7 @@ import androidx.compose.material.icons.rounded.PanTool
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.ScreenRotation
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Straighten
 import androidx.compose.material.icons.rounded.SwipeLeft
@@ -64,6 +65,7 @@ import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Timelapse
 import androidx.compose.material.icons.rounded.Today
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -392,6 +394,11 @@ fun WhatsNewScreen(s: IslandSettings, ui: Ui) {
 
     val releases = remember {
         listOf(
+            Release("1.7", "Breeze Sound Island", listOf(
+                Feature("Breeze Sound Island", "Liquid Glass volume, silent & work controls sliding out from the right screen bezel.", Icons.AutoMirrored.Rounded.VolumeUp, BadgeColors.Orange, opens = Dest.SOUND_ISLAND),
+                Feature("Physical key edge notch", "Smooth edge spring slide-out whenever volume changes, tuned to Galaxy Z Flip5.", Icons.Rounded.Tune, BadgeColors.Cyan, opens = Dest.SOUND_ISLAND),
+                Feature("100% Banking App Safe", "No accessibility service, no root, fully local and compatible with all banking apps & VNeID.", Icons.Rounded.Security, BadgeColors.Green, opens = Dest.SOUND_ISLAND),
+            )),
             Release("1.2", "Blends into One UI", listOf(
                 Feature("Seamless status bar", "While a card is open the clock and system icons step aside, then come back as it closes.", Icons.Rounded.Layers, BadgeColors.Blue, opens = Dest.BLEND),
                 Feature("No more double pop-ups", "Island can take over from One UI's pop-up banners while it's on screen.", Icons.Rounded.NotificationsPaused, BadgeColors.Pink, opens = Dest.BLEND),

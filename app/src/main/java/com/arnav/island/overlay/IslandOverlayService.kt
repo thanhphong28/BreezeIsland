@@ -19,7 +19,9 @@ import androidx.core.content.ContextCompat
 import com.arnav.island.IslandApp
 import com.arnav.island.R
 import com.arnav.island.settings.MainActivity
+import com.arnav.island.soundisland.SoundIslandController
 import com.arnav.island.util.Diagnostics
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +35,8 @@ import kotlinx.coroutines.launch
 class IslandOverlayService : Service() {
 
     private var runtime: OverlayRuntime? = null
+    private var soundIsland: SoundIslandController? = null
+    private var settingsJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -41,7 +45,17 @@ class IslandOverlayService : Service() {
             stopSelf()
             return
         }
-        runtime = OverlayRuntime(this, (application as IslandApp).graph).also { it.start() }
+        val graph = (application as IslandApp).graph
+        runtime = OverlayRuntime(this, graph).also { it.start() }
+        soundIsland = SoundIslandController(this) { graph.settings.state.value }.also {
+            it.start()
+            activeSoundIsland = it
+        }
+        settingsJob = graph.scope.launch {
+            graph.settings.flow.collect { s ->
+                soundIsland?.updateSettings(s)
+            }
+        }
         _running.value = true
     }
 
@@ -78,6 +92,13 @@ class IslandOverlayService : Service() {
     override fun onDestroy() {
         runtime?.stop()
         runtime = null
+        soundIsland?.stop()
+        if (activeSoundIsland === soundIsland) {
+            activeSoundIsland = null
+        }
+        soundIsland = null
+        settingsJob?.cancel()
+        settingsJob = null
         _running.value = false
         super.onDestroy()
     }
@@ -117,6 +138,9 @@ class IslandOverlayService : Service() {
 
         private val _running = MutableStateFlow(false)
         val running: StateFlow<Boolean> = _running.asStateFlow()
+
+        var activeSoundIsland: SoundIslandController? = null
+            internal set
 
         fun ensureChannel(context: Context) {
             val nm = context.getSystemService(NotificationManager::class.java)

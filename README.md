@@ -43,6 +43,13 @@ Direct APK links from the [**Releases**](https://github.com/thanhphong28/BreezeI
 
 - **Built for the Samsung Galaxy Z Flip 5 (`SM-F731*` · One UI 9)**:
   - Pre-calibrated camera profile (`1080 × 2640`, `120Hz`, centered punch-hole cutout) with 1-px physical calibration and **Island Studio** live blueprint resizing.
+- **Breeze Sound Island (Right-Edge Liquid Glass Notch)**:
+  - Futuristic Liquid Glass edge capsule sliding out seamlessly from the right screen bezel near the physical volume rocker.
+  - Features 3 coordinated modes:
+    - **Volume Mode**: Vertical white stadium slider with responsive volume fill and auto-inverting speaker icon.
+    - **Silent Mode**: Deep black pill with striking red crossed bell and bold SILENT label.
+    - **Work Mode**: Minimalist focus pill with violet crescent moon, user profile, cyan badge, and bold WORK label with DND synchronization.
+  - Pure `AudioManager` and `ContentObserver` integration: dragging the slider suppresses Samsung's stock volume panel without requiring root or accessibility services.
 - **Sits Cleanly on Top of One UI 9 Status Bar**:
   - Automatically suppresses duplicate One UI status bar notification icons via `WRITE_SETTINGS` (no PC required) and clears status bar ongoing chips, clock, and icons via `WRITE_SECURE_SETTINGS` when expanded.
   - Auto-expands into a sleek top card on the first track of a media session and automatically snoozes duplicate One UI heads-up banners.
