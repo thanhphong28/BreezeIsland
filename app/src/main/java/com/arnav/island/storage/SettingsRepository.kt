@@ -219,6 +219,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val customHighlight = floatPreferencesKey("custom_highlight")
         val customRimWidthDp = floatPreferencesKey("custom_rim_width_dp")
         val soundIslandEnabled = booleanPreferencesKey("sound_island_enabled")
+        val soundIslandSuppressStock = booleanPreferencesKey("sound_island_suppress_stock")
         val soundIslandEdge = stringPreferencesKey("sound_island_edge")
         val soundIslandYPercent = floatPreferencesKey("sound_island_y_percent")
         val soundIslandAutoDismiss = longPreferencesKey("sound_island_auto_dismiss_ms")
@@ -412,6 +413,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             monitorTemperature = p[K.monitorTemp] ?: d.monitorTemperature,
             monitorFps = p[K.monitorFps] ?: d.monitorFps,
             soundIslandEnabled = p[K.soundIslandEnabled] ?: d.soundIslandEnabled,
+            soundIslandSuppressStock = p[K.soundIslandSuppressStock] ?: d.soundIslandSuppressStock,
             soundIslandEdge = p.enum(K.soundIslandEdge, d.soundIslandEdge),
             soundIslandYPercent = p[K.soundIslandYPercent] ?: d.soundIslandYPercent,
             soundIslandAutoDismissMs = p[K.soundIslandAutoDismiss] ?: d.soundIslandAutoDismissMs,
@@ -476,6 +478,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.customHighlight] = s.customHighlight
         p[K.customRimWidthDp] = s.customRimWidthDp
         p[K.soundIslandEnabled] = s.soundIslandEnabled
+        p[K.soundIslandSuppressStock] = s.soundIslandSuppressStock
         p[K.soundIslandEdge] = s.soundIslandEdge.name
         p[K.soundIslandYPercent] = s.soundIslandYPercent
         p[K.soundIslandAutoDismiss] = s.soundIslandAutoDismissMs

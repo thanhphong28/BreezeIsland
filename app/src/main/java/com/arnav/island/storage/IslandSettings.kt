@@ -227,6 +227,7 @@ data class IslandSettings(
 
     // Breeze Sound Island (Liquid Glass Edge Volume & Focus Island)
     val soundIslandEnabled: Boolean = true,
+    val soundIslandSuppressStock: Boolean = false,
     val soundIslandEdge: ScreenEdge = ScreenEdge.LEFT,
     val soundIslandYPercent: Float = 0.22f,
     val soundIslandAutoDismissMs: Long = 1800L,

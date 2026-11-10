@@ -7,6 +7,7 @@ import android.os.Looper
 import com.arnav.island.soundisland.audio.SilentModeManager
 import com.arnav.island.soundisland.audio.VolumeKeyObserver
 import com.arnav.island.soundisland.audio.VolumeManager
+import com.arnav.island.soundisland.audio.VolumeSuppressor
 import com.arnav.island.soundisland.render.ScreenEdge
 import com.arnav.island.soundisland.work.WorkProfileConfig
 import com.arnav.island.soundisland.work.WorkProfileManager
@@ -101,6 +102,9 @@ class SoundIslandController(
             view.edge = s.soundIslandEdge
             volumeObserver.start()
             updateOverlayVerticalPosition()
+            if (s.soundIslandSuppressStock && VolumeSuppressor.canUseShizuku()) {
+                Thread { VolumeSuppressor.suppress() }.start()
+            }
         }
     }
 
@@ -118,6 +122,11 @@ class SoundIslandController(
         if (s.soundIslandEnabled) {
             volumeObserver.start()
             updateOverlayVerticalPosition()
+            if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed && VolumeSuppressor.canUseShizuku()) {
+                Thread { VolumeSuppressor.suppress() }.start()
+            } else if (!s.soundIslandSuppressStock && VolumeSuppressor.isSuppressed) {
+                Thread { VolumeSuppressor.restore() }.start()
+            }
         } else {
             stop()
         }

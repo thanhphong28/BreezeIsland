@@ -28,8 +28,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.arnav.island.overlay.IslandOverlayService
+import com.arnav.island.permissions.OnPhoneGranter
 import com.arnav.island.permissions.PermissionSnapshot
 import com.arnav.island.permissions.Permissions
+import com.arnav.island.soundisland.audio.VolumeSuppressor
 import com.arnav.island.soundisland.render.ScreenEdge
 import com.arnav.island.settings.ui.Ui
 import com.arnav.island.settings.ui.components.Group
@@ -48,6 +50,7 @@ import com.arnav.island.storage.IslandSettings
 fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui) {
     val context = LocalContext.current
     val hasDnd = Permissions.hasDndAccess(context)
+    val hasShizuku = VolumeSuppressor.canUseShizuku()
 
     SettingsPage(
         title = "Breeze Sound Island",
@@ -68,6 +71,46 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                         }
                     },
                 )
+            }
+        }
+
+        item {
+            Group(
+                title = "Replace Stock Samsung Volume Panel",
+                footer = "Disconnects Samsung's stock volume dialog using privileged system audio API. Zero root, zero accessibility, 100% banking and government apps safe.",
+            ) {
+                SwitchRow(
+                    title = "Completely hide Samsung stock volume panel",
+                    subtitle = if (hasShizuku) {
+                        "Active · Only Breeze Sound Island will appear when volume buttons are pressed"
+                    } else {
+                        "Requires Shizuku activation directly on phone (no PC needed)"
+                    },
+                    checked = settings.soundIslandSuppressStock && hasShizuku,
+                    icon = Icons.Rounded.Tune,
+                    iconColor = BadgeColors.Cyan,
+                    onCheckedChange = { checked ->
+                        if (checked && !hasShizuku) {
+                            OnPhoneGranter.openOrInstallShizuku(context)
+                        } else {
+                            ui.update { it.copy(soundIslandSuppressStock = checked) }
+                            if (checked) {
+                                Thread { VolumeSuppressor.suppress() }.start()
+                            } else {
+                                Thread { VolumeSuppressor.restore() }.start()
+                            }
+                        }
+                    },
+                )
+                if (!hasShizuku) {
+                    SettingRow(
+                        title = "Activate Shizuku on phone (30s)",
+                        subtitle = "Wireless Debugging -> Pair with code on your phone to unlock full volume panel replacement",
+                        icon = Icons.Rounded.Security,
+                        iconColor = BadgeColors.Blue,
+                        onClick = { OnPhoneGranter.openOrInstallShizuku(context) },
+                    )
+                }
             }
         }
 
@@ -140,8 +183,8 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
 
         item {
             InfoCard(
-                title = "Fix Overlapping with Samsung Volume Panel",
-                body = "Samsung One UI triggers its own stock volume bar on the right edge whenever physical buttons are pressed without Accessibility Service.\n\n• Solution 1 (Recommended): Set Screen edge to 'Left edge' above. Both bars appear on opposite sides cleanly without any overlap!\n• Solution 2: If you want it on the right edge, install Samsung's official SoundAssistant (Galaxy Store / Good Lock) -> 'Customize volume panel' to relocate Samsung's panel to Left.",
+                title = "All Ways to Prevent Samsung Volume Overlap",
+                body = "• Way 1 (100% Replacement): Enable 'Completely hide Samsung stock volume panel' above via Shizuku on your phone. Samsung's panel is completely suppressed!\n• Way 2 (No Shizuku): Select 'Left edge' above. Both bars appear on opposite sides without any overlap!\n• Way 3 (Samsung Official App): Install SoundAssistant from Galaxy Store (Good Lock) -> 'Customize volume panel' to relocate Samsung's panel to Left.",
                 icon = Icons.Rounded.Tune,
                 color = BadgeColors.Blue,
             )

@@ -7,3 +7,7 @@
 
 -keep class rikka.shizuku.** { *; }
 -dontwarn rikka.shizuku.**
+-keep class com.arnav.island.soundisland.audio.VolumeSuppressor { *; }
+-keep interface android.media.IVolumeController { *; }
+-keep interface android.media.IAudioService { *; }
+
