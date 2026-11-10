@@ -62,6 +62,12 @@ class ChargingPresenter(rc: RenderContext) : Presenter(rc) {
             val graph = ((event.payload as? ChargingPayload)?.powerHistory?.size ?: 0) >= MIN_GRAPH_POINTS
             expandedWidth to (bandInset + dp(if (graph) 204f else 132f))
         }
+        PresentMode.COMPACT -> {
+            // Khi rảnh: chỉ hiển thị sấm sét bên cạnh camera, không cần pin và %
+            // Thu gọn chiều rộng viên thuốc ôm camera và sấm sét, không che Wi-Fi/pin hệ thống
+            val w = (rc.geometry.holeRadius + dp(24f)) * 2f
+            w to rc.geometry.compactHeight
+        }
         else -> super.measure(event, mode)
     }
 
@@ -163,16 +169,19 @@ class ChargingPresenter(rc: RenderContext) : Presenter(rc) {
     }
 
     private fun drawCompact(canvas: Canvas, w: Float, h: Float, alpha: Float) {
-        val a = alpha * compactVisibility(w, h)
+        val needed = rc.geometry.holeRadius * 2f + dp(12f)
+        val a = alpha * ((w - needed) / dp(14f)).coerceIn(0f, 1f)
         if (a <= 0.004f) return
         val s = slot(h)
         val cy = h / 2f + rc.burnInY
-        rc.glyphs.draw(canvas, if (isChargingState) Glyph.BOLT else Glyph.BATTERY, h / 2f + rc.burnInX, cy, s, color, a)
-        val bw = dp(24f)
-        val right = w - (h - s) / 2f + rc.burnInX
-        drawBattery(canvas, right - bw, cy - dp(6f), bw, dp(12f), a, small = true)
-        rc.numberPaint.textSize = rc.sp(14f)
-        drawPercent(canvas, right - bw - dp(6f), rc.baseline(rc.numberPaint, cy), rc.numberPaint, a, Paint.Align.RIGHT)
+
+        // Căn giữa biểu tượng sấm sét ở khoảng trống bên trái camera
+        val cameraX = if (rc.cameraXInShape > 0f) rc.cameraXInShape else w / 2f
+        val leftSpace = (cameraX - rc.geometry.holeRadius).coerceAtLeast(dp(20f))
+        val iconX = (leftSpace / 2f).coerceAtLeast(dp(12f)) + rc.burnInX
+
+        val pop = lerp(0.6f, 1f, boltPop.value)
+        rc.glyphs.draw(canvas, if (isChargingState) Glyph.BOLT else Glyph.BATTERY, iconX, cy, s * pop, color, a)
     }
 
     private fun drawToast(canvas: Canvas, alpha: Float) {

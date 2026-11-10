@@ -273,7 +273,7 @@ fun ChargingScreen(s: IslandSettings, ui: Ui) {
         item {
             Group(title = "Behaviour", footer = "\"Fast charging\" appears only when Android's own current and voltage readings sustain a high charging power. Time to full appears only when Android estimates it.") {
                 SwitchRow("Charging animation", s.chargingEnabled, { v -> ui.update { it.copy(chargingEnabled = v) } }, null, Icons.Rounded.BatteryChargingFull, BadgeColors.Green)
-                SwitchRow("Keep as live activity", s.chargingLiveActivity, { v -> ui.update { it.copy(chargingLiveActivity = v) } }, "Show the percentage in the island while plugged in", Icons.Rounded.BatteryFull, BadgeColors.Teal)
+                SwitchRow("Keep as live activity", s.chargingLiveActivity, { v -> ui.update { it.copy(chargingLiveActivity = v) } }, "Show charging bolt indicator beside camera while plugged in", Icons.Rounded.BatteryChargingFull, BadgeColors.Teal)
                 SwitchRow("Temperature in details", s.batteryShowTemperature, { v -> ui.update { it.copy(batteryShowTemperature = v) } }, null, Icons.Rounded.Thermostat, BadgeColors.Orange)
             }
         }

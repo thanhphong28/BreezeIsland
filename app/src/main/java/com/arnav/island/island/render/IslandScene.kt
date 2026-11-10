@@ -191,7 +191,12 @@ class IslandScene(private val rc: RenderContext) {
             // Retreat into the camera before fading out.
             IslandState.Hidden -> cameraDisc()
             IslandState.Idle -> geometry.idleFrame()
-            is IslandState.Compact -> geometry.compactFrame()
+            is IslandState.Compact -> {
+                val presenter = reusablePresenter(mainEvent!!, mode) ?: PresenterFactory.create(mainEvent.type, rc)
+                measuredWith = presenter
+                val (w, _) = presenter.measure(mainEvent, mode)
+                geometry.compactFrame(w)
+            }
             is IslandState.Split -> geometry.splitFrames().first
             is IslandState.Toast, is IslandState.Expanded, is IslandState.Stack -> {
                 val presenter = reusablePresenter(mainEvent!!, mode) ?: PresenterFactory.create(mainEvent.type, rc)
@@ -266,7 +271,7 @@ class IslandScene(private val rc: RenderContext) {
         val current = state
         mainLayer?.let { layer ->
             val p = layer.presenter
-            if (p.mode == PresentMode.TOAST || p.mode == PresentMode.EXPANDED) {
+            if (p.mode == PresentMode.TOAST || p.mode == PresentMode.EXPANDED || p.mode == PresentMode.COMPACT) {
                 val (w, h) = p.measure(p.event, p.mode)
                 p.bind(p.event, p.mode, w, h)
             }
@@ -314,7 +319,7 @@ class IslandScene(private val rc: RenderContext) {
         val reusable = reusablePresenter(event, mode)
         if (reusable != null) {
             val p = reusable
-            if (mode == PresentMode.TOAST || mode == PresentMode.EXPANDED) {
+            if (mode == PresentMode.TOAST || mode == PresentMode.EXPANDED || mode == PresentMode.COMPACT) {
                 if (abs(p.layoutW - frame.width) > 0.5f || abs(p.layoutH - frame.height) > 0.5f) {
                     p.bind(event, mode, frame.width, frame.height)
                 } else {
