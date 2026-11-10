@@ -81,6 +81,9 @@ class SoundIslandController(
         if (!settingsFn().soundIslandEnabled) return
         val now = System.currentTimeMillis()
         val elapsed = now - lastVolumePressTime
+
+        // Debounce rapid duplicate callbacks arriving within 35ms (e.g. both Proxy Controller and BroadcastReceiver)
+        if (elapsed < 35L) return
         lastVolumePressTime = now
 
         if (!isShowing) {
@@ -119,14 +122,34 @@ class SoundIslandController(
         }
     }
 
-    private val volumeObserver = VolumeKeyObserver(context, volumeManager) { newVol, maxVol, fraction ->
-        handleVolumeTrigger(newVol, maxVol, fraction)
-    }
+    private val volumeObserver = VolumeKeyObserver(
+        context = context,
+        volumeManager = volumeManager,
+        onVolumeChanged = { newVol, maxVol, fraction ->
+            handleVolumeTrigger(newVol, maxVol, fraction)
+        },
+        onSystemVolumeChanged = { newVol, maxVol, fraction ->
+            // If user adjusts volume via Samsung Quick Settings slider or Bluetooth while island is open,
+            // update island slider position smoothly in real time!
+            if (isShowing && view.visualState.mode == SoundIslandMode.VOLUME) {
+                handler.post {
+                    updateVisualState(
+                        currentVisualState().copy(
+                            currentVolume = newVol,
+                            maxVolume = maxVol,
+                            volumeFraction = fraction,
+                        )
+                    )
+                }
+            }
+        }
+    )
 
     private fun connectVolumeSuppressor() {
-        // Intentionally keep onVolumeChangedCallback null: BroadcastReceiver is our
-        // single, atomic source of truth with verified volume indexes.
-        VolumeSuppressor.onVolumeChangedCallback = null
+        VolumeSuppressor.onVolumeChangedCallback = { _, _ ->
+            val streamInfo = volumeManager.getStreamInfo(TARGET_STREAM)
+            handleVolumeTrigger(streamInfo.current, streamInfo.max, streamInfo.fraction)
+        }
     }
 
     fun start() {
@@ -140,9 +163,13 @@ class SoundIslandController(
             if (VolumeSuppressor.canUseShizuku()) {
                 Thread {
                     // Tell Android & Samsung One UI to always route volume keys to Media
-                    VolumeSuppressor.runShizukuShell("settings put secure volume_keys_control_media 1")
+                    VolumeSuppressor.runShizukuShell(
+                        "settings put system volume_keys_control_media 1; settings put secure volume_keys_control_media 1"
+                    )
                     if (s.soundIslandSuppressStock) {
                         VolumeSuppressor.suppress(context)
+                    } else if (VolumeSuppressor.isSuppressed) {
+                        VolumeSuppressor.restore(context)
                     }
                 }.start()
             }
@@ -166,10 +193,17 @@ class SoundIslandController(
             volumeObserver.start()
             connectVolumeSuppressor()
             updateOverlayVerticalPosition()
-            if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed && VolumeSuppressor.canUseShizuku()) {
-                Thread { VolumeSuppressor.suppress(context) }.start()
-            } else if (!s.soundIslandSuppressStock && VolumeSuppressor.isSuppressed) {
-                Thread { VolumeSuppressor.restore(context) }.start()
+            if (VolumeSuppressor.canUseShizuku()) {
+                Thread {
+                    VolumeSuppressor.runShizukuShell(
+                        "settings put system volume_keys_control_media 1; settings put secure volume_keys_control_media 1"
+                    )
+                    if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed) {
+                        VolumeSuppressor.suppress(context)
+                    } else if (!s.soundIslandSuppressStock && VolumeSuppressor.isSuppressed) {
+                        VolumeSuppressor.restore(context)
+                    }
+                }.start()
             }
         } else {
             stop()

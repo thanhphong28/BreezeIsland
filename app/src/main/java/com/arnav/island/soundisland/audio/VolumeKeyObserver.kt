@@ -4,21 +4,25 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.database.ContentObserver
 import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.arnav.island.util.Diagnostics
 
 /**
- * Listens for hardware volume button presses strictly when volume changes,
+ * Listens for hardware volume button presses and audio stream updates strictly,
  * without using AccessibilityService or Root.
  *
- * Filters out spurious broadcasts (such as app switching, audio focus shifts,
- * and duplicate intent deliveries) to prevent unwanted pop-ups.
+ * Ensures seamless iOS-like Media volume handling even when no music is playing.
  */
 class VolumeKeyObserver(
     private val context: Context,
     private val volumeManager: VolumeManager,
     private val onVolumeChanged: (newVolume: Int, maxVolume: Int, fraction: Float) -> Unit,
+    private val onSystemVolumeChanged: ((newVolume: Int, maxVolume: Int, fraction: Float) -> Unit)? = null,
 ) {
 
     private var registered = false
@@ -39,14 +43,40 @@ class VolumeKeyObserver(
                 val resolvedVolume = if (newVolume >= 0) newVolume else streamInfo.current
                 onVolumeChanged(resolvedVolume, streamInfo.max, streamInfo.fraction)
             } else {
-                // When system routes keys to Ring/Notification instead of Media:
-                // Safely redirect hardware key step to STREAM_MUSIC without infinite feedback loops.
+                // When no music is playing, Samsung's default hardware key routing may fall back to
+                // Ring/Notification/System. We redirect this hardware key step to STREAM_MUSIC (Media)
+                // just like iOS, and immediately trigger the visual island HUD!
                 val now = System.currentTimeMillis()
-                if (now - lastRedirectTime > 180L && prevVolume != -1 && newVolume != -1 && newVolume != prevVolume) {
+                if (now - lastRedirectTime > 90L) {
                     lastRedirectTime = now
-                    val direction = if (newVolume > prevVolume) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
-                    volumeManager.adjustVolume(AudioManager.STREAM_MUSIC, direction)
+                    val direction = when {
+                        prevVolume != -1 && newVolume > prevVolume -> AudioManager.ADJUST_RAISE
+                        prevVolume != -1 && newVolume < prevVolume -> AudioManager.ADJUST_LOWER
+                        else -> null
+                    }
+                    if (direction != null) {
+                        volumeManager.adjustVolume(AudioManager.STREAM_MUSIC, direction)
+                    }
+                    // Restore previous volume on the non-music stream so ringtone is not inadvertently altered
+                    if (prevVolume >= 0 && newVolume >= 0 && newVolume != prevVolume) {
+                        volumeManager.setVolume(streamType, prevVolume)
+                    }
+                    // Fetch the updated STREAM_MUSIC info and notify onVolumeChanged immediately!
+                    val mediaInfo = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
+                    onVolumeChanged(mediaInfo.current, mediaInfo.max, mediaInfo.fraction)
                 }
+            }
+        }
+    }
+
+    private val contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        private var lastObservedVolume = -1
+        override fun onChange(selfChange: Boolean) {
+            super.onChange(selfChange)
+            val info = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
+            if (info.current != lastObservedVolume) {
+                lastObservedVolume = info.current
+                onSystemVolumeChanged?.invoke(info.current, info.max, info.fraction)
             }
         }
     }
@@ -65,6 +95,17 @@ class VolumeKeyObserver(
                 Diagnostics.w(TAG, "Failed to register volume broadcast receiver", t)
             }
         }
+
+        try {
+            context.contentResolver.registerContentObserver(
+                Settings.System.CONTENT_URI,
+                true,
+                contentObserver
+            )
+        } catch (t: Throwable) {
+            Diagnostics.w(TAG, "Failed to register content observer", t)
+        }
+
         registered = true
     }
 
@@ -72,6 +113,9 @@ class VolumeKeyObserver(
         if (!registered) return
         try {
             context.unregisterReceiver(receiver)
+        } catch (_: Exception) {}
+        try {
+            context.contentResolver.unregisterContentObserver(contentObserver)
         } catch (_: Exception) {}
         registered = false
     }

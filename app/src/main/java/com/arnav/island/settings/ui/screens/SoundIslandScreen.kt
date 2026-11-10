@@ -73,15 +73,15 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
 
         item {
             Group(
-                title = "Replace Stock Samsung Volume Panel",
-                footer = "Disconnects Samsung's stock volume dialog using privileged system audio API. Zero root, zero accessibility, 100% banking and government apps safe.",
+                title = "Thay thế thanh âm lượng mặc định Samsung",
+                footer = "Ẩn thanh âm lượng gốc Samsung ngoài màn hình. Thanh âm lượng trong Trung tâm điều khiển (Quick Settings) của Samsung vẫn hoạt động bình thường 100%. Không root, không trợ năng, 100% an toàn với ngân hàng & VNeID.",
             ) {
                 SwitchRow(
-                    title = "Completely hide Samsung stock volume panel",
+                    title = "Ẩn thanh âm lượng Samsung ngoài màn hình",
                     subtitle = if (hasShizuku) {
-                        "Active · Only Breeze Sound Island will appear when volume buttons are pressed"
+                        "Đang hoạt động · Chỉ Breeze Sound Island xuất hiện ngoài màn hình, Trung tâm điều khiển hoạt động bình thường"
                     } else {
-                        "Requires Shizuku activation directly on phone (no PC needed)"
+                        "Cần kích hoạt Shizuku trực tiếp trên điện thoại (không cần máy tính)"
                     },
                     checked = settings.soundIslandSuppressStock && hasShizuku,
                     icon = Icons.Rounded.Tune,
@@ -104,8 +104,8 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                     },
                 )
                 SettingRow(
-                    title = "Restore Samsung Stock Volume Panel",
-                    subtitle = "Restart SystemUI via Shizuku to reload One UI's stock volume panel instantly",
+                    title = "Khôi phục thanh âm lượng gốc Samsung",
+                    subtitle = "Khôi phục ngay thanh âm lượng màn hình và Trung tâm điều khiển Samsung về mặc định",
                     icon = Icons.Rounded.Close,
                     iconColor = BadgeColors.Red,
                     onClick = {
@@ -115,8 +115,8 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                 )
                 if (!hasShizuku) {
                     SettingRow(
-                        title = "Activate Shizuku on phone (30s)",
-                        subtitle = "Wireless Debugging -> Pair with code on your phone to unlock full volume panel replacement",
+                        title = "Kích hoạt Shizuku trên điện thoại (30s)",
+                        subtitle = "Gỡ lỗi không dây -> Ghép nối bằng mã để kích hoạt tính năng ẩn thanh âm lượng gốc",
                         icon = Icons.Rounded.Security,
                         iconColor = BadgeColors.Blue,
                         onClick = {
