@@ -17,14 +17,23 @@ import kotlin.math.abs
 @SuppressLint("ViewConstructor")
 class SoundIslandView(
     context: Context,
-    val edge: ScreenEdge = ScreenEdge.RIGHT,
+    initialEdge: ScreenEdge = ScreenEdge.RIGHT,
     val onVolumeDrag: (fraction: Float) -> Unit,
     val onSilentTap: () -> Unit,
     val onWorkTap: () -> Unit,
     val onModeSwitch: (SoundIslandMode) -> Unit,
     val onUserInteracted: () -> Unit,
     val onDismissRequested: () -> Unit,
+    val onDismissFinished: () -> Unit,
 ) : View(context), Choreographer.FrameCallback {
+
+    var edge: ScreenEdge = initialEdge
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidate()
+            }
+        }
 
     private val renderer = SoundIslandRenderer(context)
     private val choreographer = Choreographer.getInstance()
@@ -51,7 +60,6 @@ class SoundIslandView(
     }
 
     fun updateState(state: SoundIslandVisualState, animateSlide: Boolean = true) {
-        val oldMode = visualState.mode
         visualState = state
         volumeSpring.animateTo(state.volumeFraction)
         if (animateSlide) {
@@ -88,6 +96,9 @@ class SoundIslandView(
             requestFrame()
         } else {
             lastFrameNanos = 0L
+            if (slideSpring.target == 0f && slideSpring.value <= 0.02f) {
+                onDismissFinished()
+            }
         }
     }
 
@@ -109,6 +120,12 @@ class SoundIslandView(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        // Absolutely NEVER intercept touch when the island is closed or closing!
+        // This ensures swiping the screen edge in any app/launcher works 100% normally.
+        if (visualState.slideProgress < 0.25f || slideSpring.target == 0f) {
+            return false
+        }
+
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
@@ -125,10 +142,10 @@ class SoundIslandView(
                 if (!trackingTouch) return false
                 onUserInteracted()
                 val dx = event.x - downX
-                val dy = event.y - downY
 
-                // Fling/swipe right towards bezel dismisses
-                if (edge == ScreenEdge.RIGHT && dx > renderer.dp(24f)) {
+                // Swipe towards screen bezel dismisses
+                val flingTowardsBezel = if (edge == ScreenEdge.RIGHT) dx > renderer.dp(20f) else dx < -renderer.dp(20f)
+                if (flingTowardsBezel) {
                     onDismissRequested()
                     trackingTouch = false
                     return true
@@ -149,7 +166,7 @@ class SoundIslandView(
                 if (abs(dx) < renderer.dp(12f) && abs(dy) < renderer.dp(12f)) {
                     when (visualState.mode) {
                         SoundIslandMode.VOLUME -> {
-                            // Cycle to SILENT on tap outside slider or double tap
+                            // Cycle to SILENT on tap
                             onModeSwitch(SoundIslandMode.SILENT)
                             performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                         }
@@ -177,9 +194,8 @@ class SoundIslandView(
         val sliderH = renderer.dp(132f)
         val centerY = height / 2f
         val sliderTop = centerY - sliderH / 2f
-        val sliderBottom = centerY + sliderH / 2f
-
         val fraction = (1f - ((touchY - sliderTop) / sliderH)).coerceIn(0f, 1f)
+
         volumeSpring.snapTo(fraction)
         visualState = visualState.copy(volumeFraction = fraction)
         invalidate()

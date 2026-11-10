@@ -4,21 +4,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.database.ContentObserver
 import android.media.AudioManager
-import android.os.Handler
-import android.os.Looper
-import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.arnav.island.util.Diagnostics
 
 /**
- * Listens for hardware volume button presses and audio level changes in the background
+ * Listens for hardware volume button presses strictly when volume changes,
  * without using AccessibilityService or Root.
  *
- * Uses a dual-channel observation approach:
- *  1. Android's internal `android.media.VOLUME_CHANGED_ACTION` broadcast (instantaneous ~5ms).
- *  2. [ContentObserver] on `Settings.System` audio stream URIs as a fallback.
+ * Filters out spurious broadcasts (such as app switching, audio focus shifts,
+ * and duplicate intent deliveries) to prevent unwanted pop-ups.
  */
 class VolumeKeyObserver(
     private val context: Context,
@@ -26,35 +21,62 @@ class VolumeKeyObserver(
     private val onVolumeChanged: (streamType: Int, newVolume: Int, maxVolume: Int, fraction: Float) -> Unit,
 ) {
 
-    private val handler = Handler(Looper.getMainLooper())
     private var registered = false
+    private val lastVolumes = mutableMapOf<Int, Int>()
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
-            if (intent.action == ACTION_VOLUME_CHANGED) {
-                val streamType = intent.getIntExtra(EXTRA_VOLUME_STREAM_TYPE, AudioManager.STREAM_MUSIC)
-                val newVolume = intent.getIntExtra(EXTRA_VOLUME_STREAM_VALUE, -1)
-                val streamInfo = volumeManager.getStreamInfo(streamType)
-                val resolvedVolume = if (newVolume >= 0) newVolume else streamInfo.current
-                val fraction = if (streamInfo.max > streamInfo.min) {
-                    ((resolvedVolume - streamInfo.min).toFloat() / (streamInfo.max - streamInfo.min)).coerceIn(0f, 1f)
-                } else {
-                    0f
-                }
-                onVolumeChanged(streamType, resolvedVolume, streamInfo.max, fraction)
-            }
-        }
-    }
+            if (intent.action != ACTION_VOLUME_CHANGED) return
 
-    private val contentObserver = object : ContentObserver(handler) {
-        override fun onChange(selfChange: Boolean) {
-            val streamInfo = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
-            onVolumeChanged(AudioManager.STREAM_MUSIC, streamInfo.current, streamInfo.max, streamInfo.fraction)
+            val streamType = intent.getIntExtra(EXTRA_VOLUME_STREAM_TYPE, -1)
+            if (streamType == -1) return
+
+            val newVolume = intent.getIntExtra(EXTRA_VOLUME_STREAM_VALUE, -1)
+            val prevVolume = intent.getIntExtra(EXTRA_PREV_VOLUME_STREAM_VALUE, -1)
+
+            // If prevVolume is known and equals newVolume, no actual user volume change happened
+            if (prevVolume != -1 && newVolume == prevVolume) return
+
+            val streamInfo = volumeManager.getStreamInfo(streamType)
+            val resolvedVolume = if (newVolume >= 0) newVolume else streamInfo.current
+
+            // Check if volume level actually changed from our last recorded level
+            val previousRecorded = lastVolumes[streamType]
+            if (previousRecorded != null && previousRecorded == resolvedVolume) {
+                // Spurious broadcast (e.g. app transition, audio routing change)
+                return
+            }
+
+            lastVolumes[streamType] = resolvedVolume
+
+            val fraction = if (streamInfo.max > streamInfo.min) {
+                ((resolvedVolume - streamInfo.min).toFloat() / (streamInfo.max - streamInfo.min)).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+
+            onVolumeChanged(streamType, resolvedVolume, streamInfo.max, fraction)
         }
     }
 
     fun start() {
         if (registered) return
+
+        // Pre-populate last known volumes so starting up never fires a false trigger
+        val streams = intArrayOf(
+            AudioManager.STREAM_MUSIC,
+            AudioManager.STREAM_RING,
+            AudioManager.STREAM_NOTIFICATION,
+            AudioManager.STREAM_ALARM,
+            AudioManager.STREAM_SYSTEM,
+            AudioManager.STREAM_VOICE_CALL,
+        )
+        for (s in streams) {
+            try {
+                lastVolumes[s] = volumeManager.getStreamInfo(s).current
+            } catch (_: Exception) {}
+        }
+
         try {
             val filter = IntentFilter(ACTION_VOLUME_CHANGED)
             ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
@@ -66,16 +88,6 @@ class VolumeKeyObserver(
                 Diagnostics.w(TAG, "Failed to register volume broadcast receiver", t)
             }
         }
-
-        try {
-            context.contentResolver.registerContentObserver(
-                Settings.System.CONTENT_URI,
-                true,
-                contentObserver,
-            )
-        } catch (e: Exception) {
-            Diagnostics.w(TAG, "Failed to register content observer", e)
-        }
         registered = true
     }
 
@@ -84,10 +96,12 @@ class VolumeKeyObserver(
         try {
             context.unregisterReceiver(receiver)
         } catch (_: Exception) {}
-        try {
-            context.contentResolver.unregisterContentObserver(contentObserver)
-        } catch (_: Exception) {}
         registered = false
+    }
+
+    /** Keep internal state updated when the user manually changes volume on Breeze Sound Island. */
+    fun recordVolume(streamType: Int, level: Int) {
+        lastVolumes[streamType] = level
     }
 
     companion object {

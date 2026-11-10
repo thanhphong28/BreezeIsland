@@ -6,6 +6,7 @@ import com.arnav.island.events.ChargingTheme
 import com.arnav.island.events.NotificationPrivacy
 import com.arnav.island.island.GeometryConfig
 import com.arnav.island.island.IdleStyle
+import com.arnav.island.soundisland.render.ScreenEdge
 
 enum class AppLanguage(val label: String) { VIETNAMESE("Tiếng Việt"), ENGLISH("English") }
 
@@ -226,6 +227,7 @@ data class IslandSettings(
 
     // Breeze Sound Island (Liquid Glass Edge Volume & Focus Island)
     val soundIslandEnabled: Boolean = true,
+    val soundIslandEdge: ScreenEdge = ScreenEdge.LEFT,
     val soundIslandYPercent: Float = 0.22f,
     val soundIslandAutoDismissMs: Long = 1800L,
     val soundIslandWorkDnd: Boolean = true,

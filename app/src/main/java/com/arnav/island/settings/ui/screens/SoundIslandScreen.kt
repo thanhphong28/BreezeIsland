@@ -13,11 +13,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DoNotDisturb
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Work
 import androidx.compose.material3.AssistChip
@@ -33,9 +30,11 @@ import androidx.compose.ui.unit.dp
 import com.arnav.island.overlay.IslandOverlayService
 import com.arnav.island.permissions.PermissionSnapshot
 import com.arnav.island.permissions.Permissions
+import com.arnav.island.soundisland.render.ScreenEdge
 import com.arnav.island.settings.ui.Ui
 import com.arnav.island.settings.ui.components.Group
 import com.arnav.island.settings.ui.components.InfoCard
+import com.arnav.island.settings.ui.components.SegmentedRow
 import com.arnav.island.settings.ui.components.SettingRow
 import com.arnav.island.settings.ui.components.SettingsPage
 import com.arnav.island.settings.ui.components.SliderRow
@@ -58,7 +57,7 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
             Group {
                 SwitchRow(
                     title = "Enable Breeze Sound Island",
-                    subtitle = "Liquid Glass volume, silent & work controls sliding out from the right screen bezel",
+                    subtitle = "Liquid Glass volume, silent & work controls sliding out when hardware volume keys are pressed",
                     checked = settings.soundIslandEnabled,
                     icon = Icons.AutoMirrored.Rounded.VolumeUp,
                     iconColor = BadgeColors.Orange,
@@ -105,22 +104,47 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
 
         item {
             Group(
-                title = "Galaxy Z Flip5 Edge Calibration",
-                footer = "Default 22% aligns seamlessly with the Galaxy Z Flip5 physical volume rocker keys.",
+                title = "Edge & Alignment Calibration",
+                footer = "On Galaxy Z Flip5, Samsung's default volume panel is fixed on the right. Selecting 'Left edge' completely prevents them from overlapping.",
             ) {
+                SegmentedRow(
+                    options = ScreenEdge.entries,
+                    selected = settings.soundIslandEdge,
+                    label = { edge ->
+                        when (edge) {
+                            ScreenEdge.LEFT -> "Left edge (No overlap)"
+                            ScreenEdge.RIGHT -> "Right edge"
+                        }
+                    },
+                    onSelect = { edge ->
+                        ui.update { it.copy(soundIslandEdge = edge) }
+                        IslandOverlayService.activeSoundIsland?.showTestVolume()
+                    },
+                    title = "Screen edge position",
+                    subtitle = "Edge where the Liquid Glass notch slides out",
+                )
                 SliderRow(
-                    title = "Right edge vertical position",
+                    title = "Edge vertical position",
                     value = settings.soundIslandYPercent,
-                    range = 0.10f..0.65f,
+                    range = 0.10f..0.70f,
                     live = true,
                     onValueChange = { frac ->
                         ui.update { it.copy(soundIslandYPercent = frac) }
                         IslandOverlayService.activeSoundIsland?.showTestVolume()
                     },
                     format = { String.format("%.0f%%", it * 100f) },
-                    subtitle = "Aligns the Liquid Glass notch with your physical volume buttons",
+                    subtitle = "Fine-tune vertical height along the screen bezel",
                 )
             }
+        }
+
+        item {
+            InfoCard(
+                title = "Fix Overlapping with Samsung Volume Panel",
+                body = "Samsung One UI triggers its own stock volume bar on the right edge whenever physical buttons are pressed without Accessibility Service.\n\n• Solution 1 (Recommended): Set Screen edge to 'Left edge' above. Both bars appear on opposite sides cleanly without any overlap!\n• Solution 2: If you want it on the right edge, install Samsung's official SoundAssistant (Galaxy Store / Good Lock) -> 'Customize volume panel' to relocate Samsung's panel to Left.",
+                icon = Icons.Rounded.Tune,
+                color = BadgeColors.Blue,
+            )
         }
 
         item {
@@ -172,7 +196,7 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                         ui.update { it.copy(soundIslandAutoDismissMs = ms.toLong()) }
                     },
                     format = { String.format("%.1fs", it / 1000f) },
-                    subtitle = "How long the notch stays visible after the last interaction",
+                    subtitle = "Only hardware volume keys trigger the notch; screen edge swipes will never trigger it",
                 )
             }
         }
@@ -183,15 +207,6 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                 body = "Breeze Sound Island runs strictly with standard WindowManager Overlay and public Audio APIs. Absolutely NO Accessibility Service, NO Root, and NO SystemUI tampering. Your banking apps and VNeID remain 100% safe and functional.",
                 icon = Icons.Rounded.Security,
                 color = BadgeColors.Green,
-            )
-        }
-
-        item {
-            InfoCard(
-                title = "Samsung One UI 9 Volume Panel Tip",
-                body = "When sliding the Breeze Sound Island volume bar with your finger, Samsung's default volume UI is completely suppressed. If you also wish to hide the stock volume bar when pressing the physical buttons, you can easily disable it via Samsung SoundAssistant (from Good Lock on Galaxy Store) without requiring any root or special permissions.",
-                icon = Icons.Rounded.Tune,
-                color = BadgeColors.Blue,
             )
         }
 

@@ -26,12 +26,13 @@ class SoundIslandController(
     val silentManager = SilentModeManager(context)
     val workManager = WorkProfileManager(context, volumeManager)
 
-    private val edge = ScreenEdge.RIGHT
-
     private val view: SoundIslandView = SoundIslandView(
         context = context,
-        edge = edge,
+        initialEdge = settingsFn().soundIslandEdge,
         onVolumeDrag = { frac ->
+            val info = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
+            val newLevel = (frac * info.max).toInt()
+            volumeObserver.recordVolume(AudioManager.STREAM_MUSIC, newLevel)
             volumeManager.setVolumeFraction(AudioManager.STREAM_MUSIC, frac)
             scheduleAutoDismiss()
         },
@@ -68,9 +69,14 @@ class SoundIslandController(
         },
         onUserInteracted = { scheduleAutoDismiss() },
         onDismissRequested = { dismissNow() },
+        onDismissFinished = {
+            overlay.setTouchable(false)
+            overlay.detach()
+            isShowing = false
+        },
     )
 
-    private val overlay = SoundIslandOverlay(context, view, edge)
+    private val overlay = SoundIslandOverlay(context, view, settingsFn().soundIslandEdge)
 
     private val volumeObserver = VolumeKeyObserver(context, volumeManager) { streamType, newVol, maxVol, fraction ->
         if (!settingsFn().soundIslandEnabled) return@VolumeKeyObserver
@@ -90,6 +96,9 @@ class SoundIslandController(
 
     fun start() {
         if (settingsFn().soundIslandEnabled) {
+            val s = settingsFn()
+            overlay.updateEdge(s.soundIslandEdge)
+            view.edge = s.soundIslandEdge
             volumeObserver.start()
             updateOverlayVerticalPosition()
         }
@@ -98,11 +107,14 @@ class SoundIslandController(
     fun stop() {
         handler.removeCallbacks(dismissRunnable)
         volumeObserver.stop()
+        overlay.setTouchable(false)
         overlay.detach()
         isShowing = false
     }
 
     fun updateSettings(s: IslandSettings) {
+        overlay.updateEdge(s.soundIslandEdge)
+        view.edge = s.soundIslandEdge
         if (s.soundIslandEnabled) {
             volumeObserver.start()
             updateOverlayVerticalPosition()
@@ -119,7 +131,8 @@ class SoundIslandController(
         fraction: Float? = null,
         force: Boolean = false,
     ) {
-        if (!force && !settingsFn().soundIslandEnabled) return
+        val s = settingsFn()
+        if (!force && !s.soundIslandEnabled) return
 
         val info = volumeManager.getStreamInfo(streamType)
         val curVol = volume ?: info.current
@@ -138,7 +151,10 @@ class SoundIslandController(
             slideProgress = 1f,
         )
 
+        overlay.updateEdge(s.soundIslandEdge)
+        view.edge = s.soundIslandEdge
         updateOverlayVerticalPosition()
+
         overlay.attach()
         overlay.setTouchable(true)
         view.updateState(state, animateSlide = true)
@@ -154,13 +170,9 @@ class SoundIslandController(
 
     fun dismiss() {
         if (!isShowing) return
+        // Instantly disable touch input so any taps or swipes immediately pass through
+        overlay.setTouchable(false)
         view.updateState(currentVisualState().copy(slideProgress = 0f), animateSlide = true)
-        handler.postDelayed({
-            if (view.slideSpring.isAtRest && view.slideSpring.value <= 0.05f) {
-                overlay.setTouchable(false)
-                isShowing = false
-            }
-        }, 350)
     }
 
     fun dismissNow() {

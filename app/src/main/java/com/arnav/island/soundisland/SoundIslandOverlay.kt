@@ -2,22 +2,19 @@ package com.arnav.island.soundisland
 
 import android.content.Context
 import android.graphics.PixelFormat
-import android.graphics.Rect
-import android.os.Build
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
 import com.arnav.island.soundisland.render.ScreenEdge
 import com.arnav.island.util.Diagnostics
 
 /**
  * Manages the WindowManager overlay specifically for Breeze Sound Island.
- * Sits flush along the right screen bezel near the Galaxy Z Flip5 physical volume keys.
+ * Sits flush along the screen bezel with dynamic left/right placement.
  */
 class SoundIslandOverlay(
     private val context: Context,
     private val view: SoundIslandView,
-    val edge: ScreenEdge = ScreenEdge.RIGHT,
+    initialEdge: ScreenEdge = ScreenEdge.RIGHT,
 ) {
 
     private val wm = context.getSystemService(WindowManager::class.java)
@@ -25,6 +22,9 @@ class SoundIslandOverlay(
     fun dp(v: Float): Float = v * density
 
     var attached = false
+        private set
+
+    var edge: ScreenEdge = initialEdge
         private set
 
     private val windowWidth = dp(96f).toInt()
@@ -36,16 +36,16 @@ class SoundIslandOverlay(
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
         PixelFormat.TRANSLUCENT,
     ).apply {
         gravity = Gravity.TOP or (if (edge == ScreenEdge.RIGHT) Gravity.END else Gravity.START)
         layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         x = 0
-        y = dp(140f).toInt() // Default vertical placement near Z Flip5 volume rocker
+        y = dp(140f).toInt()
         title = "BreezeSoundIsland"
     }
 
@@ -69,6 +69,18 @@ class SoundIslandOverlay(
         attached = false
     }
 
+    fun updateEdge(newEdge: ScreenEdge) {
+        if (edge == newEdge) return
+        edge = newEdge
+        view.edge = newEdge
+        params.gravity = Gravity.TOP or (if (edge == ScreenEdge.RIGHT) Gravity.END else Gravity.START)
+        if (attached) {
+            try {
+                wm.updateViewLayout(view, params)
+            } catch (_: Exception) {}
+        }
+    }
+
     fun setVerticalPosition(yPx: Int) {
         if (params.y == yPx) return
         params.y = yPx
@@ -80,8 +92,8 @@ class SoundIslandOverlay(
     }
 
     /**
-     * When hidden, sets [WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE] so the collapsed window
-     * never intercepts touches meant for underlying apps.
+     * Controls whether touch events are forwarded to the island or passed straight through
+     * to the underlying app/launcher.
      */
     fun setTouchable(touchable: Boolean) {
         val oldFlags = params.flags
