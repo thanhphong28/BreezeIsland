@@ -319,16 +319,17 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
     private fun coversStatusBar(): Boolean {
         val scene = view.scene
         val card = scene.state is IslandState.Toast || scene.state.isLarge
-        return card && statusBarVisible.value && scene.target.bottom > rc.statusBarBottom + rc.dp(12f)
+        return card && (statusBarVisible.value || window.suppressingStatusBar) && scene.target.bottom > rc.geometry.statusBandBottom + rc.dp(8f)
     }
 
     /** Synchronizes status bar ongoing-chip and seamless-card blacklists with the live island state. */
     private fun syncStatusBar() {
         val scene = view.scene
-        val showing = hiddenReason == null && statusBarVisible.value
+        val showing = hiddenReason == null && (statusBarVisible.value || window.suppressingStatusBar)
         val active = showing && scene.state != IslandState.Hidden && scene.state != IslandState.Idle
         val split = active && scene.state is IslandState.Split
         val covers = active && coversStatusBar()
+        window.setSuppressStatusBar(covers && settings.seamlessStatusBar)
         StatusBarCleanup.updateOverlayState(service, active = active, split = split, coversStatusBar = covers)
     }
 
@@ -448,7 +449,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         val calibrating = graph.calibrating.value
         val pkg = foreground.current.value
         val rule = settings.ruleFor(pkg)
-        val fullscreen = !statusBarVisible.value && !st.locked
+        val fullscreen = !statusBarVisible.value && !st.locked && !window.suppressingStatusBar
         rc.statusBarBottom = if (fullscreen) 0f else g.screen.statusBarHeightPx.toFloat()
         val isGame = pkg != null && graph.apps.isGame(pkg)
         val isVideo = pkg != null && graph.apps.isVideo(pkg)

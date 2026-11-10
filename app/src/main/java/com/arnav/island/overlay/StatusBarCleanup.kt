@@ -32,6 +32,7 @@ object StatusBarCleanup {
     val ICONS: Map<String, String> = linkedMapOf(
         "ongoing_activity" to "One UI Live Notification / Media chip",
         "ongoing_call_chip" to "One UI ongoing call chip",
+        "managed_profile" to "Work Profile / Secure Folder",
         "alarm_clock" to "Alarm",
         "volume" to "Sound / vibrate",
         "zen" to "Do Not Disturb",
@@ -44,7 +45,7 @@ object StatusBarCleanup {
         "data_saver" to "Data Saver",
     )
 
-    /** One UI 6 / 7 ongoing & live notification slots that collide with the Dynamic Island in Compact/Split mode. */
+    /** One UI 6–9 ongoing & right-side icon slots that sit next to the Dynamic Island in Compact/Split mode. */
     private val ACTIVE_ISLAND_SLOTS = listOf(
         "ongoing_activity",
         "ongoing_activity_chip",
@@ -53,18 +54,36 @@ object StatusBarCleanup {
         "ongoing_privacy_chip",
         "media_ongoing",
         "live_notification",
+        "managed_profile",
+        "knox_container",
+        "volume",
+        "zen",
+        "alarm_clock",
+        "rotate",
+        "headset",
     )
 
-    /** Slots hidden while an expanded card or wide banner toast is open. */
-    private val SEAMLESS_SLOTS = ACTIVE_ISLAND_SLOTS + listOf(
+    /** Right-side status bar slots covered when the Split bubble buds to the right of the main pill. */
+    private val SPLIT_RIGHT_SLOTS = ACTIVE_ISLAND_SLOTS + listOf(
+        "wifi",
+        "bluetooth",
+        "vpn",
+        "data_saver",
+        "hotspot",
+        "nfc",
+        "location",
+        "cast",
+    )
+
+    /** Slots hidden while an expanded card or wide banner toast covers the status bar header. */
+    private val SEAMLESS_SLOTS = SPLIT_RIGHT_SLOTS + listOf(
         "clock",
         "battery",
-        "wifi",
         "mobile",
         "airplane",
-        "data_saver",
-        "vpn",
-        "hotspot",
+        "sync_active",
+        "tty",
+        "speakerphone",
     )
 
     @Volatile
@@ -131,7 +150,7 @@ object StatusBarCleanup {
                         if (s.statusBarCleanup) addAll(parse(s.statusBarIcons))
                         if (s.seamlessStatusBar && islandActive) {
                             addAll(ACTIVE_ISLAND_SLOTS)
-                            if (splitActive) add("clock")
+                            if (splitActive) addAll(SPLIT_RIGHT_SLOTS)
                         }
                         if (s.seamlessStatusBar && cardOpen) {
                             addAll(SEAMLESS_SLOTS)

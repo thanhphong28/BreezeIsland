@@ -881,33 +881,8 @@ class IslandScene(private val rc: RenderContext) {
         drawGlow(canvas, v)
         if (theme == IslandTheme.CUSTOM) drawCustomGlow(canvas, v)
 
-        // Shape: for wide cards (Toast banner, Expanded card, Stack), slide the full-width card
-        // body's top edge down to statusBandBottom so status-bar icons (left clock & right system
-        // icons) never overlap the wide card, while keeping the compact camera pill anchored around
-        // the camera cutout inside the safe center corridor of the status bar.
-        val isWideCard = shapeRect.height() > geometry.compactHeight + rc.dp(8f) &&
-            shapeRect.width() > geometry.compactWidth + rc.dp(32f)
-        val expandT = if (isWideCard) {
-            ((shapeRect.width() - (geometry.compactWidth + rc.dp(32f))) / rc.dp(56f)).coerceIn(0f, 1f)
-        } else {
-            0f
-        }
-        val targetCardTop = min(geometry.statusBandBottom, shapeRect.bottom - geometry.compactHeight)
-        val cardTop = lerp(shapeRect.top, max(shapeRect.top, targetCardTop), expandT)
-        val cardRadius = min((shapeRect.bottom - cardTop).coerceAtLeast(1f) / 2f, radius)
-        SmoothShapes.roundRect(shapePath, shapeRect.left, cardTop, shapeRect.right, shapeRect.bottom, cardRadius)
-        val hasCameraStem = cardTop > shapeRect.top + 0.5f
-        if (hasCameraStem) {
-            val stem = geometry.compactFrame()
-            SmoothShapes.roundRect(
-                stemPath,
-                stem.left,
-                shapeRect.top,
-                stem.right,
-                shapeRect.top + geometry.compactHeight,
-                geometry.compactHeight / 2f,
-            )
-        }
+        // Shape: always stays at the very top edge (shapeRect.top = baseTop) covering the camera and header.
+        SmoothShapes.roundRect(shapePath, shapeRect.left, shapeRect.top, shapeRect.right, shapeRect.bottom, radius)
         val hasBubble = isBubbleVisible
         bridgePath.rewind()
         if (hasBubble) {
@@ -937,7 +912,6 @@ class IslandScene(private val rc: RenderContext) {
         fillPaint.color = if (translucent) 0xFF0E0F12.toInt() else 0xFF000000.toInt()
         fillPaint.alpha = if (translucent) 255 else (255 * v).toInt().coerceIn(0, 255)
         if (v > 0.001f) {
-            if (hasCameraStem) canvas.drawPath(stemPath, fillPaint)
             canvas.drawPath(shapePath, fillPaint)
             if (hasBubble) {
                 canvas.drawPath(bubblePath, fillPaint)

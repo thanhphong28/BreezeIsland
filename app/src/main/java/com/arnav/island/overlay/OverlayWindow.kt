@@ -28,7 +28,50 @@ class OverlayWindow(private val context: Context, private val view: View) {
     var attached = false
         private set
 
+    var suppressingStatusBar = false
+        private set
+
     val bounds: Rect get() = current
+
+    /**
+     * When the Dynamic Island expands across the status bar header, temporarily takes focus with
+     * [WindowManager.LayoutParams.FLAG_FULLSCREEN] and hides [android.view.WindowInsets.Type.statusBars]
+     * so SystemUI hides the status bar icons underneath the Dynamic Island, making the island
+     * appear strictly on top of the header without AccessibilityService.
+     */
+    @Suppress("DEPRECATION")
+    fun setSuppressStatusBar(suppress: Boolean) {
+        if (suppressingStatusBar == suppress) return
+        suppressingStatusBar = suppress
+        if (suppress) {
+            params.flags = (params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()) or
+                WindowManager.LayoutParams.FLAG_FULLSCREEN
+            view.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        } else {
+            params.flags = (params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) and
+                WindowManager.LayoutParams.FLAG_FULLSCREEN.inv()
+            view.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+        }
+        if (attached) {
+            try {
+                wm.updateViewLayout(view, params)
+                if (Build.VERSION.SDK_INT >= 30) {
+                    val controller = view.windowInsetsController
+                    if (suppress) {
+                        controller?.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        controller?.hide(android.view.WindowInsets.Type.statusBars())
+                    } else {
+                        controller?.show(android.view.WindowInsets.Type.statusBars())
+                    }
+                }
+            } catch (e: RuntimeException) {
+                Diagnostics.w(TAG, "setSuppressStatusBar failed", e)
+            }
+        }
+    }
 
     fun attach(initial: Rect) {
         if (attached) return

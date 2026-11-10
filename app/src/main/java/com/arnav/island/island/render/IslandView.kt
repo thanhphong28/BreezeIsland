@@ -7,6 +7,7 @@ import android.graphics.RectF
 import android.os.Build
 import android.view.Choreographer
 import android.view.HapticFeedbackConstants
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
@@ -226,6 +227,16 @@ class IslandView(
 
     private fun sx(e: MotionEvent) = if (overlayMode) e.rawX else e.x
     private fun sy(e: MotionEvent) = if (overlayMode) e.rawY else e.y
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK && scene.state.isLarge) {
+            if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) {
+                host?.onOutsideTouch()
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
