@@ -18,4 +18,5 @@ data class SoundIslandVisualState(
     val workActive: Boolean = false,
     val dndActive: Boolean = false,
     val slideProgress: Float = 0f, // 0 = tucked into bezel, 1 = fully out
+    val expandProgress: Float = 0f, // 0 = thin stick, 1 = full expanded capsule
 )

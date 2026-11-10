@@ -79,9 +79,23 @@ class SoundIslandController(
 
     private val overlay = SoundIslandOverlay(context, view, settingsFn().soundIslandEdge)
 
+    private var dismissRunnable = Runnable { dismiss() }
+    private var shrinkRunnable = Runnable { view.setExpanded(false) }
+    private var lastVolumePressTime = 0L
+    private var isShowing = false
+
     private val volumeObserver = VolumeKeyObserver(context, volumeManager) { streamType, newVol, maxVol, fraction ->
         if (!settingsFn().soundIslandEnabled) return@VolumeKeyObserver
+        val now = System.currentTimeMillis()
+        val isConsecutiveOrHold = (now - lastVolumePressTime) < 420L
+        lastVolumePressTime = now
+
         handler.post {
+            handler.removeCallbacks(shrinkRunnable)
+            if (isConsecutiveOrHold) {
+                view.setExpanded(true)
+                handler.postDelayed(shrinkRunnable, 1100L)
+            }
             show(
                 mode = SoundIslandMode.VOLUME,
                 streamType = streamType,
@@ -91,9 +105,6 @@ class SoundIslandController(
             )
         }
     }
-
-    private var dismissRunnable = Runnable { dismiss() }
-    private var isShowing = false
 
     fun start() {
         if (settingsFn().soundIslandEnabled) {
@@ -158,6 +169,7 @@ class SoundIslandController(
             workActive = workManager.isActive,
             dndActive = workManager.isDndActive(),
             slideProgress = 1f,
+            expandProgress = if (mode != SoundIslandMode.VOLUME) 1f else view.expandSpring.target,
         )
 
         overlay.updateEdge(s.soundIslandEdge)
@@ -172,13 +184,20 @@ class SoundIslandController(
         scheduleAutoDismiss()
     }
 
-    fun showTestVolume() = show(SoundIslandMode.VOLUME, force = true)
+    fun showTestVolume() {
+        view.setExpanded(true)
+        show(SoundIslandMode.VOLUME, force = true)
+        handler.removeCallbacks(shrinkRunnable)
+        handler.postDelayed(shrinkRunnable, 1400L)
+    }
     fun showTestSilent() = show(SoundIslandMode.SILENT, force = true)
     fun showTestWork() = show(SoundIslandMode.WORK, force = true)
     fun hide() = dismissNow()
 
     fun dismiss() {
         if (!isShowing) return
+        handler.removeCallbacks(shrinkRunnable)
+        view.setExpanded(false)
         // Instantly disable touch input so any taps or swipes immediately pass through
         overlay.setTouchable(false)
         view.updateState(currentVisualState().copy(slideProgress = 0f), animateSlide = true)

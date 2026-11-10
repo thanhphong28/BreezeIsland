@@ -193,6 +193,15 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
 
         item {
             InfoCard(
+                title = "Smart Fluid Gestures",
+                body = "• Single press: Appears as a sleek ultra-thin Stick.\n• Hold button or touch slider: Expands into full tactile capsule.\n• Drag Up / Down: Adjusts volume level smoothly.\n• Swipe Inward (Horizontal): Switches seamlessly between Volume, Silent, and Work modes.\n• Tap in Silent Mode: Cycles Ring ↔ Vibrate ↔ Mute.",
+                icon = Icons.Rounded.Tune,
+                color = BadgeColors.Indigo,
+            )
+        }
+
+        item {
+            InfoCard(
                 title = "All Ways to Prevent Samsung Volume Overlap",
                 body = "• Way 1 (100% Replacement): Enable 'Completely hide Samsung stock volume panel' above via Shizuku on your phone. Samsung's panel is completely suppressed!\n• Way 2 (No Shizuku): Select 'Left edge' above. Both bars appear on opposite sides without any overlap!\n• Way 3 (Samsung Official App): Install SoundAssistant from Galaxy Store (Good Lock) -> 'Customize volume panel' to relocate Samsung's panel to Left.",
                 icon = Icons.Rounded.Tune,
