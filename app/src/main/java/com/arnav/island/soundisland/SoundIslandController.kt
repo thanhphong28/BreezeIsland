@@ -84,8 +84,8 @@ class SoundIslandController(
     private var lastVolumePressTime = 0L
     private var isShowing = false
 
-    private val volumeObserver = VolumeKeyObserver(context, volumeManager) { streamType, newVol, maxVol, fraction ->
-        if (!settingsFn().soundIslandEnabled) return@VolumeKeyObserver
+    private fun handleVolumeTrigger(streamType: Int, newVol: Int? = null, maxVol: Int? = null, frac: Float? = null) {
+        if (!settingsFn().soundIslandEnabled) return
         val now = System.currentTimeMillis()
         val isConsecutiveOrHold = (now - lastVolumePressTime) < 420L
         lastVolumePressTime = now
@@ -96,13 +96,24 @@ class SoundIslandController(
                 view.setExpanded(true)
                 handler.postDelayed(shrinkRunnable, 1100L)
             }
+            val info = volumeManager.getStreamInfo(streamType)
             show(
                 mode = SoundIslandMode.VOLUME,
                 streamType = streamType,
-                volume = newVol,
-                maxVolume = maxVol,
-                fraction = fraction,
+                volume = newVol ?: info.current,
+                maxVolume = maxVol ?: info.max,
+                fraction = frac ?: info.fraction,
             )
+        }
+    }
+
+    private val volumeObserver = VolumeKeyObserver(context, volumeManager) { streamType, newVol, maxVol, fraction ->
+        handleVolumeTrigger(streamType, newVol, maxVol, fraction)
+    }
+
+    private fun connectVolumeSuppressor() {
+        VolumeSuppressor.onVolumeChangedCallback = { streamType, _ ->
+            handleVolumeTrigger(streamType)
         }
     }
 
@@ -112,6 +123,7 @@ class SoundIslandController(
             overlay.updateEdge(s.soundIslandEdge)
             view.edge = s.soundIslandEdge
             volumeObserver.start()
+            connectVolumeSuppressor()
             updateOverlayVerticalPosition()
             if (s.soundIslandSuppressStock && VolumeSuppressor.canUseShizuku()) {
                 Thread { VolumeSuppressor.suppress(context) }.start()
@@ -121,6 +133,8 @@ class SoundIslandController(
 
     fun stop() {
         handler.removeCallbacks(dismissRunnable)
+        handler.removeCallbacks(shrinkRunnable)
+        VolumeSuppressor.onVolumeChangedCallback = null
         volumeObserver.stop()
         overlay.setTouchable(false)
         overlay.detach()
@@ -132,6 +146,7 @@ class SoundIslandController(
         view.edge = s.soundIslandEdge
         if (s.soundIslandEnabled) {
             volumeObserver.start()
+            connectVolumeSuppressor()
             updateOverlayVerticalPosition()
             if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed && VolumeSuppressor.canUseShizuku()) {
                 Thread { VolumeSuppressor.suppress(context) }.start()
@@ -140,6 +155,9 @@ class SoundIslandController(
             }
         } else {
             stop()
+            if (VolumeSuppressor.isSuppressed) {
+                Thread { VolumeSuppressor.restore(context) }.start()
+            }
         }
     }
 

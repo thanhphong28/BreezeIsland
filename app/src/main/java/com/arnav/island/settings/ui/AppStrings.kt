@@ -816,6 +816,8 @@ private val DICT: Map<String, String> = mapOf(
     "Disconnects Samsung's stock volume dialog using privileged system audio API. Zero root, zero accessibility, 100% banking and government apps safe." to "Ngắt kết nối thanh âm lượng Samsung bằng API âm thanh đặc quyền của hệ thống. Không root, không trợ năng, 100% an toàn với app ngân hàng và VNeID.",
     "Completely hide Samsung stock volume panel" to "Ẩn hoàn toàn thanh âm lượng mặc định Samsung",
     "Active · Only Breeze Sound Island will appear when volume buttons are pressed" to "Đang hoạt động · Chỉ duy nhất Breeze Sound Island xuất hiện khi bấm phím âm lượng",
+    "Restore Samsung Stock Volume Panel" to "Khôi phục thanh âm lượng gốc Samsung ngay lập tức",
+    "Restart SystemUI via Shizuku to reload One UI's stock volume panel instantly" to "Khởi động lại SystemUI qua Shizuku để nạp lại thanh âm lượng mặc định One UI ngay lập tức",
     "Requires Shizuku activation directly on phone (no PC needed)" to "Yêu cầu kích hoạt Shizuku ngay trên điện thoại (không cần máy tính)",
     "Activate Shizuku on phone (30s)" to "Kích hoạt Shizuku trên điện thoại (30s)",
     "Wireless Debugging -> Pair with code on your phone to unlock full volume panel replacement" to "Gỡ lỗi không dây -> Ghép nối bằng mã trên ĐT để mở khóa thay thế hoàn toàn thanh âm lượng",

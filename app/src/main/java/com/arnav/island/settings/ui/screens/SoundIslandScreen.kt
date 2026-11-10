@@ -106,6 +106,16 @@ fun SoundIslandScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                         }
                     },
                 )
+                SettingRow(
+                    title = "Restore Samsung Stock Volume Panel",
+                    subtitle = "Restart SystemUI via Shizuku to reload One UI's stock volume panel instantly",
+                    icon = Icons.Rounded.Close,
+                    iconColor = BadgeColors.Red,
+                    onClick = {
+                        ui.update { it.copy(soundIslandSuppressStock = false) }
+                        Thread { VolumeSuppressor.restore(context) }.start()
+                    },
+                )
                 if (!hasShizuku) {
                     SettingRow(
                         title = "Activate Shizuku on phone (30s)",

@@ -1,7 +1,6 @@
 package com.arnav.island.soundisland.render
 
 import android.graphics.Path
-import android.graphics.RectF
 
 enum class ScreenEdge { RIGHT, LEFT }
 
@@ -9,6 +8,9 @@ enum class ScreenEdge { RIGHT, LEFT }
  * Builds a continuous path for the Edge Bezel Notch with concave fillets blending
  * seamlessly into the physical screen bezel, matching the iPhone Action Button / Dynamic Island
  * edge protrusion style.
+ *
+ * Guarantees that cornerRadius and filletRadius are safely constrained by tabWidth so the
+ * path never inverts or self-intersects at narrow widths (e.g. Stick mode).
  */
 object EdgeBezelShape {
 
@@ -23,8 +25,12 @@ object EdgeBezelShape {
         filletRadius: Float = 18f,
     ) {
         path.rewind()
-        val cR = cornerRadius.coerceAtMost((bottom - top) / 2f)
-        val fR = filletRadius
+        if (tabWidth < 4f) return
+
+        // Constrain curves so (cR + fR) strictly never exceeds 90% of tabWidth
+        val maxCurve = tabWidth * 0.45f
+        val cR = cornerRadius.coerceAtMost((bottom - top) / 2f).coerceAtMost(maxCurve)
+        val fR = filletRadius.coerceAtMost(maxCurve)
 
         if (edge == ScreenEdge.RIGHT) {
             val right = screenWidth

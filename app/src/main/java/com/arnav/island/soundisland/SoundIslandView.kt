@@ -138,6 +138,19 @@ class SoundIslandView(
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
+
+                // If user tapped outside the active notch boundary, dismiss immediately
+                val notchW = renderer.dp(if (visualState.mode == SoundIslandMode.VOLUME) 32f + 44f * expandSpring.value else 56f)
+                val isInsideNotch = if (edge == ScreenEdge.RIGHT) {
+                    event.x >= (width - notchW - renderer.dp(16f))
+                } else {
+                    event.x <= (notchW + renderer.dp(16f))
+                }
+                if (!isInsideNotch) {
+                    onDismissRequested()
+                    return false
+                }
+
                 trackingTouch = true
                 currentGesture = GestureDirection.NONE
                 modeSwitchTriggered = false

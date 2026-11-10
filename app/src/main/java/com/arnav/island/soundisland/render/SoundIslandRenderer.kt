@@ -87,14 +87,14 @@ class SoundIslandRenderer(private val context: Context) {
 
         when (state.mode) {
             SoundIslandMode.VOLUME -> {
-                val stickW = dp(20f)
+                val stickW = dp(32f)
                 val fullW = dp(76f)
                 tabWidth = stickW + (fullW - stickW) * pExp
 
-                val stickH = dp(130f)
+                val stickH = dp(136f)
                 val fullH = dp(160f)
                 notchHeight = stickH + (fullH - stickH) * pExp
-                cornerRadius = dp(20f) + dp(6f) * pExp
+                cornerRadius = dp(16f) + dp(10f) * pExp
             }
             SoundIslandMode.SILENT -> {
                 tabWidth = dp(56f)
@@ -159,9 +159,9 @@ class SoundIslandRenderer(private val context: Context) {
         pExp: Float,
         alpha: Float,
     ) {
-        val sliderW = dp(7f) + (dp(38f) - dp(7f)) * pExp
-        val sliderH = dp(112f) + (dp(132f) - dp(112f)) * pExp
-        val marginFromEdge = dp(7f) + (dp(14f) - dp(7f)) * pExp
+        val sliderW = dp(10f) + (dp(38f) - dp(10f)) * pExp
+        val sliderH = dp(116f) + (dp(132f) - dp(116f)) * pExp
+        val marginFromEdge = dp(11f) + (dp(14f) - dp(11f)) * pExp
 
         val sliderLeft = if (edge == ScreenEdge.RIGHT) {
             screenWidth - visibleWidth + marginFromEdge

@@ -33,6 +33,9 @@ object VolumeSuppressor {
     var isSuppressed: Boolean = false
         private set
 
+    /** Callback invoked directly by AudioService across Binder IPC on every hardware volume key press. */
+    var onVolumeChangedCallback: ((streamType: Int, flags: Int) -> Unit)? = null
+
     /**
      * Real compiled AIDL Stub implementing IVolumeController.
      * When registered with AudioService, it absorbs volume change dispatches silently,
@@ -40,7 +43,11 @@ object VolumeSuppressor {
      */
     private val silentController = object : IVolumeController.Stub() {
         override fun displaySafeVolumeWarning(flags: Int) {}
-        override fun volumeChanged(streamType: Int, flags: Int) {}
+
+        override fun volumeChanged(streamType: Int, flags: Int) {
+            onVolumeChangedCallback?.invoke(streamType, flags)
+        }
+
         override fun masterMuteChanged(flags: Int) {}
         override fun setLayoutDirection(layoutDirection: Int) {}
         override fun dismiss() {}
@@ -133,10 +140,13 @@ object VolumeSuppressor {
     }
 
     /**
-     * Restores Samsung SystemUI's volume panel by restarting SystemUI (takes ~0.5s seamlessly).
+     * Restores Samsung SystemUI's volume panel by unsetting controller and restarting SystemUI.
      */
     fun restore(context: Context? = null): Boolean {
-        if (!Shizuku.pingBinder()) return false
+        if (!Shizuku.pingBinder()) {
+            toast(context, "Shizuku chưa chạy. Vui lòng bật Shizuku hoặc khởi động lại máy để khôi phục thanh Samsung.")
+            return false
+        }
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 runCatching { HiddenApiBypass.addHiddenApiExemptions("") }
@@ -151,14 +161,16 @@ object VolumeSuppressor {
                 val setVolumeControllerMethod = iAudioServiceClass.methods.firstOrNull { it.name == "setVolumeController" }
                 runCatching { setVolumeControllerMethod?.invoke(audioService, *arrayOf<Any?>(null)) }
             }
-            val cmd = "pkill -f com.android.systemui || killall com.android.systemui || kill $(pidof com.android.systemui)"
+            // Crash/stop SystemUI so Android watchdog immediately restarts it fresh and re-registers stock VolumeDialog
+            val cmd = "am crash com.android.systemui; am force-stop com.android.systemui"
             runShizukuShell(cmd)
             isSuppressed = false
             Log.i(TAG, "Restored Samsung volume panel")
-            toast(context, "Đã khôi phục thanh âm lượng mặc định Samsung")
+            toast(context, "Đã khôi phục thanh âm lượng mặc định Samsung!")
             true
         } catch (t: Throwable) {
             Diagnostics.w(TAG, "Failed to restore volume panel", t)
+            toast(context, "Lỗi khôi phục: ${t.localizedMessage}")
             false
         }
     }
