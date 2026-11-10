@@ -28,7 +28,10 @@ class SoundIslandController(
     val volumeManager = VolumeManager(context)
     val silentManager = SilentModeManager(context)
 
-    private var lastStreamType = AudioManager.STREAM_MUSIC
+    companion object {
+        const val TARGET_STREAM = AudioManager.STREAM_MUSIC
+    }
+
     private var lastVolumePressTime = 0L
     private var consecutivePressCount = 0
     private var isShowing = false
@@ -37,11 +40,7 @@ class SoundIslandController(
         context = context,
         initialEdge = settingsFn().soundIslandEdge,
         onVolumeDrag = { frac ->
-            val sType = lastStreamType
-            val info = volumeManager.getStreamInfo(sType)
-            val newLevel = (frac * info.max).toInt()
-            volumeObserver.recordVolume(sType, newLevel)
-            volumeManager.setVolumeFraction(sType, frac)
+            volumeManager.setVolumeFraction(TARGET_STREAM, frac)
             scheduleAutoDismiss()
         },
         onRingerTap = {
@@ -64,41 +63,57 @@ class SoundIslandController(
             overlay.setTouchable(false)
             overlay.detach()
             isShowing = false
+            consecutivePressCount = 0
+            view.expandSpring.snapTo(0f)
+            view.setExpanded(false)
         },
     )
 
     private val overlay = SoundIslandOverlay(context, view, settingsFn().soundIslandEdge)
 
     private var dismissRunnable = Runnable { dismiss() }
-    private var shrinkRunnable = Runnable { view.setExpanded(false) }
+    private var shrinkRunnable = Runnable {
+        view.setExpanded(false)
+        consecutivePressCount = 1
+    }
 
-    private fun handleVolumeTrigger(streamType: Int, newVol: Int? = null, maxVol: Int? = null, frac: Float? = null) {
+    private fun handleVolumeTrigger(newVol: Int? = null, maxVol: Int? = null, frac: Float? = null) {
         if (!settingsFn().soundIslandEnabled) return
         val now = System.currentTimeMillis()
         val elapsed = now - lastVolumePressTime
         lastVolumePressTime = now
 
-        // Check if user is holding button (<240ms repeat) or clicking consecutively (<500ms)
-        val isHoldingKey = elapsed in 1L..240L
-        if (elapsed < 500L) {
-            consecutivePressCount++
-        } else {
+        // Debounce duplicate broadcasts/IPC callbacks delivered within 60ms
+        val isDuplicate = isShowing && elapsed < 60L
+
+        if (!isShowing) {
+            // First open: ALWAYS start fresh in stick (compact) mode
             consecutivePressCount = 1
-        }
+            handler.removeCallbacks(shrinkRunnable)
+            view.expandSpring.snapTo(0f)
+            view.setExpanded(false)
+        } else if (!isDuplicate) {
+            val isHoldingKey = elapsed in 60L..240L
+            if (elapsed in 60L..600L) {
+                consecutivePressCount++
+            } else {
+                consecutivePressCount = 1
+            }
 
-        // Rule from user: Only expand to capsule when pressed > 3 times or held down
-        val shouldExpand = consecutivePressCount >= 3 || isHoldingKey
-
-        handler.post {
+            // Expand to capsule only on >3 consecutive presses or holding key
+            val shouldExpand = consecutivePressCount >= 3 || isHoldingKey
             handler.removeCallbacks(shrinkRunnable)
             if (shouldExpand) {
                 view.setExpanded(true)
                 handler.postDelayed(shrinkRunnable, 1200L)
             }
-            val info = volumeManager.getStreamInfo(streamType)
+        }
+
+        handler.post {
+            val info = volumeManager.getStreamInfo(TARGET_STREAM)
             show(
                 mode = SoundIslandMode.VOLUME,
-                streamType = streamType,
+                streamType = TARGET_STREAM,
                 volume = newVol ?: info.current,
                 maxVolume = maxVol ?: info.max,
                 fraction = frac ?: info.fraction,
@@ -106,14 +121,14 @@ class SoundIslandController(
         }
     }
 
-    private val volumeObserver = VolumeKeyObserver(context, volumeManager) { streamType, newVol, maxVol, fraction ->
-        handleVolumeTrigger(streamType, newVol, maxVol, fraction)
+    private val volumeObserver = VolumeKeyObserver(context, volumeManager) { newVol, maxVol, fraction ->
+        handleVolumeTrigger(newVol, maxVol, fraction)
     }
 
     private fun connectVolumeSuppressor() {
-        VolumeSuppressor.onVolumeChangedCallback = { streamType, _ ->
-            val info = volumeManager.getStreamInfo(streamType)
-            handleVolumeTrigger(streamType, info.current, info.max, info.fraction)
+        VolumeSuppressor.onVolumeChangedCallback = { _, _ ->
+            val info = volumeManager.getStreamInfo(TARGET_STREAM)
+            handleVolumeTrigger(info.current, info.max, info.fraction)
         }
     }
 
@@ -163,7 +178,7 @@ class SoundIslandController(
 
     fun show(
         mode: SoundIslandMode = SoundIslandMode.VOLUME,
-        streamType: Int = lastStreamType,
+        streamType: Int = TARGET_STREAM,
         volume: Int? = null,
         maxVolume: Int? = null,
         fraction: Float? = null,
@@ -171,9 +186,8 @@ class SoundIslandController(
     ) {
         val s = settingsFn()
         if (!force && !s.soundIslandEnabled) return
-        lastStreamType = streamType
 
-        val info = volumeManager.getStreamInfo(streamType)
+        val info = volumeManager.getStreamInfo(TARGET_STREAM)
         val curVol = volume ?: info.current
         val maxVol = maxVolume ?: info.max
         val frac = fraction ?: info.fraction
@@ -183,7 +197,7 @@ class SoundIslandController(
             volumeFraction = frac,
             currentVolume = curVol,
             maxVolume = maxVol,
-            streamType = streamType,
+            streamType = TARGET_STREAM,
             ringerMode = silentManager.currentMode(),
             slideProgress = 1f,
             expandProgress = if (mode != SoundIslandMode.VOLUME) 1f else view.expandSpring.target,
@@ -212,6 +226,7 @@ class SoundIslandController(
     fun dismiss() {
         if (!isShowing) return
         handler.removeCallbacks(shrinkRunnable)
+        consecutivePressCount = 0
         view.setExpanded(false)
         overlay.setTouchable(false)
         view.updateState(currentVisualState().copy(slideProgress = 0f), animateSlide = true)

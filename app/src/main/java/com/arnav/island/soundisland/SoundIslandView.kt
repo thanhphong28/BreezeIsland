@@ -36,10 +36,12 @@ class SoundIslandView(
     private val renderer = SoundIslandRenderer(context)
     private val choreographer = Choreographer.getInstance()
 
-    // Motion physics springs: Liquid Glass, smooth damped motion
-    val slideSpring = Spring(0f, SpringSpec(0.36f, 0.82f), restThreshold = 0.002f)
-    val volumeSpring = Spring(0.5f, SpringSpec(0.20f, 0.86f), restThreshold = 0.001f)
-    val expandSpring = Spring(0f, SpringSpec(0.28f, 0.82f), restThreshold = 0.002f)
+    // Motion physics springs: Liquid Glass, smooth damped motion with bouncy launch
+    val slideLaunchSpec = SpringSpec(0.30f, 0.54f)
+    val slideRetractSpec = SpringSpec(0.22f, 0.92f)
+    val slideSpring = Spring(0f, slideLaunchSpec, restThreshold = 0.002f)
+    val volumeSpring = Spring(0.5f, SpringSpec(0.18f, 0.80f), restThreshold = 0.001f)
+    val expandSpring = Spring(0f, SpringSpec(0.26f, 0.82f), restThreshold = 0.002f)
     val ringerPopSpring = Spring(1f, SpringSpec(0.22f, 0.50f), restThreshold = 0.002f)
 
     var visualState = SoundIslandVisualState()
@@ -74,8 +76,10 @@ class SoundIslandView(
     }
 
     fun updateState(state: SoundIslandVisualState, animateSlide: Boolean = true) {
+        val wasClosed = slideSpring.target == 0f && slideSpring.value <= 0.04f
+
         // If not attached yet or slide spring was at rest 0, snap volume immediately so it doesn't jump
-        if (!isAttachedToWindow || (slideSpring.target == 0f && slideSpring.value <= 0.02f)) {
+        if (!isAttachedToWindow || wasClosed) {
             volumeSpring.snapTo(state.volumeFraction)
         } else {
             volumeSpring.animateTo(state.volumeFraction)
@@ -83,7 +87,17 @@ class SoundIslandView(
 
         expandSpring.animateTo(state.expandProgress)
         if (animateSlide) {
-            slideSpring.animateTo(state.slideProgress)
+            if (state.slideProgress > 0f) {
+                if (wasClosed) {
+                    slideSpring.snapTo(0f)
+                    slideSpring.animateTo(1f, slideLaunchSpec)
+                    slideSpring.impulse(0.35f)
+                } else {
+                    slideSpring.animateTo(state.slideProgress, slideLaunchSpec)
+                }
+            } else {
+                slideSpring.animateTo(0f, slideRetractSpec)
+            }
         } else {
             slideSpring.snapTo(state.slideProgress)
         }

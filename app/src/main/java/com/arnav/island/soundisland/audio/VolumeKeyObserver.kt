@@ -18,11 +18,10 @@ import com.arnav.island.util.Diagnostics
 class VolumeKeyObserver(
     private val context: Context,
     private val volumeManager: VolumeManager,
-    private val onVolumeChanged: (streamType: Int, newVolume: Int, maxVolume: Int, fraction: Float) -> Unit,
+    private val onVolumeChanged: (newVolume: Int, maxVolume: Int, fraction: Float) -> Unit,
 ) {
 
     private var registered = false
-    private val lastVolumes = mutableMapOf<Int, Int>()
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -34,48 +33,35 @@ class VolumeKeyObserver(
             val newVolume = intent.getIntExtra(EXTRA_VOLUME_STREAM_VALUE, -1)
             val prevVolume = intent.getIntExtra(EXTRA_PREV_VOLUME_STREAM_VALUE, -1)
 
-            // If prevVolume is known and equals newVolume, no actual user volume change happened
-            if (prevVolume != -1 && newVolume == prevVolume) return
-
-            val streamInfo = volumeManager.getStreamInfo(streamType)
-            val resolvedVolume = if (newVolume >= 0) newVolume else streamInfo.current
-
-            // Check if volume level actually changed from our last recorded level
-            val previousRecorded = lastVolumes[streamType]
-            if (previousRecorded != null && previousRecorded == resolvedVolume) {
-                // Spurious broadcast (e.g. app transition, audio routing change)
-                return
-            }
-
-            lastVolumes[streamType] = resolvedVolume
-
-            val fraction = if (streamInfo.max > streamInfo.min) {
-                ((resolvedVolume - streamInfo.min).toFloat() / (streamInfo.max - streamInfo.min)).coerceIn(0f, 1f)
+            if (streamType == AudioManager.STREAM_MUSIC) {
+                val streamInfo = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
+                val resolvedVolume = if (newVolume >= 0) newVolume else streamInfo.current
+                onVolumeChanged(resolvedVolume, streamInfo.max, streamInfo.fraction)
             } else {
-                0f
+                // When system routes keys to Ringtone/Notification instead of Media,
+                // redirect hardware button intent to STREAM_MUSIC as requested by user.
+                if (prevVolume != -1 && newVolume != -1) {
+                    val direction = when {
+                        newVolume > prevVolume -> AudioManager.ADJUST_RAISE
+                        newVolume < prevVolume -> AudioManager.ADJUST_LOWER
+                        else -> 0
+                    }
+                    if (direction != 0) {
+                        volumeManager.adjustVolume(AudioManager.STREAM_MUSIC, direction)
+                        // Preserve original ringer volume so it remains unaffected
+                        try {
+                            volumeManager.setVolume(streamType, prevVolume)
+                        } catch (_: Exception) {}
+                    }
+                }
+                val mediaInfo = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
+                onVolumeChanged(mediaInfo.current, mediaInfo.max, mediaInfo.fraction)
             }
-
-            onVolumeChanged(streamType, resolvedVolume, streamInfo.max, fraction)
         }
     }
 
     fun start() {
         if (registered) return
-
-        // Pre-populate last known volumes so starting up never fires a false trigger
-        val streams = intArrayOf(
-            AudioManager.STREAM_MUSIC,
-            AudioManager.STREAM_RING,
-            AudioManager.STREAM_NOTIFICATION,
-            AudioManager.STREAM_ALARM,
-            AudioManager.STREAM_SYSTEM,
-            AudioManager.STREAM_VOICE_CALL,
-        )
-        for (s in streams) {
-            try {
-                lastVolumes[s] = volumeManager.getStreamInfo(s).current
-            } catch (_: Exception) {}
-        }
 
         try {
             val filter = IntentFilter(ACTION_VOLUME_CHANGED)
@@ -97,11 +83,6 @@ class VolumeKeyObserver(
             context.unregisterReceiver(receiver)
         } catch (_: Exception) {}
         registered = false
-    }
-
-    /** Keep internal state updated when the user manually changes volume on Breeze Sound Island. */
-    fun recordVolume(streamType: Int, level: Int) {
-        lastVolumes[streamType] = level
     }
 
     companion object {

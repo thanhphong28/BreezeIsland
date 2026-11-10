@@ -63,6 +63,18 @@ class VolumeManager(private val context: Context) {
         return setVolume(streamType, target, playSound)
     }
 
+    /** Adjusts volume up or down by step (+1 / -1) without system UI. */
+    fun adjustVolume(streamType: Int = AudioManager.STREAM_MUSIC, direction: Int, playSound: Boolean = false): Boolean {
+        return try {
+            val flags = if (playSound) AudioManager.FLAG_PLAY_SOUND else 0
+            audio.adjustStreamVolume(streamType, direction, flags)
+            true
+        } catch (e: Exception) {
+            Diagnostics.w(TAG, "Failed to adjust volume for stream $streamType", e)
+            false
+        }
+    }
+
     companion object {
         private const val TAG = "SoundIslandVolume"
     }

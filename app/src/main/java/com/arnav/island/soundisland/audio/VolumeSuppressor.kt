@@ -82,8 +82,8 @@ object VolumeSuppressor {
                 runCatching { HiddenApiBypass.addHiddenApiExemptions("") }
             }
 
-            // 2. Relax Hidden API policy system-wide via Shizuku shell
-            runShizukuShell("settings put global hidden_api_policy 1; settings put global hidden_api_policy_p_apps 1")
+            // 2. Relax Hidden API policy and route volume keys to Media system-wide via Shizuku shell
+            runShizukuShell("settings put global hidden_api_policy 1; settings put global hidden_api_policy_p_apps 1; settings put secure volume_keys_control_media 1")
 
             // 3. Obtain audio system binder via Shizuku privileged wrapper
             val audioBinder = SystemServiceHelper.getSystemService("audio") ?: run {

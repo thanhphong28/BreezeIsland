@@ -75,7 +75,8 @@ class SoundIslandRenderer(private val context: Context) {
     ) {
         if (alpha <= 0.005f || state.slideProgress <= 0.005f) return
 
-        val pSlide = state.slideProgress.coerceIn(0f, 1f)
+        // Allow slideProgress to overshoot past 1.0f for vibrant bouncy launch physics
+        val pSlide = state.slideProgress.coerceAtLeast(0f)
         val pExp = state.expandProgress.coerceIn(0f, 1f)
 
         // Calculate dynamic dimensions based on mode and expansion progress
