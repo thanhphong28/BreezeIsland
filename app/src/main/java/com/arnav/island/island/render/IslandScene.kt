@@ -195,18 +195,7 @@ class IslandScene(private val rc: RenderContext) {
                 val presenter = reusablePresenter(mainEvent!!, mode) ?: PresenterFactory.create(mainEvent.type, rc)
                 measuredWith = presenter
                 val (w, _) = presenter.measure(mainEvent, mode)
-                var compact = geometry.compactFrame(w)
-                if (mainEvent.type == com.arnav.island.events.EventType.MEDIA) {
-                    // One UI's Now Bar chip (▷ song title) sits in the status bar just left of the camera and
-                    // cannot be hidden without breaking the media widget in the panel. Grow the collapsed media
-                    // island to the LEFT (right edge unchanged) so it fully covers that chip.
-                    val minLeft = geometry.edgeMargin + geometry.dp(8f)
-                    val extra = (geometry.dp(NOW_BAR_COVER_DP)).coerceAtMost((compact.left - minLeft).coerceAtLeast(0f))
-                    if (extra > 0f) {
-                        compact = compact.copy(centerX = compact.centerX - extra / 2f, width = compact.width + extra)
-                    }
-                }
-                compact
+                geometry.compactFrame(w)
             }
             is IslandState.Split -> geometry.splitFrames().first
             is IslandState.Toast, is IslandState.Expanded, is IslandState.Stack -> {
@@ -1209,6 +1198,5 @@ class IslandScene(private val rc: RenderContext) {
     companion object {
         const val STACK_ID = "stack"
         private const val SHIMMER_INTERVAL_S = 60f
-        private const val NOW_BAR_COVER_DP = 110f
     }
 }

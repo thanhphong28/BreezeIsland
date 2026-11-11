@@ -208,9 +208,8 @@ class SoundIslandController(
             updateOverlayVerticalPosition()
             if (VolumeSuppressor.canUseShizuku()) {
                 Thread {
-                    com.arnav.island.overlay.NowBarDiagnostics.runOnce(context)
                     VolumeSuppressor.setupMediaKeyRouting(context)
-                    if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed) {
+                    if (s.soundIslandSuppressStock) {
                         VolumeSuppressor.suppress(context)
                     }
                 }.start()
@@ -221,7 +220,6 @@ class SoundIslandController(
     fun stop() {
         handler.removeCallbacks(dismissRunnable)
         handler.removeCallbacks(shrinkRunnable)
-        handler.removeCallbacks(syncRunnable)
         VolumeSuppressor.onVolumeChangedCallback = null
         volumeObserver.stop()
         overlay.setTouchable(false)
@@ -238,7 +236,6 @@ class SoundIslandController(
             updateOverlayVerticalPosition()
             if (VolumeSuppressor.canUseShizuku()) {
                 Thread {
-                    com.arnav.island.overlay.NowBarDiagnostics.runOnce(context)
                     VolumeSuppressor.setupMediaKeyRouting(context)
                     if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed) {
                         VolumeSuppressor.suppress(context)
@@ -292,25 +289,6 @@ class SoundIslandController(
         isShowing = true
 
         scheduleAutoDismiss()
-        startSystemSyncPolling()
-    }
-
-    /**
-     * While the island is visible, keep it locked to the REAL system media volume (the same value the
-     * Control Center slider reads), so both bars can never drift apart (Bluetooth switches, other apps,
-     * Samsung's own panel, etc.).
-     */
-    private val syncRunnable = object : Runnable {
-        override fun run() {
-            if (!isShowing) return
-            volumeObserver.syncFromSystem(force = false)
-            handler.postDelayed(this, 200L)
-        }
-    }
-
-    private fun startSystemSyncPolling() {
-        handler.removeCallbacks(syncRunnable)
-        handler.postDelayed(syncRunnable, 200L)
     }
 
     fun showTestVolume() {
