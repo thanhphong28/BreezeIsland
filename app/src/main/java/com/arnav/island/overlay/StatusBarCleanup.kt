@@ -68,6 +68,11 @@ object StatusBarCleanup {
         "sec_torch",
         "now_bar",
         "sec_now_bar",
+        "now_bar_chip",
+        "live_notification_chip",
+        "media_chip",
+        "sec_media_chip",
+        "ongoing_media",
     )
 
     private val SPLIT_RIGHT_SLOTS = ACTIVE_ISLAND_SLOTS
@@ -151,7 +156,11 @@ object StatusBarCleanup {
                         if (s.statusBarCleanup) {
                             addAll(parse(s.statusBarIcons).filterNot { it in PROTECTED_ICONS })
                         }
-                        if (s.seamlessStatusBar && islandActive) {
+                        // Hide One UI's Now Bar / media chip on the MAIN screen status bar permanently
+                        // (not only while the island is expanded), so nothing can ever overlap the
+                        // collapsed island. The cover-screen Now Bar keeps working because it is a
+                        // separate SystemUI instance that does not use this blacklist.
+                        if (s.seamlessStatusBar) {
                             addAll(ACTIVE_ISLAND_SLOTS)
                         }
                     }.filterNot { it in PROTECTED_ICONS }.joinToString(",")
