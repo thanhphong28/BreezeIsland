@@ -19,9 +19,9 @@ import com.arnav.island.util.ColorExtractor
 class BluetoothPresenter(rc: RenderContext) : Presenter(rc) {
 
     private var payload: BluetoothPayload? = null
-    private val arrival = Spring(0f, SpringSpec(0.38f, 0.85f), restThreshold = 0.002f)
-    private val ripple = Spring(0f, SpringSpec(0.9f, 1f), restThreshold = 0.002f)
-    private val batteryFade = Spring(0f, SpringSpec(0.32f, 0.95f), restThreshold = 0.002f)
+    private val arrival = Spring(0f, SpringSpec(0.32f, 0.96f), restThreshold = 0.002f)
+    private val ripple = Spring(0f, SpringSpec(0.60f, 1f), restThreshold = 0.002f)
+    private val batteryFade = Spring(0f, SpringSpec(0.30f, 1.0f), restThreshold = 0.002f)
     private var nameLine = ""
 
     override fun measure(event: IslandEvent, mode: PresentMode): Pair<Float, Float> = when (mode) {
@@ -116,7 +116,7 @@ class BluetoothPresenter(rc: RenderContext) : Presenter(rc) {
             canvas.drawCircle(cx, cy, r + dp(16f) * rp, rc.stroke)
         }
         rc.circle(canvas, cx, cy, r * lerp(0.7f, 1f, p), ColorExtractor.withAlpha(tint, 0.2f), alpha)
-        val drop = (1f - p) * -dp(10f)
+        val drop = (1f - p) * -dp(4f)
         rc.glyphs.draw(canvas, glyph(), cx, cy + drop, dp(24f) * lerp(0.5f, 1f, p), tint, alpha * p.coerceIn(0f, 1f))
 
         val textX = cx + r + dp(12f)

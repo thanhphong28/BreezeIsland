@@ -36,13 +36,13 @@ class SoundIslandView(
     private val renderer = SoundIslandRenderer(context)
     private val choreographer = Choreographer.getInstance()
 
-    // Motion physics springs: Liquid Glass, smooth damped motion with bouncy launch
-    val slideLaunchSpec = SpringSpec(0.28f, 0.52f)
-    val slideRetractSpec = SpringSpec(0.20f, 0.88f)
+    // Motion physics springs: Liquid Glass, smooth damped motion
+    val slideLaunchSpec = SpringSpec(0.26f, 0.94f)
+    val slideRetractSpec = SpringSpec(0.20f, 0.96f)
     val slideSpring = Spring(0f, slideLaunchSpec, restThreshold = 0.002f)
-    val volumeSpring = Spring(0.5f, SpringSpec(0.18f, 0.80f), restThreshold = 0.001f)
-    val expandSpring = Spring(0f, SpringSpec(0.24f, 0.80f), restThreshold = 0.002f)
-    val ringerPopSpring = Spring(1f, SpringSpec(0.20f, 0.46f), restThreshold = 0.002f)
+    val volumeSpring = Spring(0.5f, SpringSpec(0.18f, 0.94f), restThreshold = 0.001f)
+    val expandSpring = Spring(0f, SpringSpec(0.22f, 0.94f), restThreshold = 0.002f)
+    val ringerPopSpring = Spring(1f, SpringSpec(0.18f, 0.94f), restThreshold = 0.002f)
 
     var visualState = SoundIslandVisualState()
         private set

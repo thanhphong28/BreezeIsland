@@ -20,7 +20,7 @@ import java.util.Locale
 class GlancePresenter(rc: RenderContext) : Presenter(rc) {
 
     private var payload: GlancePayload? = null
-    private val ring = Spring(0f, SpringSpec(0.7f, 0.9f), restThreshold = 0.002f)
+    private val ring = Spring(0f, SpringSpec(0.45f, 0.98f), restThreshold = 0.002f)
     private var weekday = ""
     private var date = ""
     private val chips = ArrayList<Pair<Glyph, String>>(3)

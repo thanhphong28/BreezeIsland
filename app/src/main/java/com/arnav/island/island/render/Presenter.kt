@@ -65,7 +65,7 @@ abstract class Presenter(protected val rc: RenderContext) {
     /** Button currently under the finger, animated by [pressSpring]. */
     var pressedId: String? = null
         private set
-    private val pressSpring = Spring(0f, SpringSpec(0.2f, 0.7f), restThreshold = 0.002f)
+    private val pressSpring = Spring(0f, SpringSpec(0.2f, 0.94f), restThreshold = 0.002f)
 
     /** Non-null while the user scrubs a seek bar (0..1). */
     var scrubFraction: Float? = null

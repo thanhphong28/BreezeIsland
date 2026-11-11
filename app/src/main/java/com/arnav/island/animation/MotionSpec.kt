@@ -26,10 +26,10 @@ data class SpringSpec(val response: Float, val dampingRatio: Float) {
     companion object {
         const val MIN_DAMPING = 0.35f
 
-        val Natural = SpringSpec(0.44f, 0.74f)
-        val Snappy = SpringSpec(0.32f, 0.84f)
-        val Soft = SpringSpec(0.58f, 0.92f)
-        val Elastic = SpringSpec(0.50f, 0.58f)
+        val Natural = SpringSpec(0.40f, 0.94f)
+        val Snappy = SpringSpec(0.30f, 0.96f)
+        val Soft = SpringSpec(0.48f, 0.98f)
+        val Elastic = SpringSpec(0.44f, 0.88f)
 
         /** Used when the system "remove animations" / reduce motion setting is on. */
         val Reduced = SpringSpec(0.22f, 1f)
@@ -53,20 +53,20 @@ data class MotionProfile(
     val reduceMotion: Boolean,
 ) {
     /** Horizontal growth leads expansion; vertical growth follows slightly behind. */
-    val widthExpand: SpringSpec get() = pick(base.withResponseFactor(0.92f))
-    val heightExpand: SpringSpec get() = pick(base.withResponseFactor(1.08f))
+    val widthExpand: SpringSpec get() = pick(base.withResponseFactor(0.92f).damped(0.06f))
+    val heightExpand: SpringSpec get() = pick(base.withResponseFactor(1.08f).damped(0.06f))
 
     /** On collapse the order flips: height retracts first, then the pill narrows. */
-    val widthCollapse: SpringSpec get() = pick(base.withResponseFactor(1.04f).damped(0.06f))
+    val widthCollapse: SpringSpec get() = pick(base.withResponseFactor(1.04f).damped(0.08f))
     val heightCollapse: SpringSpec get() = pick(base.withResponseFactor(0.86f).damped(0.08f))
 
-    val position: SpringSpec get() = pick(base.withResponseFactor(0.95f))
-    val bubble: SpringSpec get() = pick(base.withResponseFactor(1.1f))
-    val contentIn: SpringSpec get() = pick(SpringSpec(base.response * 0.62f, 1f))
-    val contentOut: SpringSpec get() = pick(SpringSpec(base.response * 0.36f, 1f))
-    val press: SpringSpec get() = pick(SpringSpec(0.22f, 0.62f))
-    val release: SpringSpec get() = pick(SpringSpec(0.38f, 0.55f))
-    val gesture: SpringSpec get() = pick(SpringSpec(0.30f, 0.7f))
+    val position: SpringSpec get() = pick(base.withResponseFactor(0.95f).damped(0.06f))
+    val bubble: SpringSpec get() = pick(base.withResponseFactor(1.05f).damped(0.06f))
+    val contentIn: SpringSpec get() = pick(SpringSpec(base.response * 0.55f, 1f))
+    val contentOut: SpringSpec get() = pick(SpringSpec(base.response * 0.32f, 1f))
+    val press: SpringSpec get() = pick(SpringSpec(0.20f, 0.92f))
+    val release: SpringSpec get() = pick(SpringSpec(0.32f, 0.94f))
+    val gesture: SpringSpec get() = pick(SpringSpec(0.28f, 0.92f))
 
     private fun pick(spec: SpringSpec) = if (reduceMotion) SpringSpec.Reduced else spec
 

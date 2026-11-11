@@ -22,8 +22,8 @@ class ProgressPresenter(rc: RenderContext) : Presenter(rc) {
 
     private val icon = RoundedImage()
     private var progress: ProgressPayload? = null
-    private val shown = Spring(0f, SpringSpec(0.5f, 0.95f), restThreshold = 0.001f)
-    private val check = Spring(0f, SpringSpec(0.45f, 1f), restThreshold = 0.002f)
+    private val shown = Spring(0f, SpringSpec(0.35f, 0.98f), restThreshold = 0.001f)
+    private val check = Spring(0f, SpringSpec(0.35f, 1.0f), restThreshold = 0.002f)
     private val checkPath = Path()
     private val checkSegment = Path()
     private val measure = PathMeasure()

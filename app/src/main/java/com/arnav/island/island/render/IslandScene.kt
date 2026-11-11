@@ -69,7 +69,7 @@ class IslandScene(private val rc: RenderContext) {
     private val visibility = Spring(0f, SpringSpec(0.3f, 1f), restThreshold = 0.002f)
 
     /** Uniform squeeze used for toast-to-toast "gulps" and drag notch clicks. */
-    private val pulse = Spring(0f, SpringSpec(0.28f, 0.42f), restThreshold = 0.002f)
+    private val pulse = Spring(0f, SpringSpec(0.24f, 0.94f), restThreshold = 0.002f)
 
     // Split bubble.
     private val bubbleCx = Spring(0f, restThreshold = 0.25f)
@@ -88,7 +88,7 @@ class IslandScene(private val rc: RenderContext) {
     // Grab and flick: long-press an open card and it follows the finger, then springs home.
     private val grabX = Spring(0f, restThreshold = 0.3f)
     private val grabY = Spring(0f, restThreshold = 0.3f)
-    private val lift = Spring(0f, SpringSpec(0.3f, 0.7f), restThreshold = 0.002f)
+    private val lift = Spring(0f, SpringSpec(0.28f, 0.94f), restThreshold = 0.002f)
     var isGrabbed = false
         private set
 
@@ -232,15 +232,9 @@ class IslandScene(private val rc: RenderContext) {
             top.animateTo(frame.top, motion.position)
             width.animateTo(frame.width, wSpec)
             height.animateTo(frame.height, hSpec)
-            val entrance = mainEvent?.animation
-            if (kind == TransitionKind.INTERRUPT && entrance == EntranceAnimation.POP && expressive) {
-                // A lively gentle pop for moments like "charger connected".
-                width.impulse(frame.width * 0.15f)
-                height.impulse(frame.height * 0.12f)
-            }
             if (previous is IslandState.Toast && newState is IslandState.Toast && kind == TransitionKind.SWAP && expressive) {
-                // Toast to toast: a quick squeeze instead of retracting in between.
-                pulse.impulse(26f)
+                // Toast to toast: a gentle subtle squeeze instead of retracting in between.
+                pulse.impulse(4f)
             }
         }
 
@@ -460,7 +454,7 @@ class IslandScene(private val rc: RenderContext) {
             val y = if (rc.statusBarBottom > 0f) rc.statusBarBottom / 2f else geometry.cameraY
             val x = geometry.edgeMargin + rc.dp(40f)
             heroRect.set(x - size / 2f, y - size / 2f, x + size / 2f, y + size / 2f)
-            hero.start(bitmap, "flight", heroRect, size * 0.3f, SpringSpec(0.52f, 0.9f), curved = true)
+            hero.start(bitmap, "flight", heroRect, size * 0.3f, SpringSpec(0.40f, 0.98f), curved = true)
             incoming.heroHidden = true
             heroTarget = newLayer
         }
@@ -522,7 +516,7 @@ class IslandScene(private val rc: RenderContext) {
     /** Lets go: the island flies home with the finger's velocity and a little overshoot. */
     fun releaseGrab(vx: Float, vy: Float) {
         isGrabbed = false
-        val spec = SpringSpec(0.42f, 0.5f)
+        val spec = SpringSpec(0.35f, 0.94f)
         grabX.animateTo(0f, spec)
         grabY.animateTo(0f, spec)
         grabX.setVelocity(vx * 0.4f)
@@ -755,11 +749,11 @@ class IslandScene(private val rc: RenderContext) {
         var kicked = false
         if (expressive) {
             if (bridgeLinked && !linked && bubbleWanted) {
-                bubbleSize.impulse(r2 * 9f)
-                pulse.impulse(9f)
+                bubbleSize.impulse(r2 * 2f)
+                pulse.impulse(2f)
                 kicked = true
             } else if (!bridgeLinked && linked && !bubbleWanted) {
-                pulse.impulse(14f)
+                pulse.impulse(2f)
                 kicked = true
             }
         }
@@ -792,11 +786,11 @@ class IslandScene(private val rc: RenderContext) {
         var t = top.value
         val intensity = rc.settings.motionIntensity.coerceIn(0f, 2f)
 
-        // Squash and stretch: the shape elongates along its motion and thins across it.
+        // Squash and stretch: subtle optical velocity compensation
         if (rc.settings.squashStretch && expressive && intensity > 0f) {
             val unit = rc.dp(1f)
-            val sy = (height.velocity / (1600f * unit) * 0.05f * intensity).coerceIn(-0.06f, 0.06f)
-            val sx = (width.velocity / (2400f * unit) * 0.04f * intensity).coerceIn(-0.05f, 0.05f)
+            val sy = (height.velocity / (2400f * unit) * 0.02f * intensity).coerceIn(-0.025f, 0.025f)
+            val sx = (width.velocity / (3200f * unit) * 0.02f * intensity).coerceIn(-0.025f, 0.025f)
             if (h > geometry.compactHeight * 1.2f || w > geometry.compactWidth * 0.9f) {
                 h *= 1f + sy - sx * 0.5f
                 w *= 1f + sx - sy * 0.5f

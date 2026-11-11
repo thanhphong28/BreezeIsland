@@ -25,8 +25,8 @@ import kotlin.math.roundToInt
 class TorchPresenter(rc: RenderContext) : Presenter(rc) {
 
     private var payload: TorchPayload? = null
-    private val level = Spring(0f, SpringSpec(0.3f, 0.86f), restThreshold = 0.002f)
-    private val beam = Spring(0f, SpringSpec(0.55f, 0.72f), restThreshold = 0.002f)
+    private val level = Spring(0f, SpringSpec(0.26f, 0.96f), restThreshold = 0.002f)
+    private val beam = Spring(0f, SpringSpec(0.32f, 0.96f), restThreshold = 0.002f)
     private var dragFraction: Float? = null
 
     private val glowMatrix = Matrix()

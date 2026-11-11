@@ -209,7 +209,7 @@ class Hero(private val rc: RenderContext) {
     private val image = RoundedImage()
     private val from = RectF()
     private var fromRadius = 0f
-    private val progress = Spring(0f, SpringSpec(0.45f, 0.86f), restThreshold = 0.002f)
+    private val progress = Spring(0f, SpringSpec(0.38f, 0.96f), restThreshold = 0.002f)
     private var curved = false
     private val current = RectF()
 

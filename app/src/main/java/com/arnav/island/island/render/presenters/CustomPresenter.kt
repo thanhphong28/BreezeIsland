@@ -18,7 +18,7 @@ import com.arnav.island.util.Formatters
 class CustomPresenter(rc: RenderContext) : Presenter(rc) {
 
     private val image = RoundedImage()
-    private val shown = Spring(0f, SpringSpec(0.5f, 0.95f), restThreshold = 0.001f)
+    private val shown = Spring(0f, SpringSpec(0.35f, 0.98f), restThreshold = 0.001f)
     private var titleLine = ""
     private var subtitleLine = ""
     private var pad = 0f

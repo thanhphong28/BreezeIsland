@@ -20,7 +20,7 @@ class ScreenshotPresenter(rc: RenderContext) : Presenter(rc) {
 
     private val thumb = RoundedImage()
     private var aspect = 0.5f
-    private val drop = Spring(0f, SpringSpec(0.5f, 0.62f), restThreshold = 0.002f)
+    private val drop = Spring(0f, SpringSpec(0.36f, 0.96f), restThreshold = 0.002f)
     private var pad = 0f
     private var top = 0f
 
@@ -70,8 +70,8 @@ class ScreenshotPresenter(rc: RenderContext) : Presenter(rc) {
         val t = top + dp(4f)
         val d = drop.value
         canvas.save()
-        canvas.rotate(-7f * d, l + tw / 2f, t + th / 2f)
-        val s = lerp(1f, 1.18f, d)
+        canvas.rotate(-2.5f * d, l + tw / 2f, t + th / 2f)
+        val s = lerp(1f, 1.06f, d)
         canvas.scale(s, s, l + tw / 2f, t + th / 2f)
         rc.roundRect(canvas, l - dp(1.5f), t - dp(1.5f), l + tw + dp(1.5f), t + th + dp(1.5f), dp(9f), 0x33FFFFFF, alpha)
         if (thumb.hasImage) {

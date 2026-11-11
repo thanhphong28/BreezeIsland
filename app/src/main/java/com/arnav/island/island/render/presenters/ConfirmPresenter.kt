@@ -26,7 +26,7 @@ class ConfirmPresenter(rc: RenderContext) : Presenter(rc) {
     private var payload: ConfirmPayload? = null
     private val icon = RoundedImage()
     private var boundAt = 0L
-    private val done = Spring(0f, SpringSpec(0.34f, 0.5f), restThreshold = 0.002f)
+    private val done = Spring(0f, SpringSpec(0.30f, 0.96f), restThreshold = 0.002f)
     private var labelLine = ""
     private var pendingLine = ""
 

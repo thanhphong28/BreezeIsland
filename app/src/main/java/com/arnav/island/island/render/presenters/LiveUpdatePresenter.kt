@@ -27,7 +27,7 @@ class LiveUpdatePresenter(rc: RenderContext) : Presenter(rc) {
     private var payload: LiveUpdatePayload? = null
     private val icon = RoundedImage()
     private val tracker = RoundedImage()
-    private val position = Spring(0f, SpringSpec(0.9f, 0.9f), restThreshold = 0.001f)
+    private val position = Spring(0f, SpringSpec(0.50f, 0.98f), restThreshold = 0.001f)
     private val shortText = RollingText()
     private var titleLine = ""
     private var textLine = ""
