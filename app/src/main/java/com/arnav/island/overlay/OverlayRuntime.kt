@@ -522,14 +522,31 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         OverlayWindow.toRect(neededF, g.screen.widthPx, g.screen.heightPx, neededRect)
         if (neededRect.isEmpty) return
 
+        val now = android.os.SystemClock.uptimeMillis()
+        if (!settled) lastBusyAt = now
         if (!windowRect.contains(neededRect)) {
             windowRect.union(neededRect)
             window.setBounds(windowRect)
         } else if (settled && differs(windowRect, neededRect)) {
-            windowRect.set(neededRect)
-            window.setBounds(windowRect)
+            // Shrinking only after a long quiet spell: a resize right at the start of the next
+            // animation made its first frames hitch.
+            if (now - lastBusyAt > WINDOW_SHRINK_DELAY_MS) {
+                windowRect.set(neededRect)
+                window.setBounds(windowRect)
+            } else {
+                view.removeCallbacks(shrinkCheck)
+                view.postDelayed(shrinkCheck, WINDOW_SHRINK_DELAY_MS + 60L)
+            }
         }
     }
+
+    private val shrinkCheck = Runnable {
+        val b = RectF()
+        view.scene.bounds(b)
+        onIslandBounds(b, true)
+    }
+
+    private var lastBusyAt = 0L
 
     private fun differs(a: Rect, b: Rect) =
         abs(a.left - b.left) > 4 || abs(a.top - b.top) > 4 || abs(a.right - b.right) > 4 || abs(a.bottom - b.bottom) > 4
@@ -581,5 +598,6 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
     private companion object {
         const val GLANCE_ID = "glance"
         const val GLANCE_MS = 5_000L
+        const val WINDOW_SHRINK_DELAY_MS = 1_200L
     }
 }

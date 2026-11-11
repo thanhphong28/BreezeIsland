@@ -163,7 +163,7 @@ class BatteryMonitor(
                     lastPostedLevel = snap.level
                     lastPostedStatus = snap.status
                     lastPostedPlugged = snap.plugged
-                    postCharging(entrance = false)
+                    requestToastUpdate()
                 }
             } else {
                 if (s.chargingLiveActivity && s.chargingEnabled) postLive()
@@ -217,6 +217,7 @@ class BatteryMonitor(
     private fun onDisconnected() {
         connectJob?.cancel()
         connectJob = null
+        pendingUpdate?.cancel()
         isConnecting = false
         activeCountFrom = -1
         lastPostedLevel = -1
@@ -257,9 +258,32 @@ class BatteryMonitor(
         )
     }
 
+    private var lastToastPostAt = 0L
+    private var pendingUpdate: kotlinx.coroutines.Job? = null
+
+    /**
+     * Updates to the on-screen charging toast (status flips, speed detection, level ticks) are held
+     * back until the entrance animation has finished. Samsung fires several battery broadcasts in
+     * the first second after plugging in, and each re-post used to re-target the island mid
+     * entrance, which looked like the first part of the animation stuttering or repeating.
+     */
+    private fun requestToastUpdate() {
+        val wait = ENTRANCE_QUIET_MS - (android.os.SystemClock.elapsedRealtime() - lastToastPostAt)
+        pendingUpdate?.cancel()
+        if (wait <= 0L) {
+            postCharging(entrance = false)
+            return
+        }
+        pendingUpdate = scope.launch {
+            delay(wait)
+            if (engine.current().toast?.id == ID_TOAST) postCharging(entrance = false)
+        }
+    }
+
     private fun postCharging(entrance: Boolean) {
         val snap = last ?: return
         if (!snap.isPlugged) return
+        lastToastPostAt = android.os.SystemClock.elapsedRealtime()
         val s = settings()
         engine.post(
             IslandEvent(
@@ -336,7 +360,7 @@ class BatteryMonitor(
                     }
                     if (detected != null && detected != speed) {
                         speed = detected
-                        if (engine.current().toast?.id == ID_TOAST) postCharging(entrance = false)
+                        if (engine.current().toast?.id == ID_TOAST) requestToastUpdate()
                     }
                 }
             }
@@ -409,6 +433,7 @@ class BatteryMonitor(
         const val ID_LIVE = "charging.live"
         private const val BATTERY_PLUGGED_DOCK = 8
         private const val CONNECT_SETTLE_MS = 320L
+        private const val ENTRANCE_QUIET_MS = 1_100L
         private const val SAMPLE_INTERVAL_MS = 650L
         private const val COUNT_UP_SPAN = 16
         private const val FAST_WATTS = 12f

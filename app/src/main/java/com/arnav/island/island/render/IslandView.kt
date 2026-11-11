@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.RectF
 import android.os.Build
+import android.os.SystemClock
 import android.view.Choreographer
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
@@ -61,6 +62,7 @@ class IslandView(
     private var frameScheduled = false
     private var lastFrameNanos = 0L
     private var animating = false
+    private var graceUntil = 0L
     private val location = IntArray(2)
     private var windowOffsetX = 0
     private var windowOffsetY = 0
@@ -118,13 +120,25 @@ class IslandView(
             visibility = VISIBLE
         }
         scene.setState(state, kind, immediate)
+        beginMotionGrace()
         invalidate()
         requestFrame()
         reportBounds(settled = false)
     }
 
+    /**
+     * Keeps the frame loop, the high refresh-rate hint and the window headroom engaged from the
+     * very first frame of a transition, so nothing flaps while the springs spin up.
+     */
+    private fun beginMotionGrace() {
+        if (!overlayMode) return
+        graceUntil = SystemClock.uptimeMillis() + MOTION_GRACE_MS
+        setAnimating(true)
+    }
+
     fun refreshGeometry(immediate: Boolean) {
         scene.onGeometryChanged(immediate)
+        beginMotionGrace()
         invalidate()
         requestFrame()
         reportBounds(settled = false)
@@ -150,7 +164,7 @@ class IslandView(
         frameScheduled = false
         val dt = if (lastFrameNanos == 0L) 1f / 120f else ((frameTimeNanos - lastFrameNanos) / 1e9f).coerceIn(0f, 1f)
         lastFrameNanos = frameTimeNanos
-        val moving = scene.step(dt)
+        val moving = scene.step(dt) || SystemClock.uptimeMillis() < graceUntil
         invalidate()
         if (moving) recordInterval(dt)
         setAnimating(moving)
@@ -211,10 +225,29 @@ class IslandView(
         choreographer.removeFrameCallback(this)
         frameScheduled = false
         lastFrameNanos = 0L
-        setAnimating(false)
+        removeCallbacks(animOffRunnable)
+        applyAnimating(false)
     }
 
+    /**
+     * "Animating" is sticky: it turns on immediately but only turns off after a quiet period.
+     * Flapping on/off at the start of a transition used to re-request the display refresh rate
+     * and shrink/grow the overlay window repeatedly, which showed up as a stutter in the first
+     * frames of every event animation.
+     */
     private fun setAnimating(value: Boolean) {
+        if (value) {
+            removeCallbacks(animOffRunnable)
+            applyAnimating(true)
+        } else if (animating) {
+            removeCallbacks(animOffRunnable)
+            postDelayed(animOffRunnable, ANIMATING_LINGER_MS)
+        }
+    }
+
+    private val animOffRunnable = Runnable { applyAnimating(false) }
+
+    private fun applyAnimating(value: Boolean) {
         if (animating == value) return
         animating = value
         host?.onAnimatingChanged(value)
@@ -497,5 +530,7 @@ class IslandView(
         const val FLING_VELOCITY_DP = 650f
         const val DETENT_EXPAND_DP = 30f
         const val DETENT_STACK_DP = 86f
+        const val ANIMATING_LINGER_MS = 700L
+        const val MOTION_GRACE_MS = 350L
     }
 }

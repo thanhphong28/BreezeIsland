@@ -40,12 +40,17 @@ class OverlayWindow(private val context: Context, private val view: View) {
     @Suppress("DEPRECATION")
     fun setSuppressStatusBar(suppress: Boolean) {
         suppressingStatusBar = false
-        if (attached && Build.VERSION.SDK_INT >= 30) {
+        // Only needed once per attach: re-issuing show() on every state change / settled frame
+        // made the window controller re-dispatch insets right at the start of animations.
+        if (attached && !insetsShown && Build.VERSION.SDK_INT >= 30) {
+            insetsShown = true
             runCatching {
                 view.windowInsetsController?.show(android.view.WindowInsets.Type.statusBars())
             }
         }
     }
+
+    private var insetsShown = false
 
     fun applyInsetsSuppression() {
         if (!attached) return
@@ -77,6 +82,7 @@ class OverlayWindow(private val context: Context, private val view: View) {
             Diagnostics.w(TAG, "Could not remove overlay window", e)
         }
         attached = false
+        insetsShown = false
     }
 
     fun setBounds(rect: Rect) {
