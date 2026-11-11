@@ -56,6 +56,11 @@ class BatteryMonitor(
     private var connectJob: Job? = null
     private var speedJob: Job? = null
     private var historyJob: Job? = null
+    private var isConnecting = false
+    private var activeCountFrom = -1
+    private var lastPostedLevel = -1
+    private var lastPostedStatus = -1
+    private var lastPostedPlugged = -1
 
     /** Measured charging power since the charger was connected (W), oldest first. */
     private val powerHistory = ArrayDeque<Float>(HISTORY_POINTS)
@@ -106,6 +111,12 @@ class BatteryMonitor(
         context.unregisterReceiver(receiver)
         registered = false
         connectJob?.cancel()
+        connectJob = null
+        isConnecting = false
+        activeCountFrom = -1
+        lastPostedLevel = -1
+        lastPostedStatus = -1
+        lastPostedPlugged = -1
         speedJob?.cancel()
         historyJob?.cancel()
         powerHistory.clear()
@@ -145,9 +156,18 @@ class BatteryMonitor(
             // Some devices skip ACTION_POWER_CONNECTED; the plug transition is enough.
             onConnected()
         }
-        if (snap.isPlugged) {
-            if (engine.current().toast?.id == ID_TOAST) postCharging(entrance = false)
-            if (s.chargingLiveActivity && s.chargingEnabled) postLive()
+        if (snap.isPlugged && !isConnecting) {
+            val toastActive = engine.current().toast?.id == ID_TOAST
+            if (toastActive) {
+                if (snap.level != lastPostedLevel || snap.status != lastPostedStatus || snap.plugged != lastPostedPlugged) {
+                    lastPostedLevel = snap.level
+                    lastPostedStatus = snap.status
+                    lastPostedPlugged = snap.plugged
+                    postCharging(entrance = false)
+                }
+            } else {
+                if (s.chargingLiveActivity && s.chargingEnabled) postLive()
+            }
         }
 
         if (s.batteryLowEnabled && !snap.isPlugged && snap.level <= s.batteryLowThreshold && !lowAnnounced && prev.level > snap.level) {
@@ -173,21 +193,35 @@ class BatteryMonitor(
         lastConnectAt = System.currentTimeMillis()
         if (!settings().chargingEnabled) return
         connectJob?.cancel()
+        isConnecting = true
         connectJob = scope.launch {
-            // Give ACTION_BATTERY_CHANGED a moment to report the plug type.
-            delay(CONNECT_SETTLE_MS)
+            // Settle quickly for plug type (100ms is plenty for Samsung broadcast)
+            delay(100L)
             connectJob = null
+            isConnecting = false
             speed = null
             powerHistory.clear()
-            postCharging(entrance = true)
-            sampleSpeed()
-            recordPower()
+            val snap = last
+            if (snap != null && snap.isPlugged) {
+                activeCountFrom = max(0, snap.level - COUNT_UP_SPAN)
+                lastPostedLevel = snap.level
+                lastPostedStatus = snap.status
+                lastPostedPlugged = snap.plugged
+                postCharging(entrance = true)
+                sampleSpeed()
+                recordPower()
+            }
         }
     }
 
     private fun onDisconnected() {
         connectJob?.cancel()
         connectJob = null
+        isConnecting = false
+        activeCountFrom = -1
+        lastPostedLevel = -1
+        lastPostedStatus = -1
+        lastPostedPlugged = -1
         speedJob?.cancel()
         historyJob?.cancel()
         powerHistory.clear()
@@ -207,6 +241,7 @@ class BatteryMonitor(
     private fun chargingPayload(snap: Snapshot, entrance: Boolean): ChargingPayload {
         val s = settings()
         val remaining = batteryManager.computeChargeTimeRemaining().takeIf { it > 0 }
+        val countStart = if (activeCountFrom >= 0) activeCountFrom else max(0, snap.level - COUNT_UP_SPAN)
         return ChargingPayload(
             level = snap.level,
             plugType = plugType(snap.plugged),
@@ -217,7 +252,7 @@ class BatteryMonitor(
             voltageMv = snap.voltageMv,
             timeToFullMs = remaining,
             theme = s.chargingTheme,
-            countFrom = if (entrance) max(0, snap.level - COUNT_UP_SPAN) else snap.level,
+            countFrom = countStart,
             powerHistory = powerHistory.toList(),
         )
     }
@@ -237,7 +272,7 @@ class BatteryMonitor(
                 title = "Charging",
                 icon = Glyph.BOLT,
                 payload = chargingPayload(snap, entrance),
-                animation = EntranceAnimation.POP,
+                animation = if (entrance) EntranceAnimation.POP else EntranceAnimation.MORPH,
                 contentKey = "charging",
             )
         )

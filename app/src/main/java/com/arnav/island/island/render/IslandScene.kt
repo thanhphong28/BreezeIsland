@@ -234,9 +234,9 @@ class IslandScene(private val rc: RenderContext) {
             height.animateTo(frame.height, hSpec)
             val entrance = mainEvent?.animation
             if (kind == TransitionKind.INTERRUPT && entrance == EntranceAnimation.POP && expressive) {
-                // A lively pop for moments like "charger connected".
-                width.impulse(frame.width * 1.1f)
-                height.impulse(frame.height * 0.9f)
+                // A lively gentle pop for moments like "charger connected".
+                width.impulse(frame.width * 0.15f)
+                height.impulse(frame.height * 0.12f)
             }
             if (previous is IslandState.Toast && newState is IslandState.Toast && kind == TransitionKind.SWAP && expressive) {
                 // Toast to toast: a quick squeeze instead of retracting in between.

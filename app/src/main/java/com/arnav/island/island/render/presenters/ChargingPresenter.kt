@@ -39,9 +39,9 @@ class ChargingPresenter(rc: RenderContext) : Presenter(rc) {
     private var charging: ChargingPayload? = null
     private var battery: BatteryPayload? = null
 
-    private val count = Spring(0f, SpringSpec(0.9f, 1f), restThreshold = 0.05f)
-    private val fillLevel = Spring(0f, SpringSpec(0.8f, 0.9f), restThreshold = 0.001f)
-    private val boltPop = Spring(0f, SpringSpec(0.42f, 0.5f), restThreshold = 0.002f)
+    private val count = Spring(0f, SpringSpec(0.7f, 0.95f), restThreshold = 0.05f)
+    private val fillLevel = Spring(0f, SpringSpec(0.7f, 0.95f), restThreshold = 0.001f)
+    private val boltPop = Spring(0f, SpringSpec(0.35f, 0.88f), restThreshold = 0.002f)
 
     private val wavePath = Path()
     private var gradient: SweepGradient? = null
@@ -140,7 +140,10 @@ class ChargingPresenter(rc: RenderContext) : Presenter(rc) {
 
     /** Odometer percentage: digits roll as the counter climbs to the real level. */
     private fun drawPercent(canvas: Canvas, x: Float, y: Float, paint: android.text.TextPaint, alpha: Float, align: Paint.Align) {
-        percentText.set("${count.value.roundToInt()}%", direction = 1, animate = true)
+        val currentInt = count.value.roundToInt()
+        // During rapid count-up from countFrom to level, update digits crisply without backward-jitter
+        val isClimbing = kotlin.math.abs(count.value - level) > 1.0f
+        percentText.set("$currentInt%", direction = 1, animate = !isClimbing)
         percentText.draw(canvas, rc, x, y, paint, color, alpha, align)
     }
 

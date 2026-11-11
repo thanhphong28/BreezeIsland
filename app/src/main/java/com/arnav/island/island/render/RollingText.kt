@@ -13,7 +13,7 @@ import com.arnav.island.animation.SpringSpec
 class RollingText {
     private var current = ""
     private var previous = ""
-    private val progress = Spring(1f, SpringSpec(0.34f, 0.82f), restThreshold = 0.004f)
+    private val progress = Spring(1f, SpringSpec(0.22f, 0.98f), restThreshold = 0.004f)
 
     /** +1: new characters arrive from below (counting up); -1: from above (counting down). */
     private var direction = 1
@@ -23,14 +23,22 @@ class RollingText {
 
     fun set(text: String, direction: Int, animate: Boolean) {
         if (text == current) return
-        previous = current
-        current = text
-        this.direction = if (direction >= 0) 1 else -1
-        if (animate && previous.isNotEmpty()) {
-            progress.snapTo(0f)
+        if (!animate || previous.isEmpty()) {
+            previous = text
+            current = text
+            progress.snapTo(1f)
+            return
+        }
+        if (progress.value < 0.85f) {
+            // Already rolling: retarget smoothly without jarring backward snap
+            current = text
             progress.animateTo(1f)
         } else {
-            progress.snapTo(1f)
+            previous = current
+            current = text
+            this.direction = if (direction >= 0) 1 else -1
+            progress.snapTo(0f)
+            progress.animateTo(1f)
         }
     }
 

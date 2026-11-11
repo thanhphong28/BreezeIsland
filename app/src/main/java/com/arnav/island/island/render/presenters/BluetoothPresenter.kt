@@ -19,8 +19,9 @@ import com.arnav.island.util.ColorExtractor
 class BluetoothPresenter(rc: RenderContext) : Presenter(rc) {
 
     private var payload: BluetoothPayload? = null
-    private val arrival = Spring(0f, SpringSpec(0.5f, 0.55f), restThreshold = 0.002f)
+    private val arrival = Spring(0f, SpringSpec(0.38f, 0.85f), restThreshold = 0.002f)
     private val ripple = Spring(0f, SpringSpec(0.9f, 1f), restThreshold = 0.002f)
+    private val batteryFade = Spring(0f, SpringSpec(0.32f, 0.95f), restThreshold = 0.002f)
     private var nameLine = ""
 
     override fun measure(event: IslandEvent, mode: PresentMode): Pair<Float, Float> = when (mode) {
@@ -36,6 +37,15 @@ class BluetoothPresenter(rc: RenderContext) : Presenter(rc) {
             arrival.animateTo(1f)
             ripple.snapTo(0f)
             if (payload?.connected == true) ripple.animateTo(1f)
+            if (payload?.batteryLevel != null) {
+                batteryFade.snapTo(1f)
+            } else {
+                batteryFade.snapTo(0f)
+            }
+        } else {
+            if (payload?.batteryLevel != null && batteryFade.target < 0.5f) {
+                batteryFade.animateTo(1f)
+            }
         }
         rc.titlePaint.textSize = rc.sp(15f)
         val maxW = layoutW - dp(18f) * 2 - dp(52f) - (if (payload?.batteryLevel != null) dp(70f) else dp(8f))
@@ -46,6 +56,7 @@ class BluetoothPresenter(rc: RenderContext) : Presenter(rc) {
         var moving = super.step(dt)
         if (arrival.step(dt)) moving = true
         if (ripple.step(dt)) moving = true
+        if (batteryFade.step(dt)) moving = true
         return moving
     }
 
@@ -118,11 +129,13 @@ class BluetoothPresenter(rc: RenderContext) : Presenter(rc) {
         rc.text(canvas, status, textX + if (connected) dp(10f) else 0f, cy + dp(15f), rc.captionPaint, IslandColors.TEXT_SECONDARY, alpha)
 
         val level = payload?.batteryLevel ?: return
+        val bAlpha = alpha * batteryFade.value.coerceIn(0f, 1f)
+        if (bAlpha <= 0.004f) return
         val ringR = dp(13f)
         val ringX = layoutW - pad - ringR
-        rc.glyphs.drawRing(canvas, ringX, cy, ringR, dp(3f), level / 100f * p, batteryColor(level), IslandColors.TRACK, alpha)
+        rc.glyphs.drawRing(canvas, ringX, cy, ringR, dp(3f), level / 100f * arrival.value, batteryColor(level), IslandColors.TRACK, bAlpha)
         rc.numberPaint.textSize = rc.sp(14f)
-        rc.text(canvas, "$level%", ringX - ringR - dp(8f), rc.baseline(rc.numberPaint, cy), rc.numberPaint, IslandColors.TEXT, alpha, Paint.Align.RIGHT)
+        rc.text(canvas, "$level%", ringX - ringR - dp(8f), rc.baseline(rc.numberPaint, cy), rc.numberPaint, IslandColors.TEXT, bAlpha, Paint.Align.RIGHT)
     }
 
     override val contentDescription: String

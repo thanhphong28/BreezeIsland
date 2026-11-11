@@ -48,9 +48,13 @@ class BluetoothMonitor(
                     val device = device(intent) ?: return
                     val level = intent.getIntExtra(EXTRA_BATTERY_LEVEL, -1)
                     if (level in 0..100) {
+                        val prevLevel = batteryLevels[device.address]
                         batteryLevels[device.address] = level
-                        // Refresh the toast in place if it is on screen.
-                        if (engine.current().toast?.id == eventId(device)) onConnection(device, connected = true, refreshOnly = true)
+                        // Refresh the toast in place only if it is on screen and the level is new/changed
+                        val currentToast = engine.current().toast
+                        if (currentToast != null && currentToast.id == eventId(device) && prevLevel != level) {
+                            onConnection(device, connected = true, refreshOnly = true)
+                        }
                     }
                 }
                 BluetoothAdapter.ACTION_STATE_CHANGED -> {
@@ -102,10 +106,13 @@ class BluetoothMonitor(
 
         val now = System.currentTimeMillis()
         val key = "${device.address}:$connected"
+        val nameKey = "$name:$connected"
         if (!refreshOnly) {
-            val last = lastShown[key] ?: 0L
-            if (now - last < DEBOUNCE_MS) return
+            val lastAddr = lastShown[key] ?: 0L
+            val lastName = lastShown[nameKey] ?: 0L
+            if (now - lastAddr < DEBOUNCE_MS || now - lastName < 2_500L) return
             lastShown[key] = now
+            lastShown[nameKey] = now
         }
         if (!connected) batteryLevels.remove(device.address)
 
@@ -121,7 +128,7 @@ class BluetoothMonitor(
                 subtitle = if (connected) "Connected" else "Disconnected",
                 icon = Glyph.BLUETOOTH,
                 payload = BluetoothPayload(name, kind, connected, if (connected) batteryLevels[device.address] else null),
-                animation = EntranceAnimation.POP,
+                animation = if (refreshOnly) EntranceAnimation.MORPH else EntranceAnimation.POP,
                 contentKey = "$connected",
             )
         )
