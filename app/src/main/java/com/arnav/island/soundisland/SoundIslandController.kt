@@ -208,6 +208,7 @@ class SoundIslandController(
             updateOverlayVerticalPosition()
             if (VolumeSuppressor.canUseShizuku()) {
                 Thread {
+                    com.arnav.island.overlay.NowBarDiagnostics.runOnce(context)
                     VolumeSuppressor.setupMediaKeyRouting(context)
                     if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed) {
                         VolumeSuppressor.suppress(context)
@@ -237,6 +238,7 @@ class SoundIslandController(
             updateOverlayVerticalPosition()
             if (VolumeSuppressor.canUseShizuku()) {
                 Thread {
+                    com.arnav.island.overlay.NowBarDiagnostics.runOnce(context)
                     VolumeSuppressor.setupMediaKeyRouting(context)
                     if (s.soundIslandSuppressStock && !VolumeSuppressor.isSuppressed) {
                         VolumeSuppressor.suppress(context)
