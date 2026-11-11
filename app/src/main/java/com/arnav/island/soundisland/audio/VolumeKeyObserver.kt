@@ -68,20 +68,64 @@ class VolumeKeyObserver(
         }
     }
 
-    private val contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
-        private var lastObservedVolume = -1
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var lastObservedVolume = -1
+    private var lastObservedMax = -1
+
+    private val contentObserver = object : ContentObserver(mainHandler) {
         override fun onChange(selfChange: Boolean) {
             super.onChange(selfChange)
-            val info = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
-            if (info.current != lastObservedVolume) {
-                lastObservedVolume = info.current
-                onSystemVolumeChanged?.invoke(info.current, info.max, info.fraction)
-            }
+            syncFromSystem(force = false)
         }
+    }
+
+    /** Re-reads the REAL system media volume and pushes it to Breeze when it differs from the last known value. */
+    fun syncFromSystem(force: Boolean) {
+        val info = volumeManager.getStreamInfo(AudioManager.STREAM_MUSIC)
+        if (force || info.current != lastObservedVolume || info.max != lastObservedMax) {
+            lastObservedVolume = info.current
+            lastObservedMax = info.max
+            onSystemVolumeChanged?.invoke(info.current, info.max, info.fraction)
+        }
+    }
+
+    /**
+     * Bluetooth / headset / speaker switches change the active volume profile (different index and
+     * even different max). Android applies the new profile a moment AFTER the event, so re-sync a
+     * few times to land on the final value shown by the Control Center panel.
+     */
+    private fun resyncAfterRouteChange() {
+        for (delay in longArrayOf(0L, 250L, 800L, 1800L)) {
+            mainHandler.postDelayed({ syncFromSystem(force = true) }, delay)
+        }
+    }
+
+    private val routeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) = resyncAfterRouteChange()
+    }
+
+    private val deviceCallback = object : android.media.AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>?) = resyncAfterRouteChange()
+        override fun onAudioDevicesRemoved(removedDevices: Array<out android.media.AudioDeviceInfo>?) = resyncAfterRouteChange()
     }
 
     fun start() {
         if (registered) return
+
+        try {
+            val routeFilter = IntentFilter().apply {
+                addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+                addAction(AudioManager.ACTION_HEADSET_PLUG)
+                addAction("android.bluetooth.device.action.ACL_CONNECTED")
+                addAction("android.bluetooth.device.action.ACL_DISCONNECTED")
+                addAction("android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED")
+                addAction("android.bluetooth.a2dp.profile.action.ACTIVE_DEVICE_CHANGED")
+            }
+            ContextCompat.registerReceiver(context, routeReceiver, routeFilter, ContextCompat.RECEIVER_EXPORTED)
+            context.getSystemService(AudioManager::class.java)?.registerAudioDeviceCallback(deviceCallback, mainHandler)
+        } catch (t: Throwable) {
+            Diagnostics.w(TAG, "Failed to register audio route listeners", t)
+        }
 
         try {
             val filter = IntentFilter(ACTION_VOLUME_CHANGED)
@@ -101,6 +145,8 @@ class VolumeKeyObserver(
                 true,
                 contentObserver
             )
+            // Bluetooth/absolute-volume values are stored in Settings.Global
+            context.contentResolver.registerContentObserver(Settings.Global.CONTENT_URI, true, contentObserver)
         } catch (t: Throwable) {
             Diagnostics.w(TAG, "Failed to register content observer", t)
         }
@@ -112,6 +158,10 @@ class VolumeKeyObserver(
         if (!registered) return
         try {
             context.unregisterReceiver(receiver)
+        } catch (_: Exception) {}
+        try {
+            context.unregisterReceiver(routeReceiver)
+            context.getSystemService(AudioManager::class.java)?.unregisterAudioDeviceCallback(deviceCallback)
         } catch (_: Exception) {}
         try {
             context.contentResolver.unregisterContentObserver(contentObserver)

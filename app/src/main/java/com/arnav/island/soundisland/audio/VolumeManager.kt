@@ -59,7 +59,7 @@ class VolumeManager(private val context: Context) {
     /** Sets volume by fraction (0.0 .. 1.0). */
     fun setVolumeFraction(streamType: Int, fraction: Float, playSound: Boolean = false): Boolean {
         val info = getStreamInfo(streamType)
-        val target = info.min + ((info.max - info.min) * fraction.coerceIn(0f, 1f)).toInt()
+        val target = info.min + Math.round((info.max - info.min) * fraction.coerceIn(0f, 1f))
         return setVolume(streamType, target, playSound)
     }
 

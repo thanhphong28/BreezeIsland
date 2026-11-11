@@ -27,6 +27,7 @@ import rikka.shizuku.SystemServiceHelper
  */
 object VolumeSuppressor {
     private const val TAG = "VolumeSuppressor"
+    private const val PREF_KEY_ROUTING_DONE = "media_key_routing_done"
     private val mainHandler = Handler(Looper.getMainLooper())
 
     var isSuppressed: Boolean = false
@@ -95,6 +96,10 @@ object VolumeSuppressor {
      * Configures Samsung One UI system settings so hardware buttons route to Media by default.
      */
     fun setupMediaKeyRouting(context: Context? = null): Boolean {
+        // One-time setup: these are persistent system settings, so after the first successful run
+        // Shizuku / Wireless debugging is no longer needed for them.
+        val prefs = context?.applicationContext?.getSharedPreferences("breeze_volume_setup", Context.MODE_PRIVATE)
+        if (prefs?.getBoolean(PREF_KEY_ROUTING_DONE, false) == true) return true
         if (!canUseShizuku()) return false
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -111,6 +116,7 @@ object VolumeSuppressor {
                 "settings put global hidden_api_policy_p_apps 1"
             )
             Log.i(TAG, "Configured volume_keys_control_media = 1 on Samsung One UI")
+            prefs?.edit()?.putBoolean(PREF_KEY_ROUTING_DONE, true)?.apply()
             true
         } catch (t: Throwable) {
             Diagnostics.w(TAG, "Failed setting media key routing", t)
