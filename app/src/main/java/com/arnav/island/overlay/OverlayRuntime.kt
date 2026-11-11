@@ -506,8 +506,8 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         if (hiddenReason == null && view.visibility != View.VISIBLE) {
             view.visibility = View.VISIBLE
         }
-        val marginX = rc.dp(10f) + bounds.width() * 0.05f
-        val marginY = rc.dp(8f) + bounds.height() * 0.08f
+        val marginX = rc.dp(24f) + bounds.width() * 0.18f
+        val marginY = rc.dp(16f) + bounds.height() * 0.15f
         // Room for spring overshoot, plus the touch strip in compact states.
         val bottom = max(bounds.bottom + marginY, scene.touchBottom(g.touchExtension))
         neededF.set(bounds.left - marginX, 0f, bounds.right + marginX, bottom)
@@ -524,7 +524,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
     }
 
     private fun differs(a: Rect, b: Rect) =
-        abs(a.left - b.left) > 2 || abs(a.top - b.top) > 2 || abs(a.right - b.right) > 2 || abs(a.bottom - b.bottom) > 2
+        abs(a.left - b.left) > 4 || abs(a.top - b.top) > 4 || abs(a.right - b.right) > 4 || abs(a.bottom - b.bottom) > 4
 
     // ---------------------------------------------------------------------------------------------
     // Debug HUD

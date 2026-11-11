@@ -62,7 +62,14 @@ class IslandView(
     private var lastFrameNanos = 0L
     private var animating = false
     private val location = IntArray(2)
+    private var windowOffsetX = 0
+    private var windowOffsetY = 0
     private val bounds = RectF()
+
+    fun setWindowOffset(x: Int, y: Int) {
+        windowOffsetX = x
+        windowOffsetY = y
+    }
 
     // Gestures.
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
@@ -163,10 +170,18 @@ class IslandView(
         }
     }
 
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        if (overlayMode && windowOffsetX == 0 && windowOffsetY == 0) {
+            getLocationOnScreen(location)
+            windowOffsetX = location[0]
+            windowOffsetY = location[1]
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         if (overlayMode) {
-            getLocationOnScreen(location)
-            canvas.translate(-location[0].toFloat(), -location[1].toFloat())
+            canvas.translate(-windowOffsetX.toFloat(), -windowOffsetY.toFloat())
         }
         scene.draw(canvas, rc.clock())
     }
