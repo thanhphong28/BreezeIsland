@@ -91,10 +91,9 @@ class NotificationProcessor(
         val n = sbn.notification ?: return
         val selectedSlots = parseCsv(s.statusBarIcons)
         if (isMedia(n)) {
-            // NEVER snooze or cancel media notifications:
-            // Media notifications must remain fully active in the system notification shade
-            // and Quick Settings media player so the user can control playback from the panel.
-            // Duplicate status bar media pills on One UI are cleanly handled via icon_blacklist.
+            if (shouldSuppressMediaChip(s, selectedSlots)) {
+                suppressStatusBarChip(sbn)
+            }
             return
         }
         if (isFlashlightNotification(sbn)) {
@@ -135,7 +134,9 @@ class NotificationProcessor(
             if (sbn.packageName == context.packageName) continue
             val n = sbn.notification ?: continue
             if (isMedia(n)) {
-                // Keep media notifications active for the notification panel and Quick Settings player
+                if (shouldSuppressMediaChip(s, selectedSlots)) {
+                    suppressStatusBarChip(sbn)
+                }
                 continue
             }
             if (isFlashlightNotification(sbn)) {
@@ -740,7 +741,7 @@ class NotificationProcessor(
     }
 
     private fun shouldSuppressMediaChip(s: IslandSettings, selectedSlots: Set<String>): Boolean =
-        s.seamlessStatusBar || (s.statusBarCleanup && "ongoing_activity" in selectedSlots)
+        s.enabled && s.mediaEnabled && (s.seamlessStatusBar || s.statusBarCleanup)
 
     /**
      * Snoozes or cancels a status bar notification so One UI removes its status bar chip/icon

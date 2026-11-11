@@ -21,13 +21,14 @@ class IslandApp : Application() {
             }
         }
         Diagnostics.installCrashHandler(this)
-        com.arnav.island.overlay.StatusBarCleanup.cleanProtectedIconsFromSystem(this)
         graph = AppGraph(this)
         IslandOverlayService.ensureChannel(this)
         TimerNotifications.ensureChannel(this)
 
         // Process recreated (crash, update, low-memory kill): bring the island back if enabled.
         graph.scope.launch {
+            // Clean any leftover dangerous status bar slots asynchronously without blocking startup
+            com.arnav.island.overlay.StatusBarCleanup.cleanProtectedIconsFromSystem(this@IslandApp)
             val s = graph.settings.current()
             if (s.enabled && Settings.canDrawOverlays(this@IslandApp)) {
                 IslandOverlayService.start(this@IslandApp)

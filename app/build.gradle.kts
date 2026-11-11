@@ -11,8 +11,8 @@ android {
         applicationId = "com.breeze.island"
         minSdk = 29
         targetSdk = 35
-        versionCode = 34
-        versionName = "1.9.6"
+        versionCode = 35
+        versionName = "1.9.7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

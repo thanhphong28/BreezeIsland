@@ -41,10 +41,22 @@ object StatusBarCleanup {
         "data_saver",
     )
 
+    /**
+     * Standard AOSP status bar icon slots that are safe for icon_blacklist.
+     * OEM-proprietary or non-existent slots (like "ongoing_activity", "now_bar") MUST NEVER
+     * be written to icon_blacklist, as doing so crashes Samsung One UI's SecStatusBarIconController
+     * and causes SystemUI crash loops (Black Screen / Freeze).
+     */
+    val SAFE_AOSP_SLOTS = setOf(
+        "volume",
+        "alarm_clock",
+        "zen",
+        "headset",
+        "managed_profile",
+        "rotate",
+    )
+
     val ICONS: Map<String, String> = linkedMapOf(
-        "ongoing_activity" to "One UI Live Notification / Media chip",
-        "ongoing_call_chip" to "One UI ongoing call chip",
-        "flashlight" to "One UI Flashlight / Now Bar chip",
         "managed_profile" to "Work Profile / Secure Folder",
         "alarm_clock" to "Alarm",
         "volume" to "Sound / vibrate",
@@ -52,26 +64,6 @@ object StatusBarCleanup {
         "rotate" to "Rotation lock",
         "headset" to "Headset",
     )
-
-    /** Only One UI duplicate ongoing chips (e.g. Samsung media pill, flashlight chip, or call chip) */
-    val ACTIVE_ISLAND_SLOTS = listOf(
-        "ongoing_activity",
-        "ongoing_activity_chip",
-        "sec_ongoing_activity",
-        "ongoing_call_chip",
-        "media_ongoing",
-        "live_notification",
-        "chip",
-        "flashlight",
-        "torch",
-        "sec_flashlight",
-        "sec_torch",
-        "now_bar",
-        "sec_now_bar",
-    )
-
-    private val SPLIT_RIGHT_SLOTS = ACTIVE_ISLAND_SLOTS
-    private val SEAMLESS_SLOTS = ACTIVE_ISLAND_SLOTS
 
     @Volatile
     private var cardOpen = false
@@ -91,16 +83,21 @@ object StatusBarCleanup {
     fun current(context: Context): String =
         Settings.Secure.getString(context.contentResolver, KEY).orEmpty()
 
-    /** Ensures protected icons like Wi-Fi, battery, clock are NEVER blacklisted on the device. */
+    /** Ensures protected icons like Wi-Fi, battery, clock and dangerous invalid slots are NEVER blacklisted on the device. */
     fun cleanProtectedIconsFromSystem(context: Context) {
         if (!canWrite(context)) return
         runCatching {
             val now = current(context)
             if (now.isNotEmpty()) {
-                val cleaned = parse(now).filterNot { it in PROTECTED_ICONS }.joinToString(",")
+                val parsed = parse(now)
+                // Filter out protected icons AND sanitize: only allow known safe AOSP slots
+                val cleaned = parsed
+                    .filterNot { it in PROTECTED_ICONS }
+                    .filter { it in SAFE_AOSP_SLOTS }
+                    .joinToString(",")
                 if (cleaned != now) {
                     put(context, cleaned)
-                    Diagnostics.w(TAG, "Restored protected status bar icons: $now -> $cleaned")
+                    Diagnostics.w(TAG, "Restored and sanitized status bar icons: $now -> $cleaned")
                 }
             }
         }
@@ -117,8 +114,8 @@ object StatusBarCleanup {
         islandActive = active
         splitActive = split
         cardOpen = coversStatusBar
-        val settings = (context.applicationContext as? IslandApp)?.graph?.settings ?: return
-        settings.set { s -> sync(context, s) ?: s }
+        // In-memory state tracking only. We intentionally DO NOT mutate Settings.Secure or DataStore
+        // on animation/bounds changes to avoid freezing system_server IPC.
     }
 
     /** Backwards-compatible helper for callers that only toggle card state. */
@@ -136,30 +133,27 @@ object StatusBarCleanup {
 
         if (!canWrite(context)) return null
         return try {
-            val active = s.enabled && (s.statusBarCleanup || s.seamlessStatusBar)
+            val active = s.enabled && s.statusBarCleanup
             when {
                 active -> {
                     val now = current(context)
                     val backup = if (s.statusBarBackup == IslandSettings.BACKUP_NONE) {
-                        val ours = parse(s.statusBarIcons) + SEAMLESS_SLOTS
+                        val ours = parse(s.statusBarIcons).filter { it in SAFE_AOSP_SLOTS }
                         parse(now).filterNot { it in ours }.filterNot { it in PROTECTED_ICONS }.joinToString(",")
                     } else {
                         s.statusBarBackup
                     }
                     val target = buildSet {
-                        addAll(parse(backup))
+                        addAll(parse(backup).filter { it in SAFE_AOSP_SLOTS })
                         if (s.statusBarCleanup) {
-                            addAll(parse(s.statusBarIcons).filterNot { it in PROTECTED_ICONS })
-                        }
-                        if (s.seamlessStatusBar && islandActive) {
-                            addAll(ACTIVE_ISLAND_SLOTS)
+                            addAll(parse(s.statusBarIcons).filter { it in SAFE_AOSP_SLOTS })
                         }
                     }.filterNot { it in PROTECTED_ICONS }.joinToString(",")
                     put(context, target)
                     if (s.statusBarBackup == IslandSettings.BACKUP_NONE) s.copy(statusBarBackup = backup) else null
                 }
                 s.statusBarBackup != IslandSettings.BACKUP_NONE -> {
-                    val restored = parse(s.statusBarBackup).filterNot { it in PROTECTED_ICONS }.joinToString(",")
+                    val restored = parse(s.statusBarBackup).filter { it in SAFE_AOSP_SLOTS }.joinToString(",")
                     put(context, restored)
                     s.copy(statusBarBackup = IslandSettings.BACKUP_NONE)
                 }
@@ -188,7 +182,10 @@ object StatusBarCleanup {
     }
 
     private fun put(context: Context, value: String) {
-        val safeValue = parse(value).filterNot { it in PROTECTED_ICONS }.joinToString(",")
+        val safeValue = parse(value)
+            .filterNot { it in PROTECTED_ICONS }
+            .filter { it in SAFE_AOSP_SLOTS }
+            .joinToString(",")
         if (current(context) != safeValue) {
             Settings.Secure.putString(context.contentResolver, KEY, safeValue)
         }
