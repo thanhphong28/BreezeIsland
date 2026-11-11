@@ -186,7 +186,7 @@ class IslandView(
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
-        if (overlayMode && windowOffsetX == 0 && windowOffsetY == 0) {
+        if (overlayMode) {
             getLocationOnScreen(location)
             windowOffsetX = location[0]
             windowOffsetY = location[1]

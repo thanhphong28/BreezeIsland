@@ -218,10 +218,12 @@ class IslandScene(private val rc: RenderContext) {
             (frame.width > width.value + 0.5f && frame.height >= height.value - 0.5f)
         val wSpec = if (expanding) motion.widthExpand else motion.widthCollapse
         val hSpec = if (expanding) motion.heightExpand else motion.heightCollapse
-        startW = width.value
-        startH = height.value
+        if (kind != TransitionKind.UPDATE) {
+            startW = width.value
+            startH = height.value
+        }
 
-        if (!initialised || immediate) {
+        if (!initialised || (immediate && kind != TransitionKind.UPDATE)) {
             cx.snapTo(frame.centerX)
             top.snapTo(frame.top)
             width.snapTo(frame.width)
@@ -267,7 +269,7 @@ class IslandScene(private val rc: RenderContext) {
             val p = layer.presenter
             if (p.mode == PresentMode.TOAST || p.mode == PresentMode.EXPANDED || p.mode == PresentMode.COMPACT) {
                 val (w, h) = p.measure(p.event, p.mode)
-                p.bind(p.event, p.mode, w, h)
+                p.rebind(p.event, w, h)
             }
         }
         setState(current, TransitionKind.UPDATE, immediate)
@@ -315,7 +317,7 @@ class IslandScene(private val rc: RenderContext) {
             val p = reusable
             if (mode == PresentMode.TOAST || mode == PresentMode.EXPANDED || mode == PresentMode.COMPACT) {
                 if (abs(p.layoutW - frame.width) > 0.5f || abs(p.layoutH - frame.height) > 0.5f) {
-                    p.bind(event, mode, frame.width, frame.height)
+                    p.rebind(event, frame.width, frame.height)
                 } else {
                     p.update(event)
                 }

@@ -88,7 +88,6 @@ class OverlayWindow(private val context: Context, private val view: View) {
     fun setBounds(rect: Rect) {
         if (!attached || rect == current) return
         apply(rect)
-        (view as? com.arnav.island.island.render.IslandView)?.setWindowOffset(rect.left, rect.top)
         try {
             wm.updateViewLayout(view, params)
         } catch (e: RuntimeException) {

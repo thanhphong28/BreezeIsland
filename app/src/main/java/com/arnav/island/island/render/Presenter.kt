@@ -88,6 +88,15 @@ abstract class Presenter(protected val rc: RenderContext) {
         onBind(isUpdate = false)
     }
 
+    /** Updates layout bounds without resetting animation progress or entrance state. */
+    fun rebind(event: IslandEvent, width: Float, height: Float) {
+        this.event = event
+        layoutW = width
+        layoutH = height
+        hitTargets.clear()
+        onBind(isUpdate = true)
+    }
+
     /** Same event id, same mode: refresh content in place (no entrance, no relayout churn). */
     fun update(event: IslandEvent) {
         this.event = event

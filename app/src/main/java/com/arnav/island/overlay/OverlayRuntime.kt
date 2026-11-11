@@ -197,10 +197,10 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
             }
         }
         scope.launch {
-            // Unlock bloom: the island greets you with a ring of the system accent.
+            // Unlock bloom: the island greets you with a ring of the system accent when unlock animation is not active.
             var wasLocked = screen.state.value.locked
             screen.state.collect { st ->
-                if (wasLocked && st.usable && settings.unlockBloom) {
+                if (wasLocked && st.usable && settings.unlockBloom && !settings.unlockAnimationEnabled) {
                     view.post {
                         view.scene.unlockBloom()
                         view.requestFrame()
@@ -221,7 +221,8 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
                     }
                     ensureWindowAttached()
                     if (!wasInteractive) {
-                        rebuildGeometry(immediate = true)
+                        val isMidAnimation = view.scene.state != IslandState.Hidden && view.scene.state != IslandState.Idle
+                        rebuildGeometry(immediate = !isMidAnimation)
                         graph.media.refresh()
                         battery.refresh()
                         system.refresh()
