@@ -63,6 +63,7 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Everything the overlay service runs: window, renderer, controller and event monitors.
@@ -510,11 +511,14 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         if (hiddenReason == null && view.visibility != View.VISIBLE) {
             view.visibility = View.VISIBLE
         }
-        val marginX = rc.dp(24f) + bounds.width() * 0.18f
-        val marginY = rc.dp(16f) + bounds.height() * 0.15f
+        val marginX = rc.dp(40f) + max(bounds.width(), scene.target.width) * 0.15f
+        val marginY = rc.dp(32f) + max(bounds.height(), scene.target.height) * 0.15f
+        val minLeft = min(bounds.left, scene.target.left)
+        val maxRight = max(bounds.right, scene.target.right)
+        val maxBottom = max(bounds.bottom, scene.target.bottom)
         // Room for spring overshoot, plus the touch strip in compact states.
-        val bottom = max(bounds.bottom + marginY, scene.touchBottom(g.touchExtension))
-        neededF.set(bounds.left - marginX, 0f, bounds.right + marginX, bottom)
+        val bottom = max(maxBottom + marginY, scene.touchBottom(g.touchExtension))
+        neededF.set(minLeft - marginX, 0f, maxRight + marginX, bottom)
         OverlayWindow.toRect(neededF, g.screen.widthPx, g.screen.heightPx, neededRect)
         if (neededRect.isEmpty) return
 

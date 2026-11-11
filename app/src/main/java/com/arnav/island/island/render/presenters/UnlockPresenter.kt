@@ -1,49 +1,62 @@
 package com.arnav.island.island.render.presenters
 
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Paint
-import com.arnav.island.animation.Spring
-import com.arnav.island.animation.SpringSpec
+import android.graphics.RectF
 import com.arnav.island.animation.lerp
 import com.arnav.island.events.Glyph
 import com.arnav.island.events.IslandEvent
 import com.arnav.island.events.UnlockMethod
 import com.arnav.island.events.UnlockPayload
-import com.arnav.island.island.render.IslandColors
 import com.arnav.island.island.render.IslandHaptics
 import com.arnav.island.island.render.PresentMode
 import com.arnav.island.island.render.Presenter
 import com.arnav.island.island.render.RenderContext
 import com.arnav.island.util.ColorExtractor
-import kotlin.math.max
+import kotlin.math.sin
 
 /**
- * iOS-style Dynamic Island unlock animation adapted for Android:
- * - Face ID: corner brackets with smiley face morphing into confirmation
- * - Fingerprint: glowing ridge scan pulses into authenticated state
- * - Password / PIN / Pattern: locked padlock springs open with tactile pop
+ * iPhone Dynamic Island Unlock Squircle:
+ * - Face ID: 3D tilted neon green orbital scanning ring that smoothly morphs into the Apple Face ID smiley face.
+ * - Fingerprint: Radiant electric blue biometric ridges with smooth acoustic pulse.
+ * - Password: Apple-style warm gold padlock that smoothly springs open.
+ *
+ * Dimensions: Perfectly centered squircle matching iOS Dynamic Island Face ID.
  */
 class UnlockPresenter(rc: RenderContext) : Presenter(rc) {
 
     private var payload: UnlockPayload? = null
     private var boundAt = 0L
+    private var hapticPlayed = false
 
-    // Progress spring: 0f -> 1f (representing the unlock verification and confirmation)
-    private val verified = Spring(0f, SpringSpec(0.28f, 0.96f), restThreshold = 0.002f)
-    private val iconPop = Spring(1f, SpringSpec(0.24f, 0.92f), restThreshold = 0.002f)
+    private val ovalRect = RectF()
+    private val innerOvalRect = RectF()
 
-    private var label = ""
+    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        maskFilter = BlurMaskFilter(rc.dp(5f), BlurMaskFilter.Blur.NORMAL)
+    }
 
     private val accent: Int
         get() = event.colors.accent.takeIf { it != 0 }?.let(ColorExtractor::legibleOnBlack) ?: when (payload?.method) {
-            UnlockMethod.FACE -> 0xFF30D158.toInt() // Apple Mint Green
-            UnlockMethod.FINGERPRINT -> 0xFF0A84FF.toInt() // Apple Cyan/Electric Blue
+            UnlockMethod.FACE -> 0xFF30D158.toInt() // Apple Mint / Neon Green
+            UnlockMethod.FINGERPRINT -> 0xFF0A84FF.toInt() // Apple Electric Blue
             UnlockMethod.PASSWORD, null -> 0xFFFFD60A.toInt() // Apple Warm Gold
         }
 
     override fun measure(event: IslandEvent, mode: PresentMode): Pair<Float, Float> =
         if (mode == PresentMode.TOAST || mode == PresentMode.EXPANDED) {
-            (rc.geometry.compactWidth + dp(58f)) to rc.geometry.compactHeight
+            // Squircle matching the iPhone Face ID unlock Dynamic Island from user reference screenshot
+            val w = rc.dp(82f)
+            val h = rc.dp(80f)
+            w to h
         } else {
             super.measure(event, mode)
         }
@@ -52,81 +65,155 @@ class UnlockPresenter(rc: RenderContext) : Presenter(rc) {
         payload = event.payload as? UnlockPayload
         if (!isUpdate) {
             boundAt = nowElapsed
-            verified.snapTo(0f)
-            iconPop.snapTo(0.6f)
-            iconPop.animateTo(1f)
+            hapticPlayed = false
         }
-        rc.labelPaint.textSize = rc.sp(13.5f)
-        val room = max(0f, layoutW / 2f - rc.geometry.cameraExclusionHalfWidth - dp(32f))
-        label = rc.ellipsize(payload?.title ?: event.title, rc.labelPaint, room)
     }
 
-    private val isVerifying: Boolean get() = nowElapsed - boundAt < 220L
-
     override fun step(dt: Float): Boolean {
-        var moving = super.step(dt)
-        if (!isVerifying && verified.target < 1f) {
-            verified.animateTo(1f)
-            iconPop.animateTo(1.12f)
+        super.step(dt)
+        val elapsed = nowElapsed - boundAt
+        if (elapsed > 380L && !hapticPlayed) {
+            hapticPlayed = true
             if (rc.settings.haptics) {
                 rc.haptics?.play(IslandHaptics.Cue.CONFIRM, touch = false)
             }
-        } else if (verified.value > 0.85f && iconPop.target > 1f) {
-            iconPop.animateTo(1f)
         }
-
-        if (verified.step(dt)) moving = true
-        if (iconPop.step(dt)) moving = true
-        return moving || isVerifying
+        // Continuous smooth animation runs throughout the display period
+        return elapsed < event.durationMs
     }
 
-    override fun nextFrameDelay(now: Long): Long =
-        if (isVerifying || !verified.isAtRest || !iconPop.isAtRest) 0 else -1
+    override fun nextFrameDelay(now: Long): Long {
+        val elapsed = nowElapsed - boundAt
+        return if (elapsed < event.durationMs) 0L else -1L
+    }
 
     override fun draw(canvas: Canvas, w: Float, h: Float, alpha: Float, now: Long) {
         val a = if (mode == PresentMode.TOAST || mode == PresentMode.EXPANDED) alpha else alpha * compactVisibility(w, h)
         if (a <= 0.004f) return
 
-        val s = slot(h)
-        val inset = (h - s) / 2f
-        val cy = h / 2f + rc.burnInY
-        val v = verified.value.coerceIn(0f, 1f)
-        val pop = iconPop.value.coerceIn(0.5f, 1.4f)
+        val cx = w / 2f + rc.burnInX
+        val cy = h / 2f + dp(7f) + rc.burnInY // Centered in the spacious lower area below top camera cutout
 
-        // 1. Draw Unlock Glyphs on Left Side
+        val elapsed = (nowElapsed - boundAt).coerceAtLeast(0L)
         val method = payload?.method ?: UnlockMethod.FACE
-        val iconX = inset + s / 2f + rc.burnInX
-        val iconSize = s * 0.94f * pop
 
-        val iconColor = if (v < 0.35f) {
-            lerpColor(IslandColors.TEXT_SECONDARY, accent, v / 0.35f)
+        // Phase 1: Scanning / Verifying (0 -> 400ms)
+        // Phase 2: Verified / Authenticated (400ms -> end)
+        val verifyT = ((elapsed - 100L) / 350f).coerceIn(0f, 1f)
+        val verified = smoothStep(verifyT)
+
+        when (method) {
+            UnlockMethod.FACE -> drawFaceId(canvas, cx, cy, verified, elapsed, a)
+            UnlockMethod.FINGERPRINT -> drawFingerprint(canvas, cx, cy, verified, elapsed, a)
+            UnlockMethod.PASSWORD -> drawPadlock(canvas, cx, cy, verified, elapsed, a)
+        }
+    }
+
+    private fun drawFaceId(canvas: Canvas, cx: Float, cy: Float, verified: Float, elapsed: Long, alpha: Float) {
+        val baseRadius = dp(21f)
+
+        // 1. In scanning phase (verified < 1f): Draw 3D tilted neon green orbital scanning ring
+        if (verified < 1f) {
+            val scanAlpha = alpha * (1f - verified)
+            val spinAngle = -26f + sin(elapsed * 0.0035f) * 12f // Subtle organic tilt matching screenshot
+
+            canvas.save()
+            canvas.translate(cx, cy)
+            canvas.rotate(spinAngle)
+            canvas.scale(1f, 0.62f) // Perspective foreshortening for orbital ellipse
+
+            ovalRect.set(-baseRadius, -baseRadius, baseRadius, baseRadius)
+            innerOvalRect.set(-baseRadius * 0.88f, -baseRadius * 0.88f, baseRadius * 0.88f, baseRadius * 0.88f)
+
+            // Outer glowing neon green ring
+            ringPaint.color = accent
+            ringPaint.alpha = (scanAlpha * 240).toInt()
+            ringPaint.strokeWidth = dp(3.2f)
+            canvas.drawOval(ovalRect, ringPaint)
+
+            // Neon soft aura
+            glowPaint.color = accent
+            glowPaint.alpha = (scanAlpha * 140).toInt()
+            glowPaint.strokeWidth = dp(5.5f)
+            canvas.drawOval(ovalRect, glowPaint)
+
+            // Secondary dimmer offset orbit ring for 3D gyro feel (exact match to screenshot)
+            canvas.save()
+            canvas.rotate(14f)
+            canvas.translate(dp(2.5f), dp(3.5f))
+            ringPaint.alpha = (scanAlpha * 110).toInt()
+            ringPaint.strokeWidth = dp(2.2f)
+            canvas.drawOval(innerOvalRect, ringPaint)
+            canvas.restore()
+
+            canvas.restore()
+        }
+
+        // 2. Verified phase: Smoothly morph and fade in the Apple Face ID smiley face
+        if (verified > 0f) {
+            val faceAlpha = alpha * verified
+            val faceScale = lerp(0.82f, 1.0f, verified)
+            val faceSize = dp(34f) * faceScale
+
+            // Glowing subtle halo behind the face
+            if (verified > 0.4f) {
+                val haloAlpha = faceAlpha * (verified - 0.4f) / 0.6f * 0.25f
+                rc.circle(canvas, cx, cy, baseRadius * 1.15f, accent, haloAlpha)
+            }
+
+            rc.glyphs.draw(canvas, Glyph.FACE_ID, cx, cy, faceSize, accent, faceAlpha)
+        }
+    }
+
+    private fun drawFingerprint(canvas: Canvas, cx: Float, cy: Float, verified: Float, elapsed: Long, alpha: Float) {
+        val iconSize = dp(32f)
+
+        // Concentric acoustic pulse wave expanding smoothly
+        if (verified < 1f) {
+            val pulseT = (elapsed / 450f).coerceIn(0f, 1f)
+            val pulseRadius = dp(14f) + dp(18f) * pulseT
+            val pulseAlpha = alpha * (1f - pulseT) * 0.6f
+            ringPaint.color = accent
+            ringPaint.strokeWidth = dp(2f)
+            ringPaint.alpha = (pulseAlpha * 255).toInt()
+            canvas.drawCircle(cx, cy, pulseRadius, ringPaint)
+        }
+
+        // Fingerprint symbol
+        val fgColor = if (verified < 0.5f) {
+            lerpColor(0xFF8E8E93.toInt(), accent, verified / 0.5f)
+        } else {
+            accent
+        }
+        val iconScale = lerp(0.92f, 1.04f, verified)
+        rc.glyphs.draw(canvas, Glyph.FINGERPRINT, cx, cy, iconSize * iconScale, fgColor, alpha)
+
+        // Soft aura on confirmation
+        if (verified > 0.5f) {
+            val auraAlpha = alpha * (verified - 0.5f) * 0.35f
+            rc.circle(canvas, cx, cy, dp(22f), accent, auraAlpha)
+        }
+    }
+
+    private fun drawPadlock(canvas: Canvas, cx: Float, cy: Float, verified: Float, elapsed: Long, alpha: Float) {
+        val iconSize = dp(30f)
+        val glyph = if (verified > 0.45f) Glyph.LOCK_OPEN else Glyph.LOCK
+        val iconColor = if (verified < 0.3f) {
+            lerpColor(0xFF8E8E93.toInt(), accent, verified / 0.3f)
         } else {
             accent
         }
 
-        val glyph = when (method) {
-            UnlockMethod.FACE -> Glyph.FACE_ID
-            UnlockMethod.FINGERPRINT -> Glyph.FINGERPRINT
-            UnlockMethod.PASSWORD -> if (v > 0.4f) Glyph.LOCK_OPEN else Glyph.LOCK
-        }
+        val popScale = lerp(0.9f, 1.0f, verified)
+        rc.glyphs.draw(canvas, glyph, cx, cy, iconSize * popScale, iconColor, alpha)
 
-        rc.glyphs.draw(canvas, glyph, iconX, cy, iconSize, iconColor, a)
-
-        // 2. Draw Method Label Text in Center/Left of Text area
-        rc.labelPaint.textSize = rc.sp(13.5f)
-        rc.labelPaint.textAlign = Paint.Align.LEFT
-        val textX = inset + s + dp(10f) + rc.burnInX
-        rc.text(canvas, label, textX, rc.baseline(rc.labelPaint, cy), rc.labelPaint, IslandColors.TEXT, a)
-
-        // 3. Draw Success Checkmark or Glow Indicator on Right Side
-        val rightX = w - h / 2f + rc.burnInX
-        if (v > 0.1f) {
-            val checkRadius = lerp(0f, s * 0.44f, v)
-            val checkAlpha = a * v
-            rc.circle(canvas, rightX, cy, checkRadius, accent, checkAlpha)
-            rc.glyphs.draw(canvas, Glyph.CHECK, rightX, cy, checkRadius * 1.35f, 0xFF000000.toInt(), checkAlpha)
+        if (verified > 0.5f) {
+            val auraAlpha = alpha * (verified - 0.5f) * 0.3f
+            rc.circle(canvas, cx, cy, dp(20f), accent, auraAlpha)
         }
     }
+
+    private fun smoothStep(t: Float): Float = t * t * (3f - 2f * t)
 
     private fun lerpColor(c1: Int, c2: Int, fraction: Float): Int {
         val f = fraction.coerceIn(0f, 1f)
