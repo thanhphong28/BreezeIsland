@@ -879,4 +879,12 @@ private val DICT: Map<String, String> = mapOf(
     "Security & Banking Protection" to "Bảo mật & An toàn ứng dụng ngân hàng",
     "100% Safe with Banking & Government Apps" to "100% An toàn với App Ngân hàng & VNeID",
     "BreezeIsland uses public Android broadcast receivers and standard CameraManager availability callbacks. Absolutely ZERO Accessibility Services, ZERO root, and ZERO biometric data access. Fully compatible with VNeID and all banking apps." to "BreezeIsland chỉ sử dụng bộ nhận broadcast hệ thống tiêu chuẩn và callback CameraManager của Android. Tuyệt đối KHÔNG có Quyền Trợ năng (Accessibility), KHÔNG Root, KHÔNG truy cập dữ liệu sinh trắc học. Tương thích 100% và an toàn tuyệt đối với VNeID và tất cả app ngân hàng.",
+
+    // 3D Unlock v2.0.0
+    "3D Biometric Animation" to "Hoạt ảnh Sinh trắc học 3D",
+    "Show 3D Dynamic Island animation when waking up and unlocking the device" to "Hiển thị hiệu ứng 3D Dynamic Island sống động khi bật sáng và mở khóa thiết bị",
+    "Holographic 3D Fingerprint biometric scan that executes a smooth 3D Y-axis perspective flip into the golden unlocked padlock." to "Quét vân tay sinh trắc học không gian 3D, tự động xoay lật 3D quanh trục Y chuyển thành ổ khóa vàng đã mở.",
+    "Test 3D Unlock Animation" to "Thử nghiệm hoạt ảnh mở khóa 3D",
+    "Trigger real-time 3D coin flip & padlock unlock" to "Kích hoạt hiệu ứng xoay lật 3D và mở ổ khóa tức thì",
+    "Mở khóa vân tay 3D" to "Mở khóa vân tay 3D",
 )

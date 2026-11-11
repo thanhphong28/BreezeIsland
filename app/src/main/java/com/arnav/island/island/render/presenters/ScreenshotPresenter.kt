@@ -20,7 +20,7 @@ class ScreenshotPresenter(rc: RenderContext) : Presenter(rc) {
 
     private val thumb = RoundedImage()
     private var aspect = 0.5f
-    private val drop = Spring(0f, SpringSpec(0.36f, 0.96f), restThreshold = 0.002f)
+    private val drop = Spring(0f, SpringSpec(0.36f, 1.0f), restThreshold = 0.002f)
     private var pad = 0f
     private var top = 0f
 

@@ -19,7 +19,7 @@ import com.arnav.island.util.ColorExtractor
 class BluetoothPresenter(rc: RenderContext) : Presenter(rc) {
 
     private var payload: BluetoothPayload? = null
-    private val arrival = Spring(0f, SpringSpec(0.32f, 0.96f), restThreshold = 0.002f)
+    private val arrival = Spring(0f, SpringSpec(0.35f, 1.0f), restThreshold = 0.002f)
     private val ripple = Spring(0f, SpringSpec(0.60f, 1f), restThreshold = 0.002f)
     private val batteryFade = Spring(0f, SpringSpec(0.30f, 1.0f), restThreshold = 0.002f)
     private var nameLine = ""

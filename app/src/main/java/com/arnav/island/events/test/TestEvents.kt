@@ -562,12 +562,12 @@ class TestEvents(private val engine: EventEngine, private val images: ImageStore
             timestamp = System.currentTimeMillis(),
             persistent = false,
             durationMs = 1800L,
-            title = "Vân tay",
-            subtitle = "Đã mở khóa bằng vân tay",
+            title = "Đã mở khóa",
+            subtitle = "Mở khóa vân tay 3D",
             icon = Glyph.FINGERPRINT,
-            payload = UnlockPayload(UnlockMethod.FINGERPRINT, "Vân tay", "Đã mở khóa bằng vân tay"),
+            payload = UnlockPayload(UnlockMethod.FINGERPRINT, "Đã mở khóa", "Mở khóa vân tay 3D"),
             animation = EntranceAnimation.MORPH,
-            colors = EventColors(accent = 0xFF0A84FF.toInt()), // Apple Electric Blue
+            colors = EventColors(accent = 0xFF00F0FF.toInt()), // Neon Cyan / Electric Blue
         )
         engine.post(event)
     }

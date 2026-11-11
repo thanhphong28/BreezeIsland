@@ -121,42 +121,13 @@ class UnlockMonitor(
         val s = settings()
         if (!s.enabled || !s.unlockAnimationEnabled) return
 
-        val methodPref = s.unlockMethodPreference
-        val method = when {
-            methodPref == "face" -> UnlockMethod.FACE
-            methodPref == "fingerprint" -> UnlockMethod.FINGERPRINT
-            methodPref == "password" -> UnlockMethod.PASSWORD
-            else -> detectUnlockMethod(now)
-        }
-
-        val event = buildUnlockEvent(method, s.unlockDurationMs)
+        val event = buildUnlockEvent(UnlockMethod.FINGERPRINT, s.unlockDurationMs)
         scope.launch {
             events.post(event)
         }
     }
 
-    private fun detectUnlockMethod(now: Long): UnlockMethod {
-        val frontCameraUsedRecently = (now - frontCameraUsedRecentlyAt) in 0..2500L
-        if (frontCameraUsedRecently) {
-            return UnlockMethod.FACE
-        }
-        val timeSinceScreenOn = now - screenOnTime
-        // Fingerprint: instant unlock from screen off, or unlocked quickly (< 800ms) upon waking
-        return if (timeSinceScreenOn < 800L || screenOnTime <= screenOffTime) {
-            UnlockMethod.FINGERPRINT
-        } else {
-            // User took time to swipe up and type PIN or draw pattern
-            UnlockMethod.PASSWORD
-        }
-    }
-
-    fun buildUnlockEvent(method: UnlockMethod, durationMs: Long): IslandEvent {
-        val (glyph, title, text, color) = when (method) {
-            UnlockMethod.FACE -> Quad(Glyph.FACE_ID, "Face ID", "Mở khóa bằng gương mặt", 0xFF30D158.toInt())
-            UnlockMethod.FINGERPRINT -> Quad(Glyph.FINGERPRINT, "Vân tay", "Đã mở khóa bằng vân tay", 0xFF0A84FF.toInt())
-            UnlockMethod.PASSWORD -> Quad(Glyph.LOCK_OPEN, "Đã mở khóa", "Mở khóa bằng mật khẩu", 0xFFFFD60A.toInt())
-        }
-
+    fun buildUnlockEvent(method: UnlockMethod = UnlockMethod.FINGERPRINT, durationMs: Long = 1800L): IslandEvent {
         return IslandEvent(
             id = EVENT_ID,
             source = EventSource.SYSTEM,
@@ -164,12 +135,12 @@ class UnlockMonitor(
             timestamp = System.currentTimeMillis(),
             persistent = false,
             durationMs = durationMs,
-            title = title,
-            subtitle = text,
-            icon = glyph,
-            payload = UnlockPayload(method, title, text),
+            title = "Đã mở khóa",
+            subtitle = "Mở khóa vân tay 3D",
+            icon = Glyph.FINGERPRINT,
+            payload = UnlockPayload(UnlockMethod.FINGERPRINT, "Đã mở khóa", "Mở khóa vân tay 3D"),
             animation = EntranceAnimation.MORPH,
-            colors = EventColors(accent = color),
+            colors = EventColors(accent = 0xFF00F0FF.toInt()),
         )
     }
 

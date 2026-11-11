@@ -41,7 +41,7 @@ class ChargingPresenter(rc: RenderContext) : Presenter(rc) {
 
     private val count = Spring(0f, SpringSpec(0.50f, 1.0f), restThreshold = 0.05f)
     private val fillLevel = Spring(0f, SpringSpec(0.50f, 1.0f), restThreshold = 0.001f)
-    private val boltPop = Spring(0f, SpringSpec(0.28f, 0.98f), restThreshold = 0.002f)
+    private val boltPop = Spring(0f, SpringSpec(0.32f, 1.0f), restThreshold = 0.002f)
 
     private val wavePath = Path()
     private var gradient: SweepGradient? = null

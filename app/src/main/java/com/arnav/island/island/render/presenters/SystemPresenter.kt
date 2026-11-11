@@ -21,8 +21,8 @@ class SystemPresenter(rc: RenderContext) : Presenter(rc) {
 
     private var payload: SystemPayload? = null
 
-    /** Decaying swing used for the bell / vibrate micro-animations. */
-    private val swing = Spring(0f, SpringSpec(0.28f, 0.88f), restThreshold = 0.004f)
+    /** Smooth critically damped transition for the bell / vibrate micro-animations. */
+    private val swing = Spring(0f, SpringSpec(0.32f, 1.0f), restThreshold = 0.004f)
     private var label = ""
 
     private val kind: SystemKind? get() = payload?.kind

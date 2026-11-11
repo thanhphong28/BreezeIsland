@@ -69,7 +69,7 @@ class IslandScene(private val rc: RenderContext) {
     private val visibility = Spring(0f, SpringSpec(0.3f, 1f), restThreshold = 0.002f)
 
     /** Uniform squeeze used for toast-to-toast "gulps" and drag notch clicks. */
-    private val pulse = Spring(0f, SpringSpec(0.24f, 0.94f), restThreshold = 0.002f)
+    private val pulse = Spring(0f, SpringSpec(0.24f, 1.0f), restThreshold = 0.002f)
 
     // Split bubble.
     private val bubbleCx = Spring(0f, restThreshold = 0.25f)
@@ -88,7 +88,7 @@ class IslandScene(private val rc: RenderContext) {
     // Grab and flick: long-press an open card and it follows the finger, then springs home.
     private val grabX = Spring(0f, restThreshold = 0.3f)
     private val grabY = Spring(0f, restThreshold = 0.3f)
-    private val lift = Spring(0f, SpringSpec(0.28f, 0.94f), restThreshold = 0.002f)
+    private val lift = Spring(0f, SpringSpec(0.28f, 1.0f), restThreshold = 0.002f)
     var isGrabbed = false
         private set
 

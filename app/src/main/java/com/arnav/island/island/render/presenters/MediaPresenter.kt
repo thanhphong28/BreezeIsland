@@ -34,12 +34,12 @@ class MediaPresenter(rc: RenderContext) : Presenter(rc) {
     private var seed = 0f
 
     /** 1 = playing (pause glyph shown), 0 = paused (play glyph). Morphs continuously. */
-    private val playT = Spring(1f, SpringSpec(0.26f, 0.96f), restThreshold = 0.002f)
+    private val playT = Spring(1f, SpringSpec(0.26f, 1.0f), restThreshold = 0.002f)
 
     /** Equalizer amplitude: bars melt into dots when playback pauses. */
-    private val amp = Spring(1f, SpringSpec(0.36f, 0.96f), restThreshold = 0.002f)
-    private val scrubGrow = Spring(0f, SpringSpec(0.20f, 0.94f), restThreshold = 0.002f)
-    private val volumeGrow = Spring(0f, SpringSpec(0.20f, 0.94f), restThreshold = 0.002f)
+    private val amp = Spring(1f, SpringSpec(0.36f, 1.0f), restThreshold = 0.002f)
+    private val scrubGrow = Spring(0f, SpringSpec(0.20f, 1.0f), restThreshold = 0.002f)
+    private val volumeGrow = Spring(0f, SpringSpec(0.20f, 1.0f), restThreshold = 0.002f)
     private val elapsedText = RollingText()
     private val remainingText = RollingText()
     private val liveText = RollingText()

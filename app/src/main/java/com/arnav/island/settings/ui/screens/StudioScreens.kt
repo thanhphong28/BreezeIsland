@@ -395,11 +395,11 @@ fun WhatsNewScreen(s: IslandSettings, ui: Ui) {
 
     val releases = remember {
         listOf(
-            Release("1.9.9", "Squircle iPhone Unlock & Zero Jitter", listOf(
-                Feature("Dynamic Island Squircle", "iPhone-style centered squircle with glowing neon 3D orbital Face ID scan, Fingerprint and Padlock.", Icons.Rounded.PhonelinkLock, BadgeColors.Indigo, opens = Dest.UNLOCK) { p ->
-                    p.tests.unlockFace()
+            Release("2.0.0", "3D Biometric Unlock & Milestone Fluid Motion", listOf(
+                Feature("3D Biometric Flip Squircle", "Holographic 3D Fingerprint that flips in perspective 3D space into the golden open padlock.", Icons.Rounded.PhonelinkLock, BadgeColors.Indigo, opens = Dest.UNLOCK) { p ->
+                    p.tests.unlockFingerprint()
                 },
-                Feature("Zero-Jitter Window Composite", "Eliminates overlay IPC resizing and coordinates jumps; runs at silky smooth 120 FPS on screen.", Icons.Rounded.Animation, BadgeColors.Cyan, opens = Dest.UNLOCK) { p ->
+                Feature("100% Zero-Jitter Motion", "Critically damped fluid motion for Charging, Bluetooth, and System events. Zero spring bounce.", Icons.Rounded.Animation, BadgeColors.Cyan, opens = Dest.UNLOCK) { p ->
                     p.tests.unlockFingerprint()
                 },
             )),
