@@ -243,3 +243,15 @@ data class GlancePayload(
 
 /** Every running activity, shown as a stack of cards. */
 data class StackPayload(val items: List<IslandEvent>) : EventPayload
+
+enum class UnlockMethod {
+    FACE,
+    FINGERPRINT,
+    PASSWORD,
+}
+
+data class UnlockPayload(
+    val method: UnlockMethod,
+    val title: String,
+    val subtitle: String = "",
+) : EventPayload

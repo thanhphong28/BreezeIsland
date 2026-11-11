@@ -170,6 +170,11 @@ data class IslandSettings(
     val screenRecordEnabled: Boolean = true,
     val clipboardEnabled: Boolean = false,
 
+    // Unlock animation (Face ID, Fingerprint, Padlock)
+    val unlockAnimationEnabled: Boolean = true,
+    val unlockMethodPreference: String = "auto",
+    val unlockDurationMs: Long = 1800L,
+
     // Multi-activity
     val splitEnabled: Boolean = true,
     val glanceEnabled: Boolean = true,

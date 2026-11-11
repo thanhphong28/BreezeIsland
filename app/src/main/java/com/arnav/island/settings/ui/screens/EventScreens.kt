@@ -132,6 +132,7 @@ fun EventsScreen(s: IslandSettings, p: PermissionSnapshot, ui: Ui) {
         item {
             Group(title = "Moments") {
                 SwitchRow("Notifications", s.notificationsEnabled, { v -> ui.update { it.copy(notificationsEnabled = v) }; if (v) ensureNotifAccess() }, null, Icons.Rounded.Notifications, BadgeColors.Red)
+                NavRow("Device unlock", "Face ID, Fingerprint & Padlock animations", Icons.Rounded.PhonelinkLock, BadgeColors.Indigo) { ui.go(Dest.UNLOCK) }
                 SwitchRow("Charging", s.chargingEnabled, { v -> ui.update { it.copy(chargingEnabled = v) } }, null, Icons.Rounded.BatteryChargingFull, BadgeColors.Green)
                 SwitchRow("Battery alerts", s.batteryLowEnabled, { v -> ui.update { it.copy(batteryLowEnabled = v) } }, "Low battery and power saving", Icons.Rounded.BatteryAlert, BadgeColors.Yellow)
                 SwitchRow("Bluetooth", s.bluetoothEnabled, { v -> ui.update { it.copy(bluetoothEnabled = v) } }, null, Icons.Rounded.Bluetooth, BadgeColors.Blue)

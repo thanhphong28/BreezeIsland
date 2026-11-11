@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.PhonelinkLock
 import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Speed
@@ -249,6 +250,7 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
                 NavRow("Media", "Now playing, controls, artwork", Icons.Rounded.MusicNote, BadgeColors.Pink) { ui.go(Dest.MEDIA) }
                 NavRow("Notifications", "Banners, privacy, duration", Icons.Rounded.Notifications, BadgeColors.Red) { ui.go(Dest.NOTIFICATIONS) }
                 NavRow("Charging", settings.chargingTheme.label + " animation", Icons.Rounded.BatteryChargingFull, BadgeColors.Green) { ui.go(Dest.CHARGING) }
+                NavRow("Device unlock", "Face ID, Fingerprint & Padlock", Icons.Rounded.PhonelinkLock, BadgeColors.Indigo) { ui.go(Dest.UNLOCK) }
                 NavRow("Battery", "Low, full and power saving alerts", Icons.Rounded.BatteryFull, BadgeColors.Teal) { ui.go(Dest.BATTERY) }
                 NavRow("Bluetooth", "Earbuds, headphones, watch, car", Icons.Rounded.Bluetooth, BadgeColors.Blue) { ui.go(Dest.BLUETOOTH) }
                 NavRow("Timers & stopwatch", "Local timers that live in the island", Icons.Rounded.Timer, BadgeColors.Orange) { ui.go(Dest.TIMERS) }

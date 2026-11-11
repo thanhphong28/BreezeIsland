@@ -54,6 +54,7 @@ import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.NotificationsPaused
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PanTool
+import androidx.compose.material.icons.rounded.PhonelinkLock
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.ScreenRotation
@@ -394,6 +395,14 @@ fun WhatsNewScreen(s: IslandSettings, ui: Ui) {
 
     val releases = remember {
         listOf(
+            Release("1.9.8", "Device Unlock Animations", listOf(
+                Feature("Dynamic Island Unlock", "Apple iPhone-style Face ID, tactile Fingerprint, and Padlock opening animations.", Icons.Rounded.PhonelinkLock, BadgeColors.Indigo, opens = Dest.UNLOCK) { p ->
+                    p.tests.unlockFace()
+                },
+                Feature("Smart Unlock Detection", "Automatic heuristic: CameraManager detects Face Unlock, instant timing detects Fingerprint, swipe detects Password.", Icons.Rounded.Security, BadgeColors.Green, opens = Dest.UNLOCK) { p ->
+                    p.tests.unlockFingerprint()
+                },
+            )),
             Release("1.7", "Breeze Sound Island", listOf(
                 Feature("Breeze Sound Island", "Liquid Glass volume, silent & work controls sliding out from the right screen bezel.", Icons.AutoMirrored.Rounded.VolumeUp, BadgeColors.Orange, opens = Dest.SOUND_ISLAND),
                 Feature("Physical key edge notch", "Smooth edge spring slide-out whenever volume changes, tuned to Galaxy Z Flip5.", Icons.Rounded.Tune, BadgeColors.Cyan, opens = Dest.SOUND_ISLAND),

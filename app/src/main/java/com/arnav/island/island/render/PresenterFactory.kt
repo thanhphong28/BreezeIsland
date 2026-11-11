@@ -19,6 +19,7 @@ import com.arnav.island.island.render.presenters.StackPresenter
 import com.arnav.island.island.render.presenters.SystemPresenter
 import com.arnav.island.island.render.presenters.TimerPresenter
 import com.arnav.island.island.render.presenters.TorchPresenter
+import com.arnav.island.island.render.presenters.UnlockPresenter
 
 /** Maps an event type to the renderer that draws its compact, bubble, toast and expanded forms. */
 object PresenterFactory {
@@ -41,6 +42,7 @@ object PresenterFactory {
         EventType.LIVE_UPDATE -> LiveUpdatePresenter(rc)
         EventType.SCREENSHOT -> ScreenshotPresenter(rc)
         EventType.CONFIRM -> ConfirmPresenter(rc)
+        EventType.UNLOCK -> UnlockPresenter(rc)
     }
 
     /** Presenters are reusable across event types that share a renderer class. */

@@ -63,6 +63,7 @@ import com.arnav.island.settings.ui.screens.PrivacyScreen
 import com.arnav.island.settings.ui.screens.SoundIslandScreen
 import com.arnav.island.settings.ui.screens.StatusBarScreen
 import com.arnav.island.settings.ui.screens.TimersScreen
+import com.arnav.island.settings.ui.screens.UnlockScreen
 import com.arnav.island.settings.ui.screens.WhatsNewScreen
 import com.arnav.island.storage.IslandSettings
 import kotlinx.coroutines.launch
@@ -70,7 +71,7 @@ import kotlinx.coroutines.launch
 enum class Dest {
     HOME, ISLAND, SOUND_ISLAND, CALIBRATION, EVENTS, APPS, MEDIA, NOTIFICATIONS, BATTERY, CHARGING, BLUETOOTH, TIMERS,
     GESTURES, APPEARANCE, PERFORMANCE, PRIVACY, ADVANCED, DEVELOPER, ABOUT,
-    STUDIO, WHATS_NEW, STATUS_BAR, BLEND, GALLERY, DIAGNOSTICS,
+    STUDIO, WHATS_NEW, STATUS_BAR, BLEND, GALLERY, DIAGNOSTICS, UNLOCK,
 }
 
 /** Everything a screen needs besides the settings snapshot. */
@@ -237,6 +238,7 @@ fun IslandRoot(graph: AppGraph, initial: Dest?, sharedSetup: String? = null, onS
                 Dest.BLEND -> BlendScreen(settings, ui)
                 Dest.GALLERY -> GalleryScreen(settings, ui)
                 Dest.DIAGNOSTICS -> DiagnosticsScreen(settings, ui)
+                Dest.UNLOCK -> UnlockScreen(settings, ui)
             }
         }
     }

@@ -102,6 +102,9 @@ enum class EventType(val defaultPriority: EventPriority) {
     /** Short confirmation, e.g. a quick reply that was sent. */
     CONFIRM(EventPriority.NOTIFICATION),
 
+    /** Device unlock event (Face ID, Fingerprint, Lock/Password). */
+    UNLOCK(EventPriority.CHARGING),
+
     /** Synthetic: the stack of every running activity (never posted by a source). */
     STACK(EventPriority.BACKGROUND_ACTIVITY),
 }
@@ -126,6 +129,7 @@ enum class Glyph {
     ROTATE_LOCK, ROTATE, HOTSPOT, RECORD, CLIPBOARD, CHIP, PLAY, PAUSE, NEXT, PREVIOUS, PLUS, CLOSE,
     STOP, FLAG, INFO, WARNING, SPARK, MESSAGE, OPEN, REPLY, CALENDAR, ALARM,
     FLASHLIGHT, LEAF, SCREENSHOT, SCOOTER, SHARE, EDIT,
+    FACE_ID, FINGERPRINT, LOCK, LOCK_OPEN,
 }
 
 enum class ActionStyle { DEFAULT, PRIMARY, POSITIVE, DESTRUCTIVE }

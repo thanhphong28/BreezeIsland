@@ -40,6 +40,8 @@ import com.arnav.island.events.SystemKind
 import com.arnav.island.events.SystemPayload
 import com.arnav.island.events.TimerPayload
 import com.arnav.island.events.TorchPayload
+import com.arnav.island.events.UnlockMethod
+import com.arnav.island.events.UnlockPayload
 import com.arnav.island.island.render.presenters.CalendarPresenter
 import com.arnav.island.island.render.presenters.CallPresenter
 import com.arnav.island.island.render.presenters.MediaPresenter
@@ -533,6 +535,60 @@ class TestEvents(private val engine: EventEngine, private val images: ImageStore
             payload = CustomPayload("Island", null),
         )
     )
+
+    fun unlockFace() {
+        val event = IslandEvent(
+            id = "test:unlock:face",
+            source = EventSource.TEST,
+            type = EventType.UNLOCK,
+            timestamp = System.currentTimeMillis(),
+            persistent = false,
+            durationMs = 1800L,
+            title = "Face ID",
+            subtitle = "Mở khóa bằng gương mặt",
+            icon = Glyph.FACE_ID,
+            payload = UnlockPayload(UnlockMethod.FACE, "Face ID", "Mở khóa bằng gương mặt"),
+            animation = EntranceAnimation.MORPH,
+            colors = EventColors(accent = 0xFF30D158.toInt()), // Apple Mint Green
+        )
+        engine.post(event)
+    }
+
+    fun unlockFingerprint() {
+        val event = IslandEvent(
+            id = "test:unlock:fingerprint",
+            source = EventSource.TEST,
+            type = EventType.UNLOCK,
+            timestamp = System.currentTimeMillis(),
+            persistent = false,
+            durationMs = 1800L,
+            title = "Vân tay",
+            subtitle = "Đã mở khóa bằng vân tay",
+            icon = Glyph.FINGERPRINT,
+            payload = UnlockPayload(UnlockMethod.FINGERPRINT, "Vân tay", "Đã mở khóa bằng vân tay"),
+            animation = EntranceAnimation.MORPH,
+            colors = EventColors(accent = 0xFF0A84FF.toInt()), // Apple Electric Blue
+        )
+        engine.post(event)
+    }
+
+    fun unlockPassword() {
+        val event = IslandEvent(
+            id = "test:unlock:password",
+            source = EventSource.TEST,
+            type = EventType.UNLOCK,
+            timestamp = System.currentTimeMillis(),
+            persistent = false,
+            durationMs = 1800L,
+            title = "Đã mở khóa",
+            subtitle = "Mở khóa bằng mật khẩu",
+            icon = Glyph.LOCK_OPEN,
+            payload = UnlockPayload(UnlockMethod.PASSWORD, "Đã mở khóa", "Mở khóa bằng mật khẩu"),
+            animation = EntranceAnimation.MORPH,
+            colors = EventColors(accent = 0xFFFFD60A.toInt()), // Apple Warm Gold
+        )
+        engine.post(event)
+    }
 
     fun clear() {
         progressJob?.cancel()

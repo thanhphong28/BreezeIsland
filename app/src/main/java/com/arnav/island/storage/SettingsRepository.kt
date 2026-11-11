@@ -211,6 +211,9 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val calendarLeadMinutes = intPreferencesKey("calendar_lead_min")
         val torchEnabled = booleanPreferencesKey("torch_enabled")
         val screenshotPreview = booleanPreferencesKey("screenshot_preview")
+        val unlockAnimation = booleanPreferencesKey("unlock_animation_enabled")
+        val unlockMethodPref = stringPreferencesKey("unlock_method_preference")
+        val unlockDuration = longPreferencesKey("unlock_duration_ms")
         val liveUpdatesEnabled = booleanPreferencesKey("live_updates_enabled")
         val chargeCoach = booleanPreferencesKey("charge_coach")
         val chargeLimit = intPreferencesKey("charge_limit")
@@ -349,6 +352,9 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             calendarLeadMinutes = p[K.calendarLeadMinutes] ?: d.calendarLeadMinutes,
             torchEnabled = p[K.torchEnabled] ?: d.torchEnabled,
             screenshotPreview = p[K.screenshotPreview] ?: d.screenshotPreview,
+            unlockAnimationEnabled = p[K.unlockAnimation] ?: d.unlockAnimationEnabled,
+            unlockMethodPreference = p[K.unlockMethodPref] ?: d.unlockMethodPreference,
+            unlockDurationMs = p[K.unlockDuration] ?: d.unlockDurationMs,
             liveUpdatesEnabled = p[K.liveUpdatesEnabled] ?: d.liveUpdatesEnabled,
             chargeCoach = p[K.chargeCoach] ?: d.chargeCoach,
             chargeLimit = p[K.chargeLimit] ?: d.chargeLimit,
@@ -470,6 +476,9 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.calendarLeadMinutes] = s.calendarLeadMinutes
         p[K.torchEnabled] = s.torchEnabled
         p[K.screenshotPreview] = s.screenshotPreview
+        p[K.unlockAnimation] = s.unlockAnimationEnabled
+        p[K.unlockMethodPref] = s.unlockMethodPreference
+        p[K.unlockDuration] = s.unlockDurationMs
         p[K.liveUpdatesEnabled] = s.liveUpdatesEnabled
         p[K.chargeCoach] = s.chargeCoach
         p[K.chargeLimit] = s.chargeLimit
