@@ -176,7 +176,16 @@ fun IslandRoot(graph: AppGraph, initial: Dest?, sharedSetup: String? = null, onS
         // Resume the overlay if it should be running (e.g. permission granted in system settings).
         LifecycleResumeEffect(settings.enabled) {
             if (settings.enabled && !IslandOverlayService.running.value) IslandOverlayService.start(context)
-            onPauseOrDispose { }
+            onPauseOrDispose {
+                graph.testEvents.clear()
+            }
+        }
+
+        val currentDest = stack.last()
+        LaunchedEffect(currentDest) {
+            if (currentDest != Dest.CALIBRATION && currentDest != Dest.STUDIO && currentDest != Dest.DEVELOPER && currentDest != Dest.GALLERY) {
+                graph.testEvents.clear()
+            }
         }
 
         BackHandler(enabled = stack.size > 1) { ui.back() }

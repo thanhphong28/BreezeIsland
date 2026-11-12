@@ -189,7 +189,11 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
                     IslandCommand.Collapse -> controller.collapse()
                     IslandCommand.Glance -> controller.showGlance()
                     IslandCommand.Stack -> controller.showStack()
-                    is IslandCommand.SummonMascot -> mascot.summon(nextMood = true, forcedMood = command.mood)
+                    is IslandCommand.SummonMascot -> mascot.summon(
+                        nextMood = true,
+                        forcedMood = command.mood,
+                        forceMusicGroove = command.withMusic,
+                    )
                 }
             }
         }

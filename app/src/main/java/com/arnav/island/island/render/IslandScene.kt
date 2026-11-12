@@ -333,7 +333,7 @@ class IslandScene(private val rc: RenderContext) {
         presenter.bind(event, mode, frame.width, frame.height)
         val gate = when {
             immediate -> 0f
-            event.type == EventType.MASCOT -> 0.18f
+            event.type == EventType.MASCOT || event.type == EventType.UNLOCK -> 0.12f
             kind == TransitionKind.UPDATE || kind == TransitionKind.SWAP && current?.presenter?.mode == mode -> 0.15f
             mode == PresentMode.EXPANDED || mode == PresentMode.TOAST -> 0.55f
             else -> 0.4f
@@ -969,8 +969,9 @@ class IslandScene(private val rc: RenderContext) {
                 if (layer.slot != Slot.MAIN || layer.inGhost) continue
                 val a = layer.alpha.value * v
                 if (a <= 0.004f) continue
-                val isMascot = layer.presenter is com.arnav.island.island.render.presenters.MascotPresenter
-                val blur = if (canBlur && !isMascot) (1f - layer.alpha.value) * rc.dp(if (layer.removing) 5f else 8f) else 0f
+                val skipBlur = layer.presenter is com.arnav.island.island.render.presenters.MascotPresenter ||
+                    layer.presenter is com.arnav.island.island.render.presenters.UnlockPresenter
+                val blur = if (canBlur && !skipBlur) (1f - layer.alpha.value) * rc.dp(if (layer.removing) 5f else 8f) else 0f
                 if (blur > 0.4f && Build.VERSION.SDK_INT >= 31) {
                     drawBlurred(canvas, layer, w, h, a, now, blur)
                 } else {
@@ -1008,7 +1009,9 @@ class IslandScene(private val rc: RenderContext) {
     /** Draws one main layer relative to the shape's top-left (the canvas is already there). */
     private fun drawLayer(canvas: Canvas, layer: Layer, w: Float, h: Float, a: Float, now: Long) {
         val p = layer.presenter
-        if (p is com.arnav.island.island.render.presenters.MascotPresenter) {
+        if (p is com.arnav.island.island.render.presenters.MascotPresenter ||
+            p is com.arnav.island.island.render.presenters.UnlockPresenter
+        ) {
             p.draw(canvas, w, h, a, now)
         } else if (isCard(p)) {
             canvas.save()

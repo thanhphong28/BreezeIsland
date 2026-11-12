@@ -174,7 +174,7 @@ data class IslandSettings(
     // Unlock animation (Face ID, Fingerprint, Padlock)
     val unlockAnimationEnabled: Boolean = true,
     val unlockMethodPreference: String = "auto",
-    val unlockDurationMs: Long = 1800L,
+    val unlockDurationMs: Long = 2050L,
 
     // Breeze Mascot (Interactive & periodic notch companion)
     val mascotEnabled: Boolean = true,

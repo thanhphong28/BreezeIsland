@@ -250,6 +250,16 @@ class IslandController(
             return
         }
         val event = st.focusEvent ?: return
+        if (event.type == EventType.MASCOT || event.type == EventType.UNLOCK) {
+            when (direction) {
+                IslandView.Swipe.DOWN, IslandView.Swipe.DOWN_FAR -> {
+                    if (event.type == EventType.MASCOT && !st.isLarge) expand(event.id)
+                }
+                IslandView.Swipe.UP -> if (st.isLarge) collapse() else dismiss(event)
+                IslandView.Swipe.LEFT, IslandView.Swipe.RIGHT -> dismiss(event, throwVelocity = velocity)
+            }
+            return
+        }
         when (direction) {
             IslandView.Swipe.DOWN -> when {
                 // Pulling down on an open card reveals every running activity.

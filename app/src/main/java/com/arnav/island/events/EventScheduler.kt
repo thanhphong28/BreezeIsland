@@ -113,22 +113,41 @@ class EventScheduler(
         }
         if (queue.removeAll { it.event.id == id }) return bump()
         val event = live[id] ?: return false
+        if (event.source == EventSource.TEST) {
+            return remove(id)
+        }
         suppressed[id] = event.contentKey
         rebalance(now)
         return bump()
     }
 
     /** True when at least one active live activity (e.g. Media, Timer) is currently dismissed/hidden. */
-    fun hasSuppressedLive(): Boolean = suppressed.keys.any { live.containsKey(it) }
+    fun hasSuppressedLive(): Boolean = suppressed.keys.any { id ->
+        val ev = live[id]
+        ev != null && ev.source != EventSource.TEST
+    }
 
     /**
      * Restores all live activities that the user previously swiped away, returning the primary
-     * restored event's ID (or null if nothing was suppressed).
+     * restored event's ID (or null if nothing was suppressed). Never restores test events.
      */
     fun restoreSuppressed(): String? {
-        val restoredIds = suppressed.keys.filter { live.containsKey(it) }
+        val testIds = live.values.filter { it.source == EventSource.TEST }.map { it.id }
+        testIds.forEach { id ->
+            live.remove(id)
+            firstSeen.remove(id)
+            suppressed.remove(id)
+        }
+        val restoredIds = suppressed.keys.filter { id ->
+            val ev = live[id]
+            ev != null && ev.source != EventSource.TEST
+        }
         if (restoredIds.isEmpty()) {
             suppressed.clear()
+            if (testIds.isNotEmpty()) {
+                rebalance(clock())
+                bump()
+            }
             return null
         }
         suppressed.clear()

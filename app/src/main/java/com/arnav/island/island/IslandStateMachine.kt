@@ -1,6 +1,7 @@
 package com.arnav.island.island
 
 import com.arnav.island.events.EventPriority
+import com.arnav.island.events.EventType
 import com.arnav.island.events.IslandEvent
 import com.arnav.island.events.Schedule
 
@@ -95,7 +96,7 @@ class IslandStateMachine {
     }
 
     private fun stackCandidates(): List<IslandEvent> =
-        listOfNotNull(schedule.toast?.takeIf(::allowed)) + schedule.live.filter(::allowed)
+        schedule.live.filter(::allowed)
 
     private fun derive(): IslandState {
         if (!visible) return IslandState.Hidden
@@ -104,6 +105,15 @@ class IslandStateMachine {
         val live = schedule.live.filter(::allowed)
         val primary = live.getOrNull(0)
         val secondary = live.getOrNull(1)
+
+        // Dedicated visual toasts (Mascot, Unlock) always render their own presenter animation,
+        // never inside the text activity stack.
+        if (toast != null && (toast.type == EventType.MASCOT || toast.type == EventType.UNLOCK)) {
+            userStack = false
+            if (userExpandedId == toast.id) return IslandState.Expanded(toast)
+            userExpandedId = null
+            return IslandState.Toast(toast)
+        }
 
         if (userStack) {
             val items = stackCandidates()

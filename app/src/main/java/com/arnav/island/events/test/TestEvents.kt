@@ -80,12 +80,9 @@ class TestEvents(private val engine: EventEngine, private val images: ImageStore
     private var mascotInteraction = 0
 
     fun mascot(mood: MascotMood = MascotMood.AUTO, durationMs: Long = 4_500L, withMusic: Boolean = false) {
-        if (withMusic) {
-            music(playing = true, rich = false)
-        }
         mascotSeed++
         mascotInteraction++
-        val mediaEvent = engine.current().live.firstOrNull { it.type == EventType.MEDIA }
+        val mediaEvent = engine.current().live.firstOrNull { it.type == EventType.MEDIA && it.source != EventSource.TEST }
         val mediaPayload = mediaEvent?.payload as? MediaPayload
         val musicPlaying = withMusic || mediaPayload?.isPlaying == true || mediaEvent != null
         engine.post(
@@ -588,13 +585,13 @@ class TestEvents(private val engine: EventEngine, private val images: ImageStore
             type = EventType.UNLOCK,
             timestamp = System.currentTimeMillis(),
             persistent = false,
-            durationMs = 1800L,
+            durationMs = 2050L,
             title = "Đã mở khóa",
             subtitle = "Mở khóa vân tay 3D",
             icon = Glyph.FINGERPRINT,
             payload = UnlockPayload(UnlockMethod.FINGERPRINT, "Đã mở khóa", "Mở khóa vân tay 3D"),
             animation = EntranceAnimation.MORPH,
-            colors = EventColors(accent = 0xFF00F0FF.toInt()), // Neon Cyan / Electric Blue
+            colors = EventColors(accent = 0xFF30D158.toInt()),
         )
         engine.post(event)
     }

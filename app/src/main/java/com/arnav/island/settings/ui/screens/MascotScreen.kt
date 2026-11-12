@@ -12,6 +12,7 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SentimentVerySatisfied
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,12 +40,13 @@ import java.util.Locale
 fun MascotScreen(s: IslandSettings, ui: Ui) {
     var preview by remember { mutableStateOf<PreviewIsland?>(null) }
 
+    LaunchedEffect(Unit) {
+        ui.graph.testEvents.clear()
+    }
+
     fun triggerMascot(mood: MascotMood = s.mascotMood, withMusic: Boolean = false) {
         preview?.tests?.mascot(mood, s.mascotDurationMs, withMusic = withMusic)
-        if (withMusic) {
-            ui.graph.testEvents.music(playing = true, rich = false)
-        }
-        ui.graph.commands.tryEmit(IslandCommand.SummonMascot(mood))
+        ui.graph.commands.tryEmit(IslandCommand.SummonMascot(mood, withMusic = withMusic))
     }
 
     SettingsPage("Breeze Mascot", onBack = ui::back) {

@@ -76,9 +76,15 @@ class MascotMonitor(
     /**
      * Summons the Breeze Mascot onto the island or cycles its mood when tapped.
      */
-    fun summon(nextMood: Boolean = false, forcedMood: MascotMood? = null): Boolean {
+    fun summon(
+        nextMood: Boolean = false,
+        forcedMood: MascotMood? = null,
+        forceMusicGroove: Boolean = false,
+    ): Boolean {
         val s = settings()
         if (!s.mascotEnabled && forcedMood == null) return false
+        // Always purge any lingering developer/preview test events (e.g. "Test Track 1") on the real island
+        events.removeWhere { it.source == EventSource.TEST }
         lastShownAtElapsed = SystemClock.elapsedRealtime()
         if (nextMood) {
             seedCounter++
@@ -86,9 +92,9 @@ class MascotMonitor(
         }
         val chosenMood = forcedMood ?: s.mascotMood
         val duration = s.mascotDurationMs.coerceIn(2_000L, 12_000L)
-        val mediaEvent = events.current().live.firstOrNull { it.type == EventType.MEDIA }
+        val mediaEvent = events.current().live.firstOrNull { it.type == EventType.MEDIA && it.source != EventSource.TEST }
         val mediaPayload = mediaEvent?.payload as? MediaPayload
-        val musicPlaying = mediaPayload?.isPlaying == true || mediaEvent != null
+        val musicPlaying = forceMusicGroove || mediaPayload?.isPlaying == true || mediaEvent != null
         val event = buildEvent(
             mood = chosenMood,
             seed = seedCounter,

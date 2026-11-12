@@ -123,18 +123,19 @@ class UnlockMonitor(
 
         val event = buildUnlockEvent(UnlockMethod.FINGERPRINT, s.unlockDurationMs)
         scope.launch {
+            events.removeWhere { it.source == EventSource.TEST }
             events.post(event)
         }
     }
 
-    fun buildUnlockEvent(method: UnlockMethod = UnlockMethod.FINGERPRINT, durationMs: Long = 1800L): IslandEvent {
+    fun buildUnlockEvent(method: UnlockMethod = UnlockMethod.FINGERPRINT, durationMs: Long = 2050L): IslandEvent {
         return IslandEvent(
             id = EVENT_ID,
             source = EventSource.SYSTEM,
             type = EventType.UNLOCK,
             timestamp = System.currentTimeMillis(),
             persistent = false,
-            durationMs = durationMs,
+            durationMs = durationMs.coerceAtLeast(1950L),
             title = "Đã mở khóa",
             subtitle = "Mở khóa vân tay 3D",
             icon = Glyph.FINGERPRINT,

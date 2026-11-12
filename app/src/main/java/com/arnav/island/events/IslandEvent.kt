@@ -103,7 +103,7 @@ enum class EventType(val defaultPriority: EventPriority) {
     CONFIRM(EventPriority.NOTIFICATION),
 
     /** Device unlock event (Face ID, Fingerprint, Lock/Password). */
-    UNLOCK(EventPriority.CHARGING),
+    UNLOCK(EventPriority.CRITICAL_SYSTEM_EVENT),
 
     /** Breeze Mascot (interactive & periodic notch companion). */
     MASCOT(EventPriority.CHARGING),
