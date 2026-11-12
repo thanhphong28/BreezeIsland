@@ -99,7 +99,8 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
     private val screenshots = ScreenshotMonitor(service, graph.events, graph.images, scope, settingsFn)
     private val unlock = com.arnav.island.events.system.UnlockMonitor(service, graph.events, scope, settingsFn)
     private val mascot = com.arnav.island.events.system.MascotMonitor(graph.events, scope, settingsFn) {
-        controller.state == IslandState.Idle
+        val st = controller.state
+        st == IslandState.Idle || st is IslandState.Compact || st is IslandState.Split
     }
 
     /** Android's animator duration scale (Developer options); motion follows it like system UI. */

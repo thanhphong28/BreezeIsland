@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SentimentVerySatisfied
 import androidx.compose.material.icons.rounded.TouchApp
@@ -38,8 +39,11 @@ import java.util.Locale
 fun MascotScreen(s: IslandSettings, ui: Ui) {
     var preview by remember { mutableStateOf<PreviewIsland?>(null) }
 
-    fun triggerMascot(mood: MascotMood = s.mascotMood) {
-        preview?.tests?.mascot(mood, s.mascotDurationMs)
+    fun triggerMascot(mood: MascotMood = s.mascotMood, withMusic: Boolean = false) {
+        preview?.tests?.mascot(mood, s.mascotDurationMs, withMusic = withMusic)
+        if (withMusic) {
+            ui.graph.testEvents.music(playing = true, rich = false)
+        }
         ui.graph.commands.tryEmit(IslandCommand.SummonMascot(mood))
     }
 
@@ -99,7 +103,7 @@ fun MascotScreen(s: IslandSettings, ui: Ui) {
             Reveal(s.mascotEnabled) {
                 Group(
                     title = "Thời gian & Chu kỳ xuất hiện",
-                    footer = "Mascot chỉ tự động xuất hiện khi bạn đang mở máy sử dụng và trên Island đang rảnh (không làm phiền cuộc gọi, nhạc hay hẹn giờ).",
+                    footer = "Mascot tự động xuất hiện theo chu kỳ ngay cả khi bạn đang nghe nhạc trên Island (Mascot sẽ nhún nhảy cùng nốt nhạc rồi tự trả lại trình phát nhạc).",
                 ) {
                     Reveal(s.mascotPeriodicEnabled) {
                         SliderRow(
@@ -123,8 +127,8 @@ fun MascotScreen(s: IslandSettings, ui: Ui) {
 
         item {
             Group(
-                title = "Biểu cảm & Hoạt ảnh",
-                footer = "Chọn 'Ngẫu nhiên' để mỗi lần xuất hiện hoặc mỗi lần chạm, Mascot tự đổi các biểu cảm Vui vẻ (^ ^), Nháy mắt tinh nghịch (; O), Đáng yêu thả tim, Hào hứng và Thư giãn.",
+                title = "Biểu cảm & Hoạt ảnh 120Hz",
+                footer = "Chọn 'Ngẫu nhiên' để mỗi lần xuất hiện hoặc mỗi lần chạm, Mascot tự đổi các biểu cảm động: Vui vẻ (^ ^), Nháy mắt tinh nghịch (; O), Đáng yêu thả tim, Hào hứng và Thư giãn.",
             ) {
                 ChipsRow(
                     options = MascotMood.entries,
@@ -137,7 +141,7 @@ fun MascotScreen(s: IslandSettings, ui: Ui) {
                 )
                 SettingRow(
                     title = "Gọi Breeze Mascot ngay",
-                    subtitle = "Chạy thử hoạt ảnh Mascot trực tiếp trên cả mô phỏng và đảo thật",
+                    subtitle = "Chạy thử hoạt ảnh Mascot động trực tiếp trên cả mô phỏng và đảo thật",
                     icon = Icons.Rounded.AutoAwesome,
                     iconColor = BadgeColors.Pink,
                     onClick = { triggerMascot(s.mascotMood) },
@@ -148,6 +152,13 @@ fun MascotScreen(s: IslandSettings, ui: Ui) {
                     icon = Icons.Rounded.SentimentVerySatisfied,
                     iconColor = BadgeColors.Cyan,
                     onClick = { triggerMascot(MascotMood.AUTO) },
+                )
+                SettingRow(
+                    title = "Thử kết hợp Mascot + Đang nghe nhạc",
+                    subtitle = "Mascot xuất hiện nhún nhảy theo điệu nhạc ♪ ♫ rồi trả lại trình phát nhạc",
+                    icon = Icons.Rounded.MusicNote,
+                    iconColor = BadgeColors.Violet,
+                    onClick = { triggerMascot(s.mascotMood, withMusic = true) },
                 )
             }
         }

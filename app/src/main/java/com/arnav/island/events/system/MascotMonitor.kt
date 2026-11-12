@@ -10,6 +10,7 @@ import com.arnav.island.events.Glyph
 import com.arnav.island.events.IslandEvent
 import com.arnav.island.events.MascotMood
 import com.arnav.island.events.MascotPayload
+import com.arnav.island.events.MediaPayload
 import com.arnav.island.storage.IslandSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -19,8 +20,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Manages the **Breeze Mascot** companion on the Dynamic Island:
- * - Periodically pops out with cute animations while the user is actively using the phone (and the
- *   island is otherwise idle).
+ * - Periodically pops out with cute animations while the user is actively using the phone (both
+ *   when the island is idle and when compact live activities like Music are playing).
  * - Responds immediately when the user taps the camera while the island is idle, or taps the
  *   mascot while it is already showing to cycle through expressions.
  */
@@ -28,7 +29,7 @@ class MascotMonitor(
     private val events: EventEngine,
     private val scope: CoroutineScope,
     private val settings: () -> IslandSettings,
-    private val isIslandIdle: () -> Boolean,
+    private val canShowPeriodically: () -> Boolean,
 ) {
     private var periodicJob: Job? = null
     private var active = false
@@ -60,12 +61,12 @@ class MascotMonitor(
         lastShownAtElapsed = SystemClock.elapsedRealtime()
         periodicJob = scope.launch {
             while (isActive && active) {
-                delay(15_000L)
+                delay(10_000L)
                 val s = settings()
                 if (!s.mascotEnabled || !s.mascotPeriodicEnabled) continue
                 val intervalMs = s.mascotIntervalMinutes.coerceIn(1, 120) * 60_000L
                 val now = SystemClock.elapsedRealtime()
-                if (now - lastShownAtElapsed >= intervalMs && isIslandIdle()) {
+                if (now - lastShownAtElapsed >= intervalMs && canShowPeriodically()) {
                     summon(nextMood = true)
                 }
             }
@@ -85,12 +86,18 @@ class MascotMonitor(
         }
         val chosenMood = forcedMood ?: s.mascotMood
         val duration = s.mascotDurationMs.coerceIn(2_000L, 12_000L)
+        val mediaEvent = events.current().live.firstOrNull { it.type == EventType.MEDIA }
+        val mediaPayload = mediaEvent?.payload as? MediaPayload
+        val musicPlaying = mediaPayload?.isPlaying == true || mediaEvent != null
         val event = buildEvent(
             mood = chosenMood,
             seed = seedCounter,
             interactiveCount = interactionCounter,
             durationMs = duration,
             source = EventSource.SYSTEM,
+            isMusicPlaying = musicPlaying,
+            mediaTitle = mediaPayload?.title ?: mediaEvent?.title,
+            mediaAccent = mediaPayload?.accent ?: mediaEvent?.colors?.accent ?: 0,
         )
         events.post(event)
         return true
@@ -105,6 +112,9 @@ class MascotMonitor(
             interactiveCount: Int,
             durationMs: Long = 4_500L,
             source: EventSource = EventSource.SYSTEM,
+            isMusicPlaying: Boolean = false,
+            mediaTitle: String? = null,
+            mediaAccent: Int = 0,
         ): IslandEvent = IslandEvent(
             id = if (source == EventSource.TEST) "test:mascot" else MASCOT_ID,
             source = source,
@@ -117,11 +127,14 @@ class MascotMonitor(
             icon = Glyph.SPARK,
             animation = EntranceAnimation.BLOOM,
             colors = EventColors(accent = 0xFF00E5FF.toInt(), secondary = 0xFF7C4DFF.toInt()),
-            contentKey = "mascot:$mood:$seed:$interactiveCount",
+            contentKey = "mascot:$mood:$seed:$interactiveCount:$isMusicPlaying",
             payload = MascotPayload(
                 mood = mood,
                 seed = seed,
                 interactiveCount = interactiveCount,
+                isMusicPlaying = isMusicPlaying,
+                mediaTitle = mediaTitle,
+                mediaAccent = mediaAccent,
             ),
         )
     }

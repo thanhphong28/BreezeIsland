@@ -12,6 +12,7 @@ import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
 import com.arnav.island.animation.MotionProfile
+import com.arnav.island.island.GeometryConfig
 import com.arnav.island.island.IslandGeometry
 import com.arnav.island.island.ScreenSpec
 import com.arnav.island.storage.IslandTheme
@@ -97,7 +98,17 @@ class RenderContext(
 ) {
     var density: Float = context.resources.displayMetrics.density
     var fontScale: Float = context.resources.configuration.fontScale
-    lateinit var geometry: IslandGeometry
+    var geometry: IslandGeometry = run {
+        val dm = context.resources.displayMetrics
+        val w = dm.widthPixels.coerceAtLeast(320)
+        val h = dm.heightPixels.coerceAtLeast(640)
+        val d = dm.density.coerceAtLeast(1f)
+        IslandGeometry(
+            screen = ScreenSpec(w, h, d, (28 * d).toInt(), 36f * d),
+            cutout = IslandGeometry.virtualCutout(w, d),
+            config = GeometryConfig(),
+        )
+    }
     var settings = RenderSettings()
 
     /** Wall clock used by presenters (injectable for previews). */

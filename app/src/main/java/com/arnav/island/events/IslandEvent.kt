@@ -106,7 +106,7 @@ enum class EventType(val defaultPriority: EventPriority) {
     UNLOCK(EventPriority.CHARGING),
 
     /** Breeze Mascot (interactive & periodic notch companion). */
-    MASCOT(EventPriority.NOTIFICATION),
+    MASCOT(EventPriority.CHARGING),
 
     /** Synthetic: the stack of every running activity (never posted by a source). */
     STACK(EventPriority.BACKGROUND_ACTIVITY),

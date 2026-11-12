@@ -969,7 +969,8 @@ class IslandScene(private val rc: RenderContext) {
                 if (layer.slot != Slot.MAIN || layer.inGhost) continue
                 val a = layer.alpha.value * v
                 if (a <= 0.004f) continue
-                val blur = if (canBlur) (1f - layer.alpha.value) * rc.dp(if (layer.removing) 5f else 8f) else 0f
+                val isMascot = layer.presenter is com.arnav.island.island.render.presenters.MascotPresenter
+                val blur = if (canBlur && !isMascot) (1f - layer.alpha.value) * rc.dp(if (layer.removing) 5f else 8f) else 0f
                 if (blur > 0.4f && Build.VERSION.SDK_INT >= 31) {
                     drawBlurred(canvas, layer, w, h, a, now, blur)
                 } else {

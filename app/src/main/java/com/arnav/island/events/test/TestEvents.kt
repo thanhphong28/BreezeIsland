@@ -79,9 +79,15 @@ class TestEvents(private val engine: EventEngine, private val images: ImageStore
     private var mascotSeed = 0
     private var mascotInteraction = 0
 
-    fun mascot(mood: MascotMood = MascotMood.AUTO, durationMs: Long = 4_500L) {
+    fun mascot(mood: MascotMood = MascotMood.AUTO, durationMs: Long = 4_500L, withMusic: Boolean = false) {
+        if (withMusic) {
+            music(playing = true, rich = false)
+        }
         mascotSeed++
         mascotInteraction++
+        val mediaEvent = engine.current().live.firstOrNull { it.type == EventType.MEDIA }
+        val mediaPayload = mediaEvent?.payload as? MediaPayload
+        val musicPlaying = withMusic || mediaPayload?.isPlaying == true || mediaEvent != null
         engine.post(
             MascotMonitor.buildEvent(
                 mood = mood,
@@ -89,6 +95,9 @@ class TestEvents(private val engine: EventEngine, private val images: ImageStore
                 interactiveCount = mascotInteraction,
                 durationMs = durationMs,
                 source = EventSource.TEST,
+                isMusicPlaying = musicPlaying,
+                mediaTitle = mediaPayload?.title ?: mediaEvent?.title,
+                mediaAccent = mediaPayload?.accent ?: mediaEvent?.colors?.accent ?: 0,
             )
         )
     }
