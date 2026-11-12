@@ -66,6 +66,7 @@ object OnPhoneGranter {
                 Thread {
                     runShizukuShell(
                         "pm grant $pkg android.permission.READ_LOGS 2>/dev/null; " +
+                            "appops set $pkg READ_LOGS allow 2>/dev/null; " +
                             "pm grant $pkg android.permission.PACKAGE_USAGE_STATS 2>/dev/null; " +
                             "appops set $pkg GET_USAGE_STATS allow 2>/dev/null"
                     )
@@ -171,6 +172,7 @@ object OnPhoneGranter {
             val cmd = buildString {
                 append("pm grant $pkg android.permission.WRITE_SECURE_SETTINGS; ")
                 append("pm grant $pkg android.permission.READ_LOGS 2>/dev/null; ")
+                append("appops set $pkg READ_LOGS allow 2>/dev/null; ")
                 append("pm grant $pkg android.permission.PACKAGE_USAGE_STATS 2>/dev/null; ")
                 append("appops set $pkg WRITE_SETTINGS allow 2>/dev/null; ")
                 append("appops set $pkg SYSTEM_ALERT_WINDOW allow 2>/dev/null; ")
