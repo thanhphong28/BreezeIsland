@@ -279,6 +279,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
 
         val timersEnabled = booleanPreferencesKey("timers_enabled")
         val stopwatchEnabled = booleanPreferencesKey("stopwatch_enabled")
+        val alarmsEnabled = booleanPreferencesKey("alarms_enabled")
 
         val ringer = booleanPreferencesKey("ringer_enabled")
         val dnd = booleanPreferencesKey("dnd_enabled")
@@ -412,6 +413,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             bluetoothAllDevices = p[K.bluetoothAll] ?: d.bluetoothAllDevices,
             timersEnabled = p[K.timersEnabled] ?: d.timersEnabled,
             stopwatchEnabled = p[K.stopwatchEnabled] ?: d.stopwatchEnabled,
+            alarmsEnabled = p[K.alarmsEnabled] ?: d.alarmsEnabled,
             ringerEnabled = p[K.ringer] ?: d.ringerEnabled,
             dndEnabled = p[K.dnd] ?: d.dndEnabled,
             headsetEnabled = p[K.headset] ?: d.headsetEnabled,
@@ -550,6 +552,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.bluetoothAll] = s.bluetoothAllDevices
         p[K.timersEnabled] = s.timersEnabled
         p[K.stopwatchEnabled] = s.stopwatchEnabled
+        p[K.alarmsEnabled] = s.alarmsEnabled
         p[K.ringer] = s.ringerEnabled
         p[K.dnd] = s.dndEnabled
         p[K.headset] = s.headsetEnabled

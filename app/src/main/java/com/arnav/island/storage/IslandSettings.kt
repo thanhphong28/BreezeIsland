@@ -158,9 +158,10 @@ data class IslandSettings(
     val bluetoothEnabled: Boolean = true,
     val bluetoothAllDevices: Boolean = false,
 
-    // Timers
+    // Timers & System Clock
     val timersEnabled: Boolean = true,
     val stopwatchEnabled: Boolean = true,
+    val alarmsEnabled: Boolean = true,
 
     // System events
     val ringerEnabled: Boolean = true,

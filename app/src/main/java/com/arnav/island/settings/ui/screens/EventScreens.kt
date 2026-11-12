@@ -111,8 +111,8 @@ fun EventsScreen(s: IslandSettings, p: PermissionSnapshot, ui: Ui) {
             Group(title = "Live activities") {
                 SwitchRow("Media", s.mediaEnabled, { v -> ui.update { it.copy(mediaEnabled = v) }; if (v) ensureNotifAccess() }, "Now playing from any media app", Icons.Rounded.MusicNote, BadgeColors.Pink)
                 SwitchRow("Calls", s.callsEnabled, { v -> ui.update { it.copy(callsEnabled = v) }; if (v) ensureNotifAccess() }, "Incoming and ongoing calls", Icons.Rounded.Call, BadgeColors.Green)
-                SwitchRow("Timers", s.timersEnabled, { v -> ui.update { it.copy(timersEnabled = v) } }, null, Icons.Rounded.Timer, BadgeColors.Orange)
-                SwitchRow("Stopwatch", s.stopwatchEnabled, { v -> ui.update { it.copy(stopwatchEnabled = v) } }, null, Icons.Rounded.Timelapse, BadgeColors.Orange)
+                SwitchRow("Timers", s.timersEnabled, { v -> ui.update { it.copy(timersEnabled = v) }; if (v) ensureNotifAccess() }, tr("Live countdown from your phone's Clock app", "Đồng bộ đếm ngược từ ứng dụng Đồng hồ của máy"), Icons.Rounded.Timer, BadgeColors.Orange)
+                SwitchRow("Stopwatch", s.stopwatchEnabled, { v -> ui.update { it.copy(stopwatchEnabled = v) }; if (v) ensureNotifAccess() }, tr("Live stopwatch from your phone's Clock app", "Đồng bộ bấm giờ từ ứng dụng Đồng hồ của máy"), Icons.Rounded.Timelapse, BadgeColors.Orange)
                 SwitchRow("Navigation", s.navigationEnabled, { v -> ui.update { it.copy(navigationEnabled = v) }; if (v) ensureNotifAccess() }, "Turn-by-turn from navigation apps", Icons.Rounded.Navigation, BadgeColors.Blue)
                 SwitchRow("Downloads & progress", s.progressEnabled, { v -> ui.update { it.copy(progressEnabled = v) }; if (v) ensureNotifAccess() }, "Any notification that reports progress", Icons.Rounded.Download, BadgeColors.Cyan)
                 SwitchRow("Deliveries & rides", s.liveUpdatesEnabled, { v -> ui.update { it.copy(liveUpdatesEnabled = v) }; if (v) ensureNotifAccess() },

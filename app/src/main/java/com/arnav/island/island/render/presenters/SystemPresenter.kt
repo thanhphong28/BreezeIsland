@@ -32,7 +32,11 @@ class SystemPresenter(rc: RenderContext) : Presenter(rc) {
         return when (mode) {
             PresentMode.EXPANDED -> expandedWidth to (bandInset + dp(58f))
             PresentMode.TOAST -> {
-                val text = (event.payload as? SystemPayload)?.label ?: event.title
+                val p = event.payload as? SystemPayload
+                if (p?.kind == SystemKind.ALARM_SET && p.detail.isNotEmpty()) {
+                    return expandedWidth to (bandInset + dp(58f))
+                }
+                val text = p?.label ?: event.title
                 rc.labelPaint.textSize = rc.sp(15f)
                 val g = rc.geometry
                 val h = g.compactHeight
@@ -75,6 +79,7 @@ class SystemPresenter(rc: RenderContext) : Presenter(rc) {
         SystemKind.HOTSPOT_ON, SystemKind.HOTSPOT_OFF -> Glyph.HOTSPOT
         SystemKind.CLIPBOARD -> Glyph.CLIPBOARD
         SystemKind.SCREEN_RECORDING -> Glyph.RECORD
+        SystemKind.ALARM_SET -> Glyph.ALARM
         null -> event.icon ?: Glyph.INFO
     }
 
@@ -82,6 +87,7 @@ class SystemPresenter(rc: RenderContext) : Presenter(rc) {
         SystemKind.RINGER_SILENT, SystemKind.SCREEN_RECORDING -> IslandColors.RED
         SystemKind.DND_ON -> IslandColors.PURPLE
         SystemKind.HOTSPOT_ON -> IslandColors.GREEN
+        SystemKind.ALARM_SET -> IslandColors.ORANGE
         SystemKind.DND_OFF, SystemKind.HEADSET_OUT, SystemKind.HOTSPOT_OFF -> IslandColors.TEXT_SECONDARY
         else -> IslandColors.TEXT
     }
@@ -89,6 +95,11 @@ class SystemPresenter(rc: RenderContext) : Presenter(rc) {
     override fun draw(canvas: Canvas, w: Float, h: Float, alpha: Float, now: Long) {
         when (mode) {
             PresentMode.EXPANDED -> drawExpanded(canvas, alpha)
+            PresentMode.TOAST -> if (kind == SystemKind.ALARM_SET && !payload?.detail.isNullOrEmpty()) {
+                drawExpanded(canvas, alpha)
+            } else {
+                drawPill(canvas, w, h, alpha, now)
+            }
             PresentMode.BUBBLE -> drawBubbleGlyph(canvas, w, glyph(), color(), alpha)
             else -> drawPill(canvas, w, h, alpha, now)
         }

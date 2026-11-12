@@ -32,10 +32,14 @@ import com.arnav.island.events.NavigationPayload
 import com.arnav.island.events.NotificationPayload
 import com.arnav.island.events.NotificationPrivacy
 import com.arnav.island.events.ProgressPayload
+import com.arnav.island.events.StopwatchPayload
+import com.arnav.island.events.TimerPayload
 import com.arnav.island.events.navigation.NavigationRegistry
 import com.arnav.island.island.render.presenters.CallPresenter
 import com.arnav.island.island.render.presenters.NotificationPresenter
+import com.arnav.island.island.render.presenters.TimerPresenter
 import com.arnav.island.settings.reply.ReplyRequest
+import com.arnav.island.storage.AppLanguage
 import com.arnav.island.storage.IslandSettings
 import com.arnav.island.util.AppInfoCache
 import com.arnav.island.util.Bitmaps
@@ -71,6 +75,8 @@ class NotificationProcessor(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Int>?) = size > 96
     }
     private val lastProgress = HashMap<String, Float>()
+    private val clockTotalMs = HashMap<String, Long>()
+    private val clockLaps = HashMap<String, MutableList<Long>>()
 
     val isConnected: Boolean get() = listener != null
 
@@ -81,7 +87,12 @@ class NotificationProcessor(
 
     fun detach() {
         listener = null
-        engine.removeWhere { it.source == EventSource.CALL || it.source == EventSource.NAVIGATION || it.source == EventSource.PROGRESS }
+        engine.removeWhere {
+            it.source == EventSource.CALL ||
+                it.source == EventSource.NAVIGATION ||
+                it.source == EventSource.PROGRESS ||
+                it.id.startsWith("clock-")
+        }
     }
 
     fun onPosted(sbn: StatusBarNotification, rankingMap: RankingMap?, initialScan: Boolean) {
@@ -93,6 +104,10 @@ class NotificationProcessor(
         if (isMedia(n)) {
             // Never snooze or cancel MediaStyle notifications: Android SystemUI's Media Player
             // in the Notification Shade & Quick Settings Panel depends on this notification!
+            return
+        }
+        if (isClockAppNotification(sbn)) {
+            handleClockNotification(sbn, s)
             return
         }
         if (isFlashlightNotification(sbn)) {
@@ -134,7 +149,7 @@ class NotificationProcessor(
         runCatching {
             svc.snoozedNotifications?.forEach { snoozed ->
                 val n = snoozed.notification
-                if (n != null && isMedia(n)) {
+                if (n != null && (isMedia(n) || isClockAppNotification(snoozed))) {
                     svc.snoozeNotification(snoozed.key, 1L)
                 }
             }
@@ -143,6 +158,10 @@ class NotificationProcessor(
             if (sbn.packageName == context.packageName) continue
             val n = sbn.notification ?: continue
             if (isMedia(n)) {
+                continue
+            }
+            if (isClockAppNotification(sbn)) {
+                handleClockNotification(sbn, s)
                 continue
             }
             if (isFlashlightNotification(sbn)) {
@@ -162,6 +181,11 @@ class NotificationProcessor(
         engine.remove(callId(key))
         engine.remove(navId(key))
         engine.remove(liveId(key))
+        engine.remove(clockTimerId(key))
+        engine.remove(clockStopwatchId(key))
+        engine.remove(clockAlarmId(key))
+        clockTotalMs.remove(key)
+        clockLaps.remove(key)
         lastProgress.remove(key)?.let { last ->
             engine.remove(progressId(key))
             val finished = last >= 0.97f && reason != NotificationListenerService.REASON_CANCEL && reason != NotificationListenerService.REASON_USER_STOPPED
@@ -728,6 +752,380 @@ class NotificationProcessor(
     }
 
     // ---------------------------------------------------------------------------------------------
+    // System Clock: Timers, Stopwatch & Alarms
+    // ---------------------------------------------------------------------------------------------
+
+    fun isClockAppNotification(sbn: StatusBarNotification): Boolean {
+        val pkg = sbn.packageName.lowercase()
+        return pkg in CLOCK_PACKAGES || pkg.endsWith(".clockpackage") || pkg.endsWith(".deskclock") || pkg.endsWith(".alarmclock")
+    }
+
+    private fun handleClockNotification(sbn: StatusBarNotification, s: IslandSettings) {
+        val n = sbn.notification ?: return
+        val key = sbn.key
+        val pkg = sbn.packageName
+        val extras = n.extras
+        val channel = n.channelId.orEmpty().lowercase()
+        val tag = sbn.tag.orEmpty().lowercase()
+        val rawTitle = (extras.getCharSequence(Notification.EXTRA_TITLE_BIG) ?: extras.getCharSequence(Notification.EXTRA_TITLE))?.toString()?.trim().orEmpty()
+        val rawText = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()?.trim().orEmpty()
+        val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.trim().orEmpty()
+        val actionTitles = n.actions.orEmpty().mapNotNull { it.title?.toString()?.lowercase() }.joinToString(" ")
+        val meta = "$channel $tag ${rawTitle.lowercase()} ${rawText.lowercase()} ${subText.lowercase()} $actionTitles"
+
+        val isCountDownChrono = extras.getBoolean("android.chronometerCountDown", false)
+        val usesChrono = extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false)
+
+        val isStopwatch = meta.contains("stopwatch") ||
+            meta.contains("bấm giờ") ||
+            actionTitles.contains("lap") ||
+            actionTitles.contains("vòng") ||
+            (usesChrono && !isCountDownChrono && n.`when` in 1..System.currentTimeMillis() && !meta.contains("timer") && !meta.contains("hẹn giờ") && !meta.contains("alarm") && !meta.contains("báo thức"))
+
+        val isTimer = !isStopwatch && (
+            isCountDownChrono ||
+                meta.contains("timer") ||
+                meta.contains("hẹn giờ") ||
+                meta.contains("đếm ngược") ||
+                meta.contains("countdown")
+            )
+
+        when {
+            isStopwatch -> {
+                if (s.stopwatchEnabled) handleClockStopwatch(sbn, rawTitle, rawText, actionTitles)
+                else engine.remove(clockStopwatchId(key))
+            }
+            isTimer -> {
+                if (s.timersEnabled) handleClockTimer(sbn, rawTitle, rawText, subText, actionTitles, isCountDownChrono, usesChrono)
+                else engine.remove(clockTimerId(key))
+            }
+            else -> {
+                if (s.alarmsEnabled) handleClockAlarm(sbn, rawTitle, rawText, s)
+                else engine.remove(clockAlarmId(key))
+            }
+        }
+    }
+
+    private fun handleClockTimer(
+        sbn: StatusBarNotification,
+        rawTitle: String,
+        rawText: String,
+        subText: String,
+        actionTitles: String,
+        isCountDownChrono: Boolean,
+        usesChrono: Boolean,
+    ) {
+        val n = sbn.notification
+        val key = sbn.key
+        val pkg = sbn.packageName
+        val now = System.currentTimeMillis()
+        val actions = n.actions.orEmpty()
+
+        fun findAction(vararg words: String): Notification.Action? = actions.firstOrNull { a ->
+            val t = a.title?.toString()?.lowercase().orEmpty()
+            words.any { w -> t.contains(w) }
+        }
+
+        val pauseResumeAction = findAction("pause", "tạm dừng", "resume", "tiếp tục", "start", "bắt đầu")
+        val cancelStopAction = findAction("cancel", "hủy", "delete", "xóa", "dismiss", "bỏ qua", "stop", "dừng", "reset", "đặt lại")
+        val addAction = findAction("+1", "add", "thêm", "1:00", "1 min", "1 phút", "restart", "khởi động lại")
+
+        val isPaused = actionTitles.contains("resume") ||
+            actionTitles.contains("tiếp tục") ||
+            rawTitle.lowercase().contains("paused") ||
+            rawText.lowercase().contains("paused") ||
+            rawTitle.lowercase().contains("tạm dừng") ||
+            rawText.lowercase().contains("tạm dừng")
+
+        val parsedMs = parseDurationMs(rawTitle) ?: parseDurationMs(rawText) ?: parseDurationMs(subText)
+        val chronoRemainingMs = if ((usesChrono || isCountDownChrono) && n.`when` > now) (n.`when` - now) else null
+        val remainingMs = chronoRemainingMs ?: parsedMs ?: 0L
+
+        val isRinging = !isPaused && (
+            n.fullScreenIntent != null ||
+                n.category == Notification.CATEGORY_ALARM ||
+                (remainingMs <= 0L && (parsedMs == 0L || actionTitles.contains("dismiss") || actionTitles.contains("bỏ qua") || actionTitles.contains("stop") || actionTitles.contains("dừng"))) ||
+                rawTitle.lowercase().contains("time's up") ||
+                rawText.lowercase().contains("time's up") ||
+                rawTitle.lowercase().contains("hết giờ") ||
+                rawText.lowercase().contains("hết giờ")
+            )
+
+        val prevTotal = clockTotalMs[key] ?: 0L
+        val totalMs = maxOf(prevTotal, remainingMs, 1_000L)
+        clockTotalMs[key] = totalMs
+
+        val endsAt = if (chronoRemainingMs != null) n.`when` else now + remainingMs
+        val cleanLabel = listOf(rawTitle, rawText, subText)
+            .firstOrNull { it.isNotBlank() && parseDurationMs(it) == null }
+            ?.takeIf { it.length <= 32 }
+            ?: if (settings().language == AppLanguage.VIETNAMESE) "Hẹn giờ" else "Timer"
+
+        val openAction = IslandAction("clock.timer.open", "Open Clock") {
+            Launch.send(context, n.contentIntent ?: n.fullScreenIntent) || Launch.openApp(context, pkg)
+        }
+
+        val islandActions = if (isRinging) {
+            buildList {
+                addAction?.actionIntent?.let { pi ->
+                    add(IslandAction(TimerPresenter.ACTION_ADD, "+1 min", Glyph.PLUS) { Launch.send(context, pi) })
+                }
+                val stopPi = (cancelStopAction ?: actions.firstOrNull())?.actionIntent
+                add(
+                    IslandAction(TimerPresenter.ACTION_STOP, "Stop", Glyph.STOP, ActionStyle.PRIMARY, collapses = true) {
+                        if (stopPi != null) Launch.send(context, stopPi) else openAction.invoke()
+                        cancel(key)
+                        engine.remove(clockTimerId(key))
+                    }
+                )
+            }
+        } else {
+            buildList {
+                val togglePi = pauseResumeAction?.actionIntent
+                add(
+                    IslandAction(
+                        TimerPresenter.ACTION_TOGGLE,
+                        if (isPaused) "Resume" else "Pause",
+                        if (isPaused) Glyph.PLAY else Glyph.PAUSE,
+                    ) {
+                        if (togglePi != null) Launch.send(context, togglePi) else openAction.invoke()
+                    }
+                )
+                val cancelPi = cancelStopAction?.actionIntent
+                add(
+                    IslandAction(TimerPresenter.ACTION_SECONDARY, "Cancel", Glyph.CLOSE, collapses = true) {
+                        if (cancelPi != null) Launch.send(context, cancelPi) else cancel(key)
+                        engine.remove(clockTimerId(key))
+                    }
+                )
+                addAction?.actionIntent?.let { pi ->
+                    add(IslandAction(TimerPresenter.ACTION_ADD, "+1 min", Glyph.PLUS) { Launch.send(context, pi) })
+                }
+            }
+        }
+
+        val timerId = key.hashCode().toLong()
+        engine.post(
+            IslandEvent(
+                id = clockTimerId(key),
+                source = EventSource.TIMER,
+                type = if (isRinging) EventType.TIMER_DONE else EventType.TIMER,
+                timestamp = now,
+                persistent = true,
+                title = cleanLabel,
+                icon = Glyph.TIMER,
+                actions = islandActions,
+                autoExpand = isRinging,
+                blocksToasts = isRinging,
+                dismissible = true,
+                tapAction = openAction,
+                contentKey = "clock-timer:$isPaused:$isRinging",
+                payload = TimerPayload(
+                    timerId = timerId,
+                    label = cleanLabel,
+                    totalMs = totalMs,
+                    endsAt = endsAt,
+                    remainingWhenPausedMs = remainingMs,
+                    isPaused = isPaused,
+                    isRinging = isRinging,
+                    ringingSince = if (isRinging) now else 0L,
+                ),
+            )
+        )
+    }
+
+    private fun handleClockStopwatch(
+        sbn: StatusBarNotification,
+        rawTitle: String,
+        rawText: String,
+        actionTitles: String,
+    ) {
+        val n = sbn.notification
+        val key = sbn.key
+        val pkg = sbn.packageName
+        val now = System.currentTimeMillis()
+        val extras = n.extras
+        val usesChrono = extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false)
+        val actions = n.actions.orEmpty()
+
+        fun findAction(vararg words: String): Notification.Action? = actions.firstOrNull { a ->
+            val t = a.title?.toString()?.lowercase().orEmpty()
+            words.any { w -> t.contains(w) }
+        }
+
+        val isRunning = !(
+            actionTitles.contains("resume") ||
+                actionTitles.contains("tiếp tục") ||
+                actionTitles.contains("start") ||
+                actionTitles.contains("bắt đầu") ||
+                rawTitle.lowercase().contains("paused") ||
+                rawText.lowercase().contains("paused") ||
+                rawTitle.lowercase().contains("tạm dừng") ||
+                rawText.lowercase().contains("tạm dừng")
+            )
+
+        val parsedMs = parseDurationMs(rawTitle) ?: parseDurationMs(rawText)
+        val chronoElapsedMs = if (usesChrono && n.`when` in 1..now) (now - n.`when`) else null
+        val elapsedMs = chronoElapsedMs ?: parsedMs ?: 0L
+
+        val runningSince = if (isRunning) (now - elapsedMs) else now
+        val accumulatedMs = if (isRunning) 0L else elapsedMs
+
+        val laps = clockLaps.getOrPut(key) { ArrayList() }
+        val openAction = IslandAction("clock.sw.open", "Open Clock") {
+            Launch.send(context, n.contentIntent) || Launch.openApp(context, pkg)
+        }
+
+        val toggleAction = findAction("pause", "tạm dừng", "stop", "dừng", "resume", "tiếp tục", "start", "bắt đầu")
+        val secondaryAction = if (isRunning) {
+            findAction("lap", "vòng", "reset", "đặt lại")
+        } else {
+            findAction("reset", "đặt lại", "clear", "xóa", "lap", "vòng")
+        }
+
+        val islandActions = listOf(
+            IslandAction(
+                TimerPresenter.ACTION_TOGGLE,
+                if (isRunning) "Stop" else "Start",
+                if (isRunning) Glyph.STOP else Glyph.PLAY,
+            ) {
+                val pi = toggleAction?.actionIntent
+                if (pi != null) Launch.send(context, pi) else openAction.invoke()
+            },
+            if (isRunning) {
+                IslandAction(TimerPresenter.ACTION_SECONDARY, "Lap", Glyph.FLAG) {
+                    val pi = secondaryAction?.actionIntent
+                    if (pi != null) {
+                        laps.add(elapsedMs)
+                        Launch.send(context, pi)
+                    } else {
+                        openAction.invoke()
+                    }
+                }
+            } else {
+                IslandAction(TimerPresenter.ACTION_SECONDARY, "Reset", Glyph.CLOSE, collapses = true) {
+                    val pi = secondaryAction?.actionIntent
+                    laps.clear()
+                    if (pi != null) Launch.send(context, pi) else cancel(key)
+                    engine.remove(clockStopwatchId(key))
+                }
+            },
+        )
+
+        engine.post(
+            IslandEvent(
+                id = clockStopwatchId(key),
+                source = EventSource.STOPWATCH,
+                type = EventType.STOPWATCH,
+                timestamp = now,
+                persistent = true,
+                title = if (settings().language == AppLanguage.VIETNAMESE) "Bấm giờ" else "Stopwatch",
+                icon = Glyph.STOPWATCH,
+                actions = islandActions,
+                tapAction = openAction,
+                contentKey = "clock-sw:$isRunning",
+                payload = StopwatchPayload(
+                    runningSince = runningSince,
+                    accumulatedMs = accumulatedMs,
+                    isRunning = isRunning,
+                    laps = laps.toList(),
+                ),
+            )
+        )
+    }
+
+    private fun handleClockAlarm(
+        sbn: StatusBarNotification,
+        rawTitle: String,
+        rawText: String,
+        s: IslandSettings,
+    ) {
+        val n = sbn.notification
+        val key = sbn.key
+        val pkg = sbn.packageName
+        val now = System.currentTimeMillis()
+        if (rawTitle.isBlank() && rawText.isBlank()) return
+
+        val hash = (rawTitle + '\u0000' + rawText).hashCode()
+        if (seen[key] == hash) return
+        seen[key] = hash
+
+        val isRinging = n.fullScreenIntent != null || n.category == Notification.CATEGORY_ALARM
+        val isVi = s.language == AppLanguage.VIETNAMESE
+        val title = rawTitle.ifBlank { if (isVi) "Báo thức" else "Alarm" }
+        val subtitle = rawText.ifBlank { if (isVi) "Đồng hồ" else "Clock" }
+
+        val actions = n.actions.orEmpty()
+            .filter { it.actionIntent != null && !it.title.isNullOrBlank() }
+            .take(2)
+            .mapIndexed { i, action ->
+                IslandAction(NotificationPresenter.ACTION_PREFIX + i, action.title.toString(), collapses = true) {
+                    Launch.send(context, action.actionIntent)
+                    engine.remove(clockAlarmId(key))
+                }
+            }
+
+        val open = IslandAction("clock.alarm.open", "Open Clock") {
+            Launch.send(context, n.contentIntent ?: n.fullScreenIntent) || Launch.openApp(context, pkg)
+        }
+
+        scope.launch {
+            val appRef = withContext(Dispatchers.Default) { loadAppIcon(pkg) }
+            engine.post(
+                IslandEvent(
+                    id = clockAlarmId(key),
+                    source = EventSource.NOTIFICATION,
+                    type = EventType.NOTIFICATION,
+                    priority = if (isRinging) EventPriority.CRITICAL_SYSTEM_EVENT else EventPriority.CHARGING,
+                    timestamp = now,
+                    persistent = isRinging,
+                    durationMs = 4_500L,
+                    title = title,
+                    subtitle = subtitle,
+                    icon = Glyph.ALARM,
+                    iconImage = appRef,
+                    actions = actions,
+                    autoExpand = isRinging,
+                    blocksToasts = isRinging,
+                    tapAction = open,
+                    colors = EventColors(accent = 0xFFFFA23A.toInt()),
+                    animation = EntranceAnimation.POP,
+                    contentKey = hash.toString(),
+                    payload = NotificationPayload(
+                        packageName = pkg,
+                        appLabel = apps.label(pkg),
+                        title = title,
+                        text = subtitle,
+                        extraLines = emptyList(),
+                        privacy = NotificationPrivacy.FULL,
+                        showText = true,
+                        postedAt = sbn.postTime,
+                        hasLargeIcon = false,
+                        isConversation = false,
+                    ),
+                )
+            )
+        }
+    }
+
+    private fun parseDurationMs(text: String): Long? {
+        if (text.isBlank()) return null
+        CLOCK_HMS_REGEX.find(text)?.let { m ->
+            val p1 = m.groupValues[1].toLongOrNull() ?: return null
+            val p2 = m.groupValues[2].toLongOrNull() ?: return null
+            val p3 = m.groupValues[3].takeIf { it.isNotEmpty() }?.toLongOrNull()
+            val hundredths = m.groupValues[4].takeIf { it.isNotEmpty() }?.padEnd(2, '0')?.take(2)?.toLongOrNull() ?: 0L
+            val totalSeconds = if (p3 != null) {
+                p1 * 3600L + p2 * 60L + p3
+            } else {
+                p1 * 60L + p2
+            }
+            return totalSeconds * 1_000L + hundredths * 10L
+        }
+        return null
+    }
+
+    // ---------------------------------------------------------------------------------------------
 
     private fun cancel(key: String) {
         try {
@@ -798,7 +1196,6 @@ class NotificationProcessor(
         if ("rotate" in selectedSlots && (channel.contains("rotate") || channel.contains("rotation") || tag.contains("rotate"))) return true
         if ("headset" in selectedSlots && (channel.contains("headset") || channel.contains("usb_audio") || tag.contains("headset"))) return true
         if ("nfc" in selectedSlots && (pkg.contains("nfc") || channel.contains("nfc") || tag.contains("nfc"))) return true
-        if ("alarm_clock" in selectedSlots && n.fullScreenIntent == null && (pkg.contains("clock") || channel.contains("alarm_upcoming") || tag.contains("upcoming_alarm"))) return true
         if (("flashlight" in selectedSlots || "torch" in selectedSlots) && isFlashlightNotification(sbn)) return true
         return false
     }
@@ -851,12 +1248,29 @@ class NotificationProcessor(
     private fun navId(key: String) = "nav:$key"
     private fun liveId(key: String) = "live:$key"
     private fun progressId(key: String) = "progress:$key"
+    private fun clockTimerId(key: String) = "clock-timer:$key"
+    private fun clockStopwatchId(key: String) = "clock-stopwatch:$key"
+    private fun clockAlarmId(key: String) = "clock-alarm:$key"
 
     companion object {
         private const val ICON_PX = 144
         private const val AVATAR_PX = 96
         private const val MAX_SENDERS = 3
         private const val CHIP_SNOOZE_MS = 3_600_000L
+
+        private val CLOCK_PACKAGES = setOf(
+            "com.sec.android.app.clockpackage",
+            "com.samsung.android.app.clockpackage",
+            "com.google.android.deskclock",
+            "com.android.deskclock",
+            "com.coloros.alarmclock",
+            "com.oplus.alarmclock",
+            "com.oneplus.deskclock",
+            "com.android.bbkclock",
+            "com.asus.deskclock",
+            "com.lge.clock",
+        )
+        private val CLOCK_HMS_REGEX = Regex("""\b(\d{1,2}):(\d{2})(?::(\d{2}))?(?:[.,](\d{1,2}))?\b""")
 
         private val DELIVERY_APPS = setOf(
             "in.swiggy.android", "com.application.zomato", "com.ubercab.eats", "com.grofers.customerapp",

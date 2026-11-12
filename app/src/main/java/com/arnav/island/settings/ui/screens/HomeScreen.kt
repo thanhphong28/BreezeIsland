@@ -256,7 +256,7 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
                 NavRow("Device unlock", "Face ID, Fingerprint & Padlock", Icons.Rounded.PhonelinkLock, BadgeColors.Indigo) { ui.go(Dest.UNLOCK) }
                 NavRow("Battery", "Low, full and power saving alerts", Icons.Rounded.BatteryFull, BadgeColors.Teal) { ui.go(Dest.BATTERY) }
                 NavRow("Bluetooth", "Earbuds, headphones, watch, car", Icons.Rounded.Bluetooth, BadgeColors.Blue) { ui.go(Dest.BLUETOOTH) }
-                NavRow("Timers & stopwatch", "Local timers that live in the island", Icons.Rounded.Timer, BadgeColors.Orange) { ui.go(Dest.TIMERS) }
+                NavRow("Timers & stopwatch", "Sync alarms, timers & stopwatch from phone Clock", Icons.Rounded.Timer, BadgeColors.Orange) { ui.go(Dest.TIMERS) }
                 NavRow("Apps", "Per-app rules, motion, fullscreen, Game Mode", Icons.Rounded.Apps, BadgeColors.Yellow) { ui.go(Dest.APPS) }
                 NavRow("Gallery", "Every activity, live, ready to pin", Icons.Rounded.GridView, BadgeColors.Violet) { ui.go(Dest.GALLERY) }
             }

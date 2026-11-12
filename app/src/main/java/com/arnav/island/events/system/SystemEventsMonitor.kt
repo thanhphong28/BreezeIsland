@@ -1,5 +1,6 @@
 package com.arnav.island.events.system
 
+import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.ClipboardManager
@@ -10,20 +11,26 @@ import android.database.ContentObserver
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
+import android.provider.AlarmClock
 import android.provider.Settings
+import android.text.format.DateFormat
 import androidx.core.content.ContextCompat
 import com.arnav.island.events.EntranceAnimation
 import com.arnav.island.events.EventEngine
 import com.arnav.island.events.EventSource
 import com.arnav.island.events.EventType
+import com.arnav.island.events.IslandAction
 import com.arnav.island.events.IslandEvent
 import com.arnav.island.events.SystemKind
 import com.arnav.island.events.SystemPayload
+import com.arnav.island.storage.AppLanguage
 import com.arnav.island.storage.IslandSettings
+import com.arnav.island.util.Launch
+import java.util.Date
 
 /**
  * Small system moments Android exposes publicly: ringer mode, Do Not Disturb, wired headset,
- * rotation lock, hotspot (best effort) and, if enabled, clipboard copies.
+ * rotation lock, hotspot (best effort), system alarm clock changes and, if enabled, clipboard copies.
  */
 class SystemEventsMonitor(
     private val context: Context,
@@ -32,12 +39,14 @@ class SystemEventsMonitor(
 ) {
     private val notifications = context.getSystemService(NotificationManager::class.java)
     private val clipboard = context.getSystemService(ClipboardManager::class.java)
+    private val alarmManager = context.getSystemService(AlarmManager::class.java)
     private val handler = Handler(Looper.getMainLooper())
     private var registered = false
     private var lastKind: SystemKind? = null
     private var lastAt = 0L
     private var lastDndOn: Boolean? = null
     private var lastRotationLocked: Boolean? = null
+    private var lastAlarmTriggerTime: Long = -1L
     private var clipboardRegistered = false
 
     private val receiver = object : BroadcastReceiver() {
@@ -70,8 +79,82 @@ class SystemEventsMonitor(
                         WIFI_AP_STATE_DISABLED -> post(SystemKind.HOTSPOT_OFF, "Hotspot off")
                     }
                 }
+                AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED -> if (s.alarmsEnabled) {
+                    onNextAlarmChanged(s)
+                }
             }
         }
+    }
+
+    private fun onNextAlarmChanged(s: IslandSettings) {
+        val info = try {
+            alarmManager?.nextAlarmClock
+        } catch (_: Exception) {
+            null
+        }
+        val now = System.currentTimeMillis()
+        if (info == null) {
+            lastAlarmTriggerTime = -1L
+            return
+        }
+        val creatorPkg = info.showIntent?.creatorPackage?.lowercase().orEmpty()
+        if (creatorPkg == context.packageName.lowercase()) return
+        val trigger = info.triggerTime
+        if (trigger <= now + 15_000L) return
+        // Ignore duplicate broadcasts for the same alarm minute
+        if (kotlin.math.abs(trigger - lastAlarmTriggerTime) < 30_000L) return
+        lastAlarmTriggerTime = trigger
+
+        val isVi = s.language == AppLanguage.VIETNAMESE
+        val timeStr = DateFormat.getTimeFormat(context).format(Date(trigger))
+        val diffMs = (trigger - now).coerceAtLeast(60_000L)
+        val totalMinutes = ((diffMs + 30_000L) / 60_000L).coerceAtLeast(1L)
+        val days = totalMinutes / (24 * 60)
+        val hours = (totalMinutes % (24 * 60)) / 60
+        val minutes = totalMinutes % 60
+
+        val label = if (isVi) "Báo thức · $timeStr" else "Alarm · $timeStr"
+        val detail = if (isVi) {
+            buildString {
+                append("Đổ chuông sau ")
+                if (days > 0) append("$days ngày ")
+                if (hours > 0) append("$hours giờ ")
+                if (minutes > 0 || (days == 0L && hours == 0L)) append("$minutes phút")
+            }.trim()
+        } else {
+            buildString {
+                append("Rings in ")
+                if (days > 0) append("${days}d ")
+                if (hours > 0) append("${hours}h ")
+                if (minutes > 0 || (days == 0L && hours == 0L)) append("${minutes}m")
+            }.trim()
+        }
+
+        val tap = IslandAction("alarm.open", if (isVi) "Mở Đồng hồ" else "Open Clock") {
+            val opened = info.showIntent?.let { Launch.send(context, it) } ?: false
+            if (!opened) {
+                runCatching {
+                    context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            }
+        }
+
+        engine.post(
+            IslandEvent(
+                id = "system:alarm",
+                source = EventSource.SYSTEM,
+                type = EventType.SYSTEM,
+                timestamp = now,
+                persistent = false,
+                durationMs = 3_400L,
+                title = label,
+                subtitle = detail,
+                tapAction = tap,
+                payload = SystemPayload(SystemKind.ALARM_SET, label, detail),
+                animation = EntranceAnimation.POP,
+                contentKey = trigger.toString(),
+            )
+        )
     }
 
     private val rotationObserver = object : ContentObserver(handler) {
@@ -91,13 +174,15 @@ class SystemEventsMonitor(
 
     fun start() {
         if (registered) return
+        lastAlarmTriggerTime = runCatching { alarmManager?.nextAlarmClock?.triggerTime ?: -1L }.getOrDefault(-1L)
         val filter = IntentFilter().apply {
             addAction(AudioManager.RINGER_MODE_CHANGED_ACTION)
             addAction(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
             addAction(AudioManager.ACTION_HEADSET_PLUG)
             addAction(ACTION_WIFI_AP_STATE_CHANGED)
+            addAction(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED)
         }
-        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
         context.contentResolver.registerContentObserver(Settings.System.getUriFor(Settings.System.ACCELEROMETER_ROTATION), false, rotationObserver)
         lastRotationLocked = readRotationLocked()
         lastDndOn = notifications.currentInterruptionFilter.let { it != NotificationManager.INTERRUPTION_FILTER_ALL && it != NotificationManager.INTERRUPTION_FILTER_UNKNOWN }

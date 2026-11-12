@@ -1,235 +1,240 @@
 package com.arnav.island.settings.ui.screens
 
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
+import android.app.AlarmManager
+import android.content.Context
+import android.content.Intent
+import android.provider.AlarmClock
+import android.text.format.DateFormat
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.AlarmOn
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Timelapse
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.arnav.island.events.timer.StopwatchState
-import com.arnav.island.events.timer.TimerItem
 import com.arnav.island.permissions.PermissionSnapshot
 import com.arnav.island.permissions.Permissions
 import com.arnav.island.settings.ui.Ui
-import com.arnav.island.settings.ui.components.ChipsRow
 import com.arnav.island.settings.ui.components.Group
-import com.arnav.island.settings.ui.components.PermissionRow
+import com.arnav.island.settings.ui.components.InfoCard
 import com.arnav.island.settings.ui.components.SettingsPage
-import com.arnav.island.settings.ui.components.SliderRow
 import com.arnav.island.settings.ui.components.SwitchRow
 import com.arnav.island.settings.ui.theme.BadgeColors
 import com.arnav.island.settings.ui.theme.LocalIslandColors
 import com.arnav.island.settings.ui.tr
+import com.arnav.island.storage.AppLanguage
 import com.arnav.island.storage.IslandSettings
-import com.arnav.island.util.Formatters
+import com.arnav.island.util.Launch
 import kotlinx.coroutines.delay
+import java.util.Date
 
 private val TimerOrange = Color(0xFFFFA23A)
-private val tabular = TextStyle(fontFeatureSettings = "tnum")
 
 @Composable
 fun TimersScreen(s: IslandSettings, p: PermissionSnapshot, ui: Ui) {
     val context = LocalContext.current
-    val state by ui.graph.timers.state.collectAsStateWithLifecycle()
-    var minutes by remember { mutableIntStateOf(5) }
-    var seconds by remember { mutableIntStateOf(0) }
-    var label by remember { mutableStateOf("") }
-    var notificationsGranted by remember(p.postNotifications) { mutableStateOf(p.postNotifications) }
-    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notificationsGranted = it }
-    val now by produceState(System.currentTimeMillis()) {
+    val isVi = s.language == AppLanguage.VIETNAMESE
+    val nextAlarm by produceState<AlarmManager.AlarmClockInfo?>(initialValue = null, context) {
+        val am = context.getSystemService(AlarmManager::class.java)
         while (true) {
-            delay(if (state.stopwatch.running) 50 else 250)
-            value = System.currentTimeMillis()
+            value = runCatching { am?.nextAlarmClock }.getOrNull()
+            delay(2_000L)
         }
     }
 
-    SettingsPage("Timers", onBack = ui::back) {
+    SettingsPage(tr("Timers & stopwatch", "Đồng hồ, Báo thức & Bấm giờ"), onBack = ui::back) {
+        if (!p.notificationAccess) {
+            item {
+                InfoCard(
+                    title = tr("Notification access needed", "Cần cấp Quyền truy cập thông báo"),
+                    body = tr(
+                        "Grant Notification Access so BreezeIsland can sync active Timers, Stopwatch, and Alarms directly from your phone's default Clock app.",
+                        "Cấp Quyền truy cập thông báo để BreezeIsland tự động kết nối và hiển thị trực tiếp Hẹn giờ, Bấm giờ và Báo thức từ ứng dụng Đồng hồ mặc định của điện thoại.",
+                    ),
+                    icon = Icons.Rounded.NotificationsActive,
+                    color = BadgeColors.Orange,
+                    actionLabel = tr("Grant access", "Cấp quyền"),
+                    onAction = { ui.open(Permissions.notificationAccessSettings(context), Permissions.notificationAccessFallback()) },
+                )
+            }
+        }
+
         item {
-            Surface(shape = RoundedCornerShape(28.dp), color = LocalIslandColors.current.card, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Column(Modifier.padding(vertical = 18.dp)) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = LocalIslandColors.current.card,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            ) {
+                Column(Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Alarm, null, tint = TimerOrange)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            tr("System Clock Integration", "Đồng bộ Đồng hồ điện thoại"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    val alarmInfo = nextAlarm
+                    if (alarmInfo != null && alarmInfo.triggerTime > System.currentTimeMillis()) {
+                        val timeStr = DateFormat.getTimeFormat(context).format(Date(alarmInfo.triggerTime))
+                        Text(
+                            if (isVi) "Báo thức kế tiếp: $timeStr" else "Next alarm: $timeStr",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = TimerOrange,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    } else {
+                        Text(
+                            if (isVi) "Chưa có báo thức nào đang bật" else "No upcoming alarm set",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
                     Text(
-                        Formatters.clock(minutes * 60L + seconds),
-                        style = tabular.merge(TextStyle(fontSize = 56.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1).sp)),
-                        color = TimerOrange,
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        tr(
+                            "Start any alarm, timer, or stopwatch inside your phone's Clock app — BreezeIsland automatically displays and controls it right on the Dynamic Island.",
+                            "Khi bạn bật Báo thức, Hẹn giờ hoặc Bấm giờ trong ứng dụng Đồng hồ của điện thoại, BreezeIsland sẽ tự động hiển thị và cho phép điều khiển trực tiếp ngay trên Dynamic Island.",
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    ChipsRow(listOf(1, 3, 5, 10, 15, 25, 45, 60), minutes.takeIf { seconds == 0 } ?: -1, { "$it min" }, { minutes = it; seconds = 0 })
-                    SliderRow("Minutes", minutes.toFloat(), 0f..120f, { minutes = it.toInt() }, { "${it.toInt()}" }, live = true)
-                    SliderRow("Seconds", seconds.toFloat(), 0f..55f, { seconds = it.toInt() }, { "${it.toInt()}" }, steps = 10, live = true)
-                    OutlinedTextField(
-                        value = label,
-                        onValueChange = { label = it.take(24) },
-                        placeholder = { Text(tr("Label (optional)")) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(18.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    )
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(16.dp))
                     Button(
-                        onClick = {
-                            ui.graph.timers.start((minutes * 60L + seconds) * 1000L, label)
-                            label = ""
-                        },
-                        enabled = minutes * 60 + seconds > 0,
+                        onClick = { openPhoneClockApp(context, AlarmClock.ACTION_SHOW_ALARMS, nextAlarm) },
                         colors = ButtonDefaults.buttonColors(containerColor = TimerOrange, contentColor = Color.Black),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(52.dp),
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(18.dp),
                     ) {
-                        Icon(Icons.Rounded.PlayArrow, null)
-                        Spacer(Modifier.width(6.dp))
-                        Text(tr("Start timer"), style = MaterialTheme.typography.titleMedium)
+                        Icon(Icons.Rounded.OpenInNew, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            tr("Open Phone Clock App", "Mở ứng dụng Đồng hồ của máy"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        FilledTonalButton(
+                            onClick = { openPhoneClockApp(context, AlarmClock.ACTION_SHOW_TIMERS, nextAlarm) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Icon(Icons.Rounded.Timer, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text(tr("Timers", "Hẹn giờ"))
+                        }
+                        FilledTonalButton(
+                            onClick = { openPhoneClockApp(context, "android.intent.action.SHOW_STOPWATCH", nextAlarm) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Icon(Icons.Rounded.Timelapse, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text(tr("Stopwatch", "Bấm giờ"))
+                        }
                     }
                 }
             }
         }
-
-        if (state.timers.isNotEmpty()) {
-            item {
-                Group(title = "Running") {
-                    state.timers.forEach { t -> TimerRow(t, now, ui) }
-                }
-            }
-        }
-
-        item { StopwatchCard(state.stopwatch, now, ui) }
 
         item {
-            Group(title = "Island", footer = "Timers keep running with Island closed or after a restart; completion is delivered by Android's alarm service.") {
-                SwitchRow("Show timers", s.timersEnabled, { v -> ui.update { it.copy(timersEnabled = v) } }, null, Icons.Rounded.Timer, BadgeColors.Orange)
-                SwitchRow("Show stopwatch", s.stopwatchEnabled, { v -> ui.update { it.copy(stopwatchEnabled = v) } }, null, Icons.Rounded.Timelapse, BadgeColors.Orange)
-                PermissionRow("Precise alarms", if (p.exactAlarms) "Timers finish to the second" else "Without it, Android may delay the alert slightly in deep sleep", p.exactAlarms, Icons.Rounded.AlarmOn, BadgeColors.Yellow,
-                    onGrant = { ui.open(Permissions.exactAlarmSettings(context)) })
-                PermissionRow("Timer alerts", if (notificationsGranted) "Sound when a timer finishes" else "Allow notifications for the finished-timer sound", notificationsGranted, Icons.Rounded.NotificationsActive, BadgeColors.Red,
-                    onGrant = { notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun TimerRow(t: TimerItem, now: Long, ui: Ui) {
-    val remaining = t.remaining(now)
-    val fraction = if (t.totalMs > 0) remaining.toFloat() / t.totalMs else 0f
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
-            val track = LocalIslandColors.current.cardPressed
-            Canvas(Modifier.size(46.dp)) {
-                val stroke = 4.dp.toPx()
-                drawArc(track, 0f, 360f, false, topLeft = Offset(stroke / 2, stroke / 2), size = Size(size.width - stroke, size.height - stroke), style = Stroke(stroke))
-                drawArc(if (t.paused) Color.Gray else TimerOrange, -90f, 360f * fraction, false, topLeft = Offset(stroke / 2, stroke / 2), size = Size(size.width - stroke, size.height - stroke), style = Stroke(stroke, cap = StrokeCap.Round))
-            }
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                if (t.ringing) tr("Done") else Formatters.countdown(remaining),
-                style = tabular.merge(MaterialTheme.typography.headlineSmall),
-                color = if (t.paused) MaterialTheme.colorScheme.onSurfaceVariant else TimerOrange,
-            )
-            Text(t.label.ifBlank { Formatters.humanDuration(t.totalMs) + " " + tr("timer", "hẹn giờ") }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (!t.ringing) {
-                FilledTonalIconButton(onClick = { ui.graph.timers.togglePause(t.id) }) {
-                    Icon(if (t.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause, if (t.paused) tr("Resume") else tr("Pause"))
-                }
-            }
-            FilledTonalIconButton(onClick = { ui.graph.timers.addMinute(t.id) }) { Icon(Icons.Rounded.Add, "Add one minute") }
-            FilledTonalIconButton(onClick = { ui.graph.timers.cancel(t.id) }) { Icon(Icons.Rounded.Close, if (t.ringing) tr("Stop") else tr("Cancel")) }
-        }
-    }
-}
-
-@Composable
-private fun StopwatchCard(sw: StopwatchState, now: Long, ui: Ui) {
-    Surface(shape = RoundedCornerShape(28.dp), color = LocalIslandColors.current.card, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Column(Modifier.padding(20.dp)) {
-            Text(tr("Stopwatch"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Text(
-                Formatters.stopwatch(sw.elapsed(now)),
-                style = tabular.merge(TextStyle(fontSize = 44.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.5).sp)),
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(
-                    onClick = { ui.graph.timers.stopwatchToggle() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (sw.running) Color(0xFFFF5147) else Color(0xFF3DDC84),
-                        contentColor = Color.Black,
+            Group(
+                title = tr("Dynamic Island Sync", "Hiển thị trên Dynamic Island"),
+                footer = tr(
+                    "All controls (Pause, Resume, Lap, Reset, Dismiss) on the Dynamic Island control your phone's native Clock app directly.",
+                    "Mọi nút bấm (Tạm dừng, Tiếp tục, Vòng chạy, Đặt lại, Tắt báo thức) trên Dynamic Island đều điều khiển trực tiếp ứng dụng Đồng hồ gốc của điện thoại.",
+                ),
+            ) {
+                SwitchRow(
+                    tr("Alarm set & ringing alerts", "Thông báo khi bật Báo thức & Chuông báo"),
+                    s.alarmsEnabled,
+                    { v -> ui.update { it.copy(alarmsEnabled = v) } },
+                    tr(
+                        "Shows remaining time on the island when you toggle an alarm in Clock",
+                        "Hiển thị giờ báo thức và thời gian đổ chuông còn lại trên đảo khi bạn bật báo thức",
                     ),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Icon(if (sw.running) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(tr(if (sw.running) "Stop" else if (sw.accumulatedMs > 0) "Resume" else "Start"))
-                }
-                if (sw.running) {
-                    FilledTonalIconButton(onClick = { ui.graph.timers.stopwatchLap() }) { Icon(Icons.Rounded.Flag, tr("Lap")) }
-                } else if (sw.active) {
-                    FilledTonalIconButton(onClick = { ui.graph.timers.stopwatchReset() }) { Icon(Icons.Rounded.RestartAlt, tr("Reset")) }
-                }
-            }
-            if (sw.laps.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
-                sw.laps.withIndex().reversed().take(6).forEach { (i, lap) ->
-                    val previous = if (i > 0) sw.laps[i - 1] else 0L
-                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                        Text(tr("Lap ${i + 1}"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                        Text(Formatters.stopwatch(lap - previous), style = tabular.merge(MaterialTheme.typography.bodyMedium))
-                    }
-                }
+                    Icons.Rounded.AlarmOn,
+                    BadgeColors.Orange,
+                )
+                SwitchRow(
+                    tr("Sync system Timers", "Đồng bộ Hẹn giờ (Timer) của máy"),
+                    s.timersEnabled,
+                    { v -> ui.update { it.copy(timersEnabled = v) } },
+                    tr(
+                        "Live countdown from your phone's Clock app",
+                        "Hiển thị đếm ngược trực tiếp từ ứng dụng Đồng hồ của điện thoại",
+                    ),
+                    Icons.Rounded.Timer,
+                    BadgeColors.Orange,
+                )
+                SwitchRow(
+                    tr("Sync system Stopwatch", "Đồng bộ Bấm giờ (Stopwatch) của máy"),
+                    s.stopwatchEnabled,
+                    { v -> ui.update { it.copy(stopwatchEnabled = v) } },
+                    tr(
+                        "Live stopwatch & laps from your phone's Clock app",
+                        "Hiển thị bấm giờ và vòng chạy trực tiếp từ ứng dụng Đồng hồ của điện thoại",
+                    ),
+                    Icons.Rounded.Timelapse,
+                    BadgeColors.Orange,
+                )
             }
         }
+    }
+}
+
+private fun openPhoneClockApp(context: Context, action: String, alarmInfo: AlarmManager.AlarmClockInfo?) {
+    val launchedAction = runCatching {
+        context.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    }.getOrDefault(false)
+    if (launchedAction) return
+
+    val showPi = alarmInfo?.showIntent
+    if (showPi != null && Launch.send(context, showPi)) return
+
+    val clockPackages = listOf(
+        "com.sec.android.app.clockpackage",
+        "com.google.android.deskclock",
+        "com.android.deskclock",
+        "com.coloros.alarmclock",
+        "com.oplus.alarmclock",
+        "com.oneplus.deskclock",
+        "com.android.bbkclock",
+    )
+    for (pkg in clockPackages) {
+        if (Launch.openApp(context, pkg)) return
+    }
+    runCatching {
+        context.startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }

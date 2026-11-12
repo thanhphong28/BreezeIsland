@@ -172,6 +172,7 @@ data class NotificationPayload(
 enum class SystemKind {
     RINGER_SILENT, RINGER_VIBRATE, RINGER_NORMAL, DND_ON, DND_OFF, HEADSET_IN, HEADSET_OUT,
     ROTATION_LOCKED, ROTATION_AUTO, HOTSPOT_ON, HOTSPOT_OFF, CLIPBOARD, SCREEN_RECORDING,
+    ALARM_SET,
 }
 
 data class SystemPayload(val kind: SystemKind, val label: String, val detail: String = "") : EventPayload
