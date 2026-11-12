@@ -113,9 +113,6 @@ class EventScheduler(
         }
         if (queue.removeAll { it.event.id == id }) return bump()
         val event = live[id] ?: return false
-        if (event.source == EventSource.TEST) {
-            return remove(id)
-        }
         suppressed[id] = event.contentKey
         rebalance(now)
         return bump()

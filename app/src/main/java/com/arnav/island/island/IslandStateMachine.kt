@@ -95,8 +95,12 @@ class IslandStateMachine {
         return IslandTransition(previous, next, classifyTransition(previous, next))
     }
 
-    private fun stackCandidates(): List<IslandEvent> =
-        schedule.live.filter(::allowed)
+    private fun stackCandidates(): List<IslandEvent> = buildList {
+        schedule.toast
+            ?.takeIf { allowed(it) && it.type != EventType.MASCOT && it.type != EventType.UNLOCK }
+            ?.let(::add)
+        schedule.live.filter(::allowed).forEach(::add)
+    }
 
     private fun derive(): IslandState {
         if (!visible) return IslandState.Hidden

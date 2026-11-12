@@ -3,6 +3,7 @@ package com.arnav.island.island
 import android.graphics.RectF
 import com.arnav.island.events.EventEngine
 import com.arnav.island.events.EventPriority
+import com.arnav.island.events.EventSource
 import com.arnav.island.events.EventType
 import com.arnav.island.events.IslandAction
 import com.arnav.island.events.IslandEvent
@@ -151,7 +152,11 @@ class IslandController(
         }
         if (throwVelocity != null) view.throwAway(throwVelocity)
         event.onDismiss?.invoke?.invoke()
-        engine.dismiss(event.id)
+        if (event.source == EventSource.TEST) {
+            engine.remove(event.id)
+        } else {
+            engine.dismiss(event.id)
+        }
         apply(machine.onDismissed(event.id))
     }
 
