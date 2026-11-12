@@ -87,7 +87,10 @@ class IslandView(
     private var downSlot = IslandScene.Slot.MAIN
     private var downTarget: HitTarget? = null
     private var detentLevel = 0
+    private var maxDetentLevel = 0
     private val detents = FloatArray(2)
+    private val exclusionRect = android.graphics.Rect()
+    private val exclusionList = listOf(exclusionRect)
     private var velocityTracker: VelocityTracker? = null
     private val longPressRunnable = Runnable { onLongPressTimeout() }
 
@@ -190,6 +193,10 @@ class IslandView(
             getLocationOnScreen(location)
             windowOffsetX = location[0]
             windowOffsetY = location[1]
+            if (Build.VERSION.SDK_INT >= 29) {
+                exclusionRect.set(0, 0, right - left, bottom - top)
+                systemGestureExclusionRects = exclusionList
+            }
         }
     }
 
@@ -311,6 +318,7 @@ class IslandView(
                 grabbing = false
                 scrubbing = false
                 detentLevel = 0
+                maxDetentLevel = 0
                 detents[0] = rc.dp(DETENT_EXPAND_DP)
                 detents[1] = rc.dp(DETENT_STACK_DP)
                 downX = x
@@ -411,13 +419,14 @@ class IslandView(
                 feedback(IslandHaptics.Cue.TICK)
             }
             grabbing -> scene.releaseGrab(vx, vy)
-            detentLevel >= 2 -> {
+            detentLevel >= 2 || (maxDetentLevel >= 2 && dy > detents[0]) -> {
                 scene.releaseDrag(0f, vy)
                 host?.onSwipe(Swipe.DOWN_FAR, vy)
             }
             longPressed -> scene.releaseDrag(vx, vy)
             dragging -> {
-                val swipe = if (detentLevel == 1) Swipe.DOWN else classify(dx, dy, vx, vy)
+                val effectiveDown = detentLevel >= 1 || (maxDetentLevel >= 1 && dy > rc.dp(12f))
+                val swipe = if (effectiveDown) Swipe.DOWN else classify(dx, dy, vx, vy)
                 scene.releaseDrag(vx, vy)
                 if (swipe != null) {
                     feedback(if (swipe == Swipe.DOWN) IslandHaptics.Cue.EXPAND else IslandHaptics.Cue.COLLAPSE)
@@ -494,6 +503,7 @@ class IslandView(
             dy >= detents[0] -> 1
             else -> 0
         }
+        if (level > maxDetentLevel) maxDetentLevel = level
         if (level != detentLevel) {
             detentLevel = level
             feedback(IslandHaptics.Cue.NOTCH)
@@ -526,10 +536,10 @@ class IslandView(
 
     companion object {
         const val LONG_PRESS_MS = 380L
-        const val SWIPE_DISTANCE_DP = 26f
-        const val FLING_VELOCITY_DP = 650f
-        const val DETENT_EXPAND_DP = 30f
-        const val DETENT_STACK_DP = 86f
+        const val SWIPE_DISTANCE_DP = 18f
+        const val FLING_VELOCITY_DP = 400f
+        const val DETENT_EXPAND_DP = 22f
+        const val DETENT_STACK_DP = 76f
         const val ANIMATING_LINGER_MS = 700L
         const val MOTION_GRACE_MS = 350L
     }

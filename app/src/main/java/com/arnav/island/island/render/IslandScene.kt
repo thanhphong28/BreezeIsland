@@ -149,6 +149,7 @@ class IslandScene(private val rc: RenderContext) {
     private var customHighlightAlpha = -1
     private val tmpRect = RectF()
     private val heroRect = RectF()
+    private val tmpTouchRect = RectF()
 
     /** Displayed geometry this frame (screen px). */
     val shapeRect = RectF()
@@ -583,6 +584,29 @@ class IslandScene(private val rc: RenderContext) {
         height.impulse(vy * 0.5f)
     }
 
+    /**
+     * Writes the active touchable rectangle (in screen coordinates) into [out].
+     * For Idle, Compact, Split, and Toast states, the horizontal touch corridor in the center is
+     * fixed to at least the full Compact Island width so that:
+     *  - Left status bar area opens Notifications;
+     *  - Right status bar area opens Quick Settings Panel;
+     *  - Center Island area always grabs BreezeIsland reliably.
+     */
+    fun touchCorridor(touchExtension: Float, out: RectF) {
+        val compact = geometry.compactFrame()
+        val centerHalfW = max(compact.width / 2f, rc.dp(76f))
+        val fixedLeft = geometry.anchorX - centerHalfW - rc.dp(8f)
+        val fixedRight = geometry.anchorX + centerHalfW + rc.dp(8f)
+
+        var left = min(shapeRect.left - rc.dp(6f), fixedLeft)
+        var right = max(shapeRect.right + rc.dp(6f), fixedRight)
+        if (isBubbleVisible) {
+            left = min(left, bubbleRect.left - rc.dp(6f))
+            right = max(right, bubbleRect.right + rc.dp(6f))
+        }
+        out.set(left, 0f, right, touchBottom(touchExtension))
+    }
+
     /** Hit test in screen coordinates. */
     fun hitTest(x: Float, y: Float, touchExtension: Float): Hit? {
         if (!isVisible || state == IslandState.Hidden) return null
@@ -590,10 +614,8 @@ class IslandScene(private val rc: RenderContext) {
             val r = bubbleRect.width() / 2f + rc.dp(6f)
             if (hypot(x - bubbleRect.centerX(), y - bubbleRect.centerY()) <= r) return Hit(Slot.BUBBLE, null)
         }
-        val leftBound = if (state == IslandState.Idle) min(shapeRect.left, geometry.anchorX - geometry.holeRadius) - rc.dp(20f) else shapeRect.left - rc.dp(6f)
-        val rightBound = if (state == IslandState.Idle) max(shapeRect.right, geometry.anchorX + geometry.holeRadius) + rc.dp(20f) else shapeRect.right + rc.dp(6f)
-        val topBound = if (state == IslandState.Idle) 0f else shapeRect.top - rc.dp(4f)
-        if (x < leftBound || x > rightBound || y < topBound || y > touchBottom(touchExtension)) {
+        touchCorridor(touchExtension, tmpTouchRect)
+        if (!tmpTouchRect.contains(x, y)) {
             return null
         }
         val layer = mainLayer
@@ -607,17 +629,19 @@ class IslandScene(private val rc: RenderContext) {
 
     /** True for states that sit inside the status bar and need a touch strip below it. */
     val usesTouchStrip: Boolean
-        get() = state is IslandState.Compact || state is IslandState.Split ||
-            (state is IslandState.Toast && mainMode == PresentMode.TOAST && target.bottom <= rc.statusBarBottom + rc.dp(4f))
+        get() = state == IslandState.Idle || state is IslandState.Compact || state is IslandState.Split ||
+            (state is IslandState.Toast && mainMode == PresentMode.TOAST)
 
     /**
-     * Lowest touchable y for the island. Compact states get a strip of [touchExtension] below the
-     * status bar (or below the pill in fullscreen apps); other states only their own bounds.
+     * Lowest touchable y for the island. Compact & Idle states get a strip of [touchExtension]
+     * below the status bar (or below the pill in fullscreen apps); other states their own bounds.
      */
     fun touchBottom(touchExtension: Float): Float = when {
-        usesTouchStrip -> max(shapeRect.bottom, rc.statusBarBottom) + touchExtension
-        state == IslandState.Idle -> max(shapeRect.bottom, geometry.cameraY + geometry.holeRadius) + rc.dp(12f)
-        else -> shapeRect.bottom + rc.dp(6f)
+        usesTouchStrip -> {
+            val base = max(max(shapeRect.bottom, target.bottom), max(geometry.compactFrame().bottom, rc.statusBarBottom))
+            base + max(touchExtension, rc.dp(24f))
+        }
+        else -> max(shapeRect.bottom, target.bottom) + rc.dp(10f)
     }
 
     /** Converts a screen x into a 0..1 position along a hit target (seek bars, sliders). */
@@ -1176,14 +1200,8 @@ class IslandScene(private val rc: RenderContext) {
         computeDisplayedShape()
         out.set(shapeRect)
         out.union(target.left, target.top, target.right, target.bottom)
-        if (state == IslandState.Idle) {
-            out.union(
-                geometry.anchorX - geometry.holeRadius - rc.dp(20f),
-                0f,
-                geometry.anchorX + geometry.holeRadius + rc.dp(20f),
-                geometry.cameraY + geometry.holeRadius + rc.dp(12f),
-            )
-        }
+        touchCorridor(geometry.touchExtension, tmpTouchRect)
+        out.union(tmpTouchRect)
         if (isBubbleVisible || bubbleWanted) {
             out.union(bubbleRect)
             bubbleTarget?.let { out.union(it.left, it.top, it.right, it.bottom) }

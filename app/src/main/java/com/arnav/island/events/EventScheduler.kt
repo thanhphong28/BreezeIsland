@@ -118,6 +118,25 @@ class EventScheduler(
         return bump()
     }
 
+    /** True when at least one active live activity (e.g. Media, Timer) is currently dismissed/hidden. */
+    fun hasSuppressedLive(): Boolean = suppressed.keys.any { live.containsKey(it) }
+
+    /**
+     * Restores all live activities that the user previously swiped away, returning the primary
+     * restored event's ID (or null if nothing was suppressed).
+     */
+    fun restoreSuppressed(): String? {
+        val restoredIds = suppressed.keys.filter { live.containsKey(it) }
+        if (restoredIds.isEmpty()) {
+            suppressed.clear()
+            return null
+        }
+        suppressed.clear()
+        rebalance(clock())
+        bump()
+        return sortedLive().firstOrNull { it.id in restoredIds }?.id ?: restoredIds.first()
+    }
+
     /** Freezes the toast countdown while the user is touching or reading the island. */
     fun setHeld(held: Boolean): Boolean {
         val now = clock()

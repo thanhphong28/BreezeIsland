@@ -219,16 +219,50 @@ class IslandController(
         if (action.collapses) collapse() else scheduleAutoCollapse()
     }
 
+    /** Restores any live activity (e.g. Music) that was previously swiped away. */
+    fun restoreSuppressed(expandRestored: Boolean = false): Boolean {
+        val restoredId = engine.restoreSuppressed() ?: return false
+        apply(machine.onSchedule(engine.current()))
+        if (expandRestored && settings.swipeDownExpands) {
+            expand(restoredId)
+        }
+        return true
+    }
+
     override fun onSwipe(direction: IslandView.Swipe, velocity: Float) {
         val st = machine.state
+        if (st == IslandState.Idle) {
+            when (direction) {
+                IslandView.Swipe.DOWN, IslandView.Swipe.DOWN_FAR -> {
+                    if (!restoreSuppressed(expandRestored = true)) {
+                        if (settings.mascotEnabled && settings.mascotTapToSummon) {
+                            mascotProvider?.invoke(false)
+                        } else if (settings.glanceEnabled) {
+                            showGlance()
+                        }
+                    }
+                }
+                IslandView.Swipe.LEFT, IslandView.Swipe.RIGHT -> {
+                    restoreSuppressed(expandRestored = false)
+                }
+                IslandView.Swipe.UP -> Unit
+            }
+            return
+        }
         val event = st.focusEvent ?: return
         when (direction) {
             IslandView.Swipe.DOWN -> when {
                 // Pulling down on an open card reveals every running activity.
-                st is IslandState.Expanded -> showStack()
+                st is IslandState.Expanded -> {
+                    engine.restoreSuppressed()
+                    showStack()
+                }
                 settings.swipeDownExpands && !st.isLarge -> expand(event.id)
             }
-            IslandView.Swipe.DOWN_FAR -> if (!showStack() && settings.swipeDownExpands && !st.isLarge) expand(event.id)
+            IslandView.Swipe.DOWN_FAR -> {
+                engine.restoreSuppressed()
+                if (!showStack() && settings.swipeDownExpands && !st.isLarge) expand(event.id)
+            }
             IslandView.Swipe.UP -> when (st) {
                 is IslandState.Expanded, is IslandState.Stack -> collapse()
                 is IslandState.Toast -> dismiss(event)

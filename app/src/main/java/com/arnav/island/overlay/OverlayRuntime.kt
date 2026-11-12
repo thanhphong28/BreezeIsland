@@ -248,16 +248,9 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         if (window.attached && !view.isAttachedToWindow) {
             window.detach()
         }
-        val compact = rc.geometry.compactFrame()
-        val margin = rc.dp(8f)
-        window.attach(
-            Rect(
-                (compact.left - margin).toInt().coerceAtLeast(0),
-                0,
-                (compact.right + margin).toInt(),
-                (compact.bottom + rc.geometry.touchExtension + margin).toInt(),
-            )
-        )
+        view.scene.touchCorridor(rc.geometry.touchExtension, neededF)
+        OverlayWindow.toRect(neededF, rc.geometry.screen.widthPx, rc.geometry.screen.heightPx, neededRect)
+        window.attach(neededRect)
         windowRect.set(window.bounds)
         probe.attach()
         graph.runtime.update { it.copy(overlayAttached = window.attached) }
@@ -519,14 +512,20 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         if (hiddenReason == null && view.visibility != View.VISIBLE) {
             view.visibility = View.VISIBLE
         }
-        val marginX = rc.dp(40f) + max(bounds.width(), scene.target.width) * 0.15f
-        val marginY = rc.dp(32f) + max(bounds.height(), scene.target.height) * 0.15f
-        val minLeft = min(bounds.left, scene.target.left)
-        val maxRight = max(bounds.right, scene.target.right)
-        val maxBottom = max(bounds.bottom, scene.target.bottom)
-        // Room for spring overshoot, plus the touch strip in compact states.
-        val bottom = max(maxBottom + marginY, scene.touchBottom(g.touchExtension))
-        neededF.set(minLeft - marginX, 0f, maxRight + marginX, bottom)
+        if (!settled) {
+            val marginX = rc.dp(40f) + max(bounds.width(), scene.target.width) * 0.15f
+            val marginY = rc.dp(32f) + max(bounds.height(), scene.target.height) * 0.15f
+            val minLeft = min(bounds.left, scene.target.left)
+            val maxRight = max(bounds.right, scene.target.right)
+            val maxBottom = max(bounds.bottom, scene.target.bottom)
+            val bottom = max(maxBottom + marginY, scene.touchBottom(g.touchExtension))
+            neededF.set(minLeft - marginX, 0f, maxRight + marginX, bottom)
+        } else {
+            scene.touchCorridor(g.touchExtension, neededF)
+            if (scene.state.isLarge || rc.settings.theme == com.arnav.island.storage.IslandTheme.CUSTOM) {
+                neededF.union(bounds)
+            }
+        }
         OverlayWindow.toRect(neededF, g.screen.widthPx, g.screen.heightPx, neededRect)
         if (neededRect.isEmpty) return
 
@@ -606,6 +605,6 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
     private companion object {
         const val GLANCE_ID = "glance"
         const val GLANCE_MS = 5_000L
-        const val WINDOW_SHRINK_DELAY_MS = 1_200L
+        const val WINDOW_SHRINK_DELAY_MS = 450L
     }
 }

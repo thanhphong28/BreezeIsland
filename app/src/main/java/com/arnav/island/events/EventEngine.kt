@@ -41,6 +41,15 @@ class EventEngine(
 
     fun dismiss(id: String) = mutate { scheduler.dismiss(id) }
 
+    fun hasSuppressedLive(): Boolean = synchronized(lock) { scheduler.hasSuppressedLive() }
+
+    /** Restores any swiped-away live activities (such as Music) and returns the primary restored event ID. */
+    fun restoreSuppressed(): String? = synchronized(lock) {
+        val restoredId = scheduler.restoreSuppressed()
+        if (restoredId != null) publishLocked()
+        restoredId
+    }
+
     fun hold(held: Boolean) = mutate { scheduler.setHeld(held) }
 
     fun clear() = mutate {
