@@ -98,6 +98,9 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
     private val calendar = CalendarMonitor(service, graph.events, scope, settingsFn)
     private val screenshots = ScreenshotMonitor(service, graph.events, graph.images, scope, settingsFn)
     private val unlock = com.arnav.island.events.system.UnlockMonitor(service, graph.events, scope, settingsFn)
+    private val mascot = com.arnav.island.events.system.MascotMonitor(graph.events, scope, settingsFn) {
+        controller.state == IslandState.Idle
+    }
 
     /** Android's animator duration scale (Developer options); motion follows it like system UI. */
     private var systemAnimationScale = readAnimationScale()
@@ -160,6 +163,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
             syncStatusBar()
         }
         controller.glanceProvider = ::buildGlance
+        controller.mascotProvider = { nextMood -> mascot.summon(nextMood = nextMood) }
         controller.start()
         controller.updateSettings(settings)
 
@@ -184,6 +188,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
                     IslandCommand.Collapse -> controller.collapse()
                     IslandCommand.Glance -> controller.showGlance()
                     IslandCommand.Stack -> controller.showStack()
+                    is IslandCommand.SummonMascot -> mascot.summon(nextMood = true, forcedMood = command.mood)
                 }
             }
         }
@@ -279,6 +284,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         calendar.stop()
         screenshots.stop()
         unlock.stop()
+        mascot.stop()
         tilt.setActive(false)
         sounds.release()
         controller.stop()
@@ -385,6 +391,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
             settings.appRules.values.any { it.visibility != AppVisibility.NORMAL || it.motionPreset != null }
         foreground.setActive(usable && needsForeground)
         stats.setActive(usable && settings.monitorEnabled)
+        mascot.setActive(usable)
     }
 
     private fun rebuildGeometry(immediate: Boolean) {

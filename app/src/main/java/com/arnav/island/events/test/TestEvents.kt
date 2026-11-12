@@ -42,6 +42,8 @@ import com.arnav.island.events.TimerPayload
 import com.arnav.island.events.TorchPayload
 import com.arnav.island.events.UnlockMethod
 import com.arnav.island.events.UnlockPayload
+import com.arnav.island.events.MascotMood
+import com.arnav.island.events.system.MascotMonitor
 import com.arnav.island.island.render.presenters.CalendarPresenter
 import com.arnav.island.island.render.presenters.CallPresenter
 import com.arnav.island.island.render.presenters.MediaPresenter
@@ -74,6 +76,22 @@ class TestEvents(private val engine: EventEngine, private val images: ImageStore
     private var mediaTrack = 1
     private var mediaVolume = 0.6f
     private var mediaRich = true
+    private var mascotSeed = 0
+    private var mascotInteraction = 0
+
+    fun mascot(mood: MascotMood = MascotMood.AUTO, durationMs: Long = 4_500L) {
+        mascotSeed++
+        mascotInteraction++
+        engine.post(
+            MascotMonitor.buildEvent(
+                mood = mood,
+                seed = mascotSeed,
+                interactiveCount = mascotInteraction,
+                durationMs = durationMs,
+                source = EventSource.TEST,
+            )
+        )
+    }
 
     /** [rich] adds up next, output and volume to the card (small previews leave them out). */
     fun music(playing: Boolean = true, rich: Boolean = true) {

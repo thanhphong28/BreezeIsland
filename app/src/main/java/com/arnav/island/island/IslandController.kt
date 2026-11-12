@@ -44,6 +44,9 @@ class IslandController(
     /** Builds the Glance card for a long-press on the idle island (null: feature unavailable). */
     var glanceProvider: (() -> IslandEvent?)? = null
 
+    /** Summons or interacts with the Breeze Mascot on tap (parameter: true = cycle mood). */
+    var mascotProvider: ((Boolean) -> Boolean)? = null
+
     val state: IslandState get() = machine.state
 
     fun start() {
@@ -163,7 +166,17 @@ class IslandController(
 
     override fun onTap(slot: IslandScene.Slot) {
         val st = machine.state
+        if (st == IslandState.Idle) {
+            if (settings.mascotEnabled && settings.mascotTapToSummon) {
+                mascotProvider?.invoke(false)
+            }
+            return
+        }
         val event = slotEvent(slot) ?: return
+        if (event.type == EventType.MASCOT) {
+            mascotProvider?.invoke(true)
+            return
+        }
         if (slot == IslandScene.Slot.BUBBLE) {
             expand(event.id)
             return

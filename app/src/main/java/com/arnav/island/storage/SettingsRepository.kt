@@ -15,6 +15,7 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.arnav.island.animation.MotionPreset
+import com.arnav.island.events.MascotMood
 import com.arnav.island.events.NotificationPrivacy
 import com.arnav.island.util.Diagnostics
 import kotlinx.coroutines.CoroutineScope
@@ -214,6 +215,12 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val unlockAnimation = booleanPreferencesKey("unlock_animation_enabled")
         val unlockMethodPref = stringPreferencesKey("unlock_method_preference")
         val unlockDuration = longPreferencesKey("unlock_duration_ms")
+        val mascotEnabled = booleanPreferencesKey("mascot_enabled")
+        val mascotTapToSummon = booleanPreferencesKey("mascot_tap_to_summon")
+        val mascotPeriodicEnabled = booleanPreferencesKey("mascot_periodic_enabled")
+        val mascotIntervalMinutes = intPreferencesKey("mascot_interval_min")
+        val mascotDurationMs = longPreferencesKey("mascot_duration_ms")
+        val mascotMood = stringPreferencesKey("mascot_mood")
         val liveUpdatesEnabled = booleanPreferencesKey("live_updates_enabled")
         val chargeCoach = booleanPreferencesKey("charge_coach")
         val chargeLimit = intPreferencesKey("charge_limit")
@@ -355,6 +362,12 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             unlockAnimationEnabled = p[K.unlockAnimation] ?: d.unlockAnimationEnabled,
             unlockMethodPreference = p[K.unlockMethodPref] ?: d.unlockMethodPreference,
             unlockDurationMs = p[K.unlockDuration] ?: d.unlockDurationMs,
+            mascotEnabled = p[K.mascotEnabled] ?: d.mascotEnabled,
+            mascotTapToSummon = p[K.mascotTapToSummon] ?: d.mascotTapToSummon,
+            mascotPeriodicEnabled = p[K.mascotPeriodicEnabled] ?: d.mascotPeriodicEnabled,
+            mascotIntervalMinutes = p[K.mascotIntervalMinutes] ?: d.mascotIntervalMinutes,
+            mascotDurationMs = p[K.mascotDurationMs] ?: d.mascotDurationMs,
+            mascotMood = p.enum(K.mascotMood, d.mascotMood),
             liveUpdatesEnabled = p[K.liveUpdatesEnabled] ?: d.liveUpdatesEnabled,
             chargeCoach = p[K.chargeCoach] ?: d.chargeCoach,
             chargeLimit = p[K.chargeLimit] ?: d.chargeLimit,
@@ -479,6 +492,12 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.unlockAnimation] = s.unlockAnimationEnabled
         p[K.unlockMethodPref] = s.unlockMethodPreference
         p[K.unlockDuration] = s.unlockDurationMs
+        p[K.mascotEnabled] = s.mascotEnabled
+        p[K.mascotTapToSummon] = s.mascotTapToSummon
+        p[K.mascotPeriodicEnabled] = s.mascotPeriodicEnabled
+        p[K.mascotIntervalMinutes] = s.mascotIntervalMinutes
+        p[K.mascotDurationMs] = s.mascotDurationMs
+        p[K.mascotMood] = s.mascotMood.name
         p[K.liveUpdatesEnabled] = s.liveUpdatesEnabled
         p[K.chargeCoach] = s.chargeCoach
         p[K.chargeLimit] = s.chargeLimit

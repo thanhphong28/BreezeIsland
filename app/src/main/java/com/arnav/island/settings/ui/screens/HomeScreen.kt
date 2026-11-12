@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.CenterFocusStrong
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Crop169
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Layers
@@ -171,6 +172,7 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
                 demo = false
                 val p = preview ?: return@DemoChips
                 when (pick) {
+                    "Mascot" -> p.tests.mascot(settings.mascotMood, settings.mascotDurationMs)
                     "Music" -> p.tests.music(true, rich = false)
                     "Charging" -> p.tests.charging(settings.chargingTheme)
                     "Timer" -> p.tests.timer(5)
@@ -236,6 +238,7 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
 
         item {
             Group(title = "Island") {
+                NavRow("Breeze Mascot", "Thú cưng Aurora dễ thương · chạm camera lúc nghỉ", Icons.Rounded.EmojiEmotions, BadgeColors.Cyan) { ui.go(Dest.MASCOT) }
                 NavRow("Breeze Sound Island (Edge)", "Liquid Glass volume, silent & work mode edge notch", Icons.AutoMirrored.Rounded.VolumeUp, BadgeColors.Orange) { ui.go(Dest.SOUND_ISLAND) }
                 NavRow("Blend with One UI 9 (Z Flip5)", "Seamless status bar, Now Bar fix & pop-up replacement", Icons.Rounded.PhoneAndroid, BadgeColors.Blue) { ui.go(Dest.BLEND) }
                 NavRow("Shape & motion", "Size, corners, springs, split island", Icons.Rounded.Crop169, BadgeColors.Graphite) { ui.go(Dest.ISLAND) }
@@ -322,6 +325,7 @@ private data class DemoChip(val label: String, val icon: ImageVector)
 @Composable
 private fun DemoChips(onPick: (String) -> Unit) {
     val chips = listOf(
+        DemoChip("Mascot", Icons.Rounded.EmojiEmotions),
         DemoChip("Music", Icons.Rounded.MusicNote),
         DemoChip("Charging", Icons.Rounded.BatteryChargingFull),
         DemoChip("Timer", Icons.Rounded.Timer),

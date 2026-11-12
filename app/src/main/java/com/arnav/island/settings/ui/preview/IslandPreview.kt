@@ -76,6 +76,10 @@ class PreviewIsland(context: Context, graph: AppGraph) {
     private var laidOut = false
 
     fun start() {
+        controller.mascotProvider = { _ ->
+            tests.mascot(settings.mascotMood, settings.mascotDurationMs)
+            true
+        }
         controller.start()
     }
 

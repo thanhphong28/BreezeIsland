@@ -92,4 +92,5 @@ sealed interface IslandCommand {
     data object Collapse : IslandCommand
     data object Glance : IslandCommand
     data object Stack : IslandCommand
+    data class SummonMascot(val mood: com.arnav.island.events.MascotMood? = null) : IslandCommand
 }

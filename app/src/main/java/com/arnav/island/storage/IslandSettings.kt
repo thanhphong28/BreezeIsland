@@ -3,6 +3,7 @@ package com.arnav.island.storage
 import com.arnav.island.animation.MotionPreset
 import com.arnav.island.animation.MotionProfile
 import com.arnav.island.events.ChargingTheme
+import com.arnav.island.events.MascotMood
 import com.arnav.island.events.NotificationPrivacy
 import com.arnav.island.island.GeometryConfig
 import com.arnav.island.island.IdleStyle
@@ -174,6 +175,14 @@ data class IslandSettings(
     val unlockAnimationEnabled: Boolean = true,
     val unlockMethodPreference: String = "auto",
     val unlockDurationMs: Long = 1800L,
+
+    // Breeze Mascot (Interactive & periodic notch companion)
+    val mascotEnabled: Boolean = true,
+    val mascotTapToSummon: Boolean = true,
+    val mascotPeriodicEnabled: Boolean = true,
+    val mascotIntervalMinutes: Int = 15,
+    val mascotDurationMs: Long = 4500L,
+    val mascotMood: MascotMood = MascotMood.AUTO,
 
     // Multi-activity
     val splitEnabled: Boolean = true,

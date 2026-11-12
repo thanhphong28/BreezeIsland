@@ -105,6 +105,9 @@ enum class EventType(val defaultPriority: EventPriority) {
     /** Device unlock event (Face ID, Fingerprint, Lock/Password). */
     UNLOCK(EventPriority.CHARGING),
 
+    /** Breeze Mascot (interactive & periodic notch companion). */
+    MASCOT(EventPriority.NOTIFICATION),
+
     /** Synthetic: the stack of every running activity (never posted by a source). */
     STACK(EventPriority.BACKGROUND_ACTIVITY),
 }

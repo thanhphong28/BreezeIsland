@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.BubbleChart
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeliveryDining
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.Flare
 import androidx.compose.material.icons.rounded.FlashlightOn
@@ -395,6 +396,14 @@ fun WhatsNewScreen(s: IslandSettings, ui: Ui) {
 
     val releases = remember {
         listOf(
+            Release("2.1.0", "Breeze Mascot — Thú cưng Aurora trên Dynamic Island", listOf(
+                Feature("Breeze Mascot (Aurora Notch Pet)", "Đôi mắt phát sáng dễ thương cùng dải hào quang Aurora dưới camera với 5 biểu cảm sống động.", Icons.Rounded.EmojiEmotions, BadgeColors.Cyan, opens = Dest.MASCOT) { p ->
+                    p.tests.mascot()
+                },
+                Feature("Chạm vào Camera lúc nghỉ & Tự động xuất hiện", "Chạm nhẹ vào vùng camera khi Island đang nghỉ để gọi Mascot ra chơi, hoặc hẹn chu kỳ tự xuất hiện khi dùng máy.", Icons.Rounded.PanTool, BadgeColors.Violet, opens = Dest.MASCOT) { p ->
+                    p.tests.mascot()
+                },
+            )),
             Release("2.0.0", "3D Biometric Unlock & Milestone Fluid Motion", listOf(
                 Feature("3D Biometric Flip Squircle", "Holographic 3D Fingerprint that flips in perspective 3D space into the golden open padlock.", Icons.Rounded.PhonelinkLock, BadgeColors.Indigo, opens = Dest.UNLOCK) { p ->
                     p.tests.unlockFingerprint()

@@ -244,6 +244,21 @@ data class GlancePayload(
 /** Every running activity, shown as a stack of cards. */
 data class StackPayload(val items: List<IslandEvent>) : EventPayload
 
+enum class MascotMood(val label: String) {
+    AUTO("Ngẫu nhiên"),
+    HAPPY("Vui vẻ"),
+    WINK("Tinh nghịch"),
+    LOVE("Đáng yêu"),
+    EXCITED("Hào hứng"),
+    SLEEPY("Thư giãn"),
+}
+
+data class MascotPayload(
+    val mood: MascotMood = MascotMood.HAPPY,
+    val seed: Int = 0,
+    val interactiveCount: Int = 0,
+) : EventPayload
+
 enum class UnlockMethod {
     FACE,
     FINGERPRINT,

@@ -332,6 +332,7 @@ class IslandScene(private val rc: RenderContext) {
         presenter.bind(event, mode, frame.width, frame.height)
         val gate = when {
             immediate -> 0f
+            event.type == EventType.MASCOT -> 0.18f
             kind == TransitionKind.UPDATE || kind == TransitionKind.SWAP && current?.presenter?.mode == mode -> 0.15f
             mode == PresentMode.EXPANDED || mode == PresentMode.TOAST -> 0.55f
             else -> 0.4f
@@ -589,7 +590,10 @@ class IslandScene(private val rc: RenderContext) {
             val r = bubbleRect.width() / 2f + rc.dp(6f)
             if (hypot(x - bubbleRect.centerX(), y - bubbleRect.centerY()) <= r) return Hit(Slot.BUBBLE, null)
         }
-        if (x < shapeRect.left - rc.dp(6f) || x > shapeRect.right + rc.dp(6f) || y < shapeRect.top - rc.dp(4f) || y > touchBottom(touchExtension)) {
+        val leftBound = if (state == IslandState.Idle) min(shapeRect.left, geometry.anchorX - geometry.holeRadius) - rc.dp(20f) else shapeRect.left - rc.dp(6f)
+        val rightBound = if (state == IslandState.Idle) max(shapeRect.right, geometry.anchorX + geometry.holeRadius) + rc.dp(20f) else shapeRect.right + rc.dp(6f)
+        val topBound = if (state == IslandState.Idle) 0f else shapeRect.top - rc.dp(4f)
+        if (x < leftBound || x > rightBound || y < topBound || y > touchBottom(touchExtension)) {
             return null
         }
         val layer = mainLayer
@@ -612,7 +616,7 @@ class IslandScene(private val rc: RenderContext) {
      */
     fun touchBottom(touchExtension: Float): Float = when {
         usesTouchStrip -> max(shapeRect.bottom, rc.statusBarBottom) + touchExtension
-        state == IslandState.Idle -> shapeRect.bottom + rc.dp(2f)
+        state == IslandState.Idle -> max(shapeRect.bottom, geometry.cameraY + geometry.holeRadius) + rc.dp(12f)
         else -> shapeRect.bottom + rc.dp(6f)
     }
 
@@ -979,7 +983,9 @@ class IslandScene(private val rc: RenderContext) {
     /** Draws one main layer relative to the shape's top-left (the canvas is already there). */
     private fun drawLayer(canvas: Canvas, layer: Layer, w: Float, h: Float, a: Float, now: Long) {
         val p = layer.presenter
-        if (isCard(p)) {
+        if (p is com.arnav.island.island.render.presenters.MascotPresenter) {
+            p.draw(canvas, w, h, a, now)
+        } else if (isCard(p)) {
             canvas.save()
             canvas.translate((w - p.layoutW) / 2f + tiltX.value, tiltY.value)
             val s = contentScale(layer)
@@ -1170,6 +1176,14 @@ class IslandScene(private val rc: RenderContext) {
         computeDisplayedShape()
         out.set(shapeRect)
         out.union(target.left, target.top, target.right, target.bottom)
+        if (state == IslandState.Idle) {
+            out.union(
+                geometry.anchorX - geometry.holeRadius - rc.dp(20f),
+                0f,
+                geometry.anchorX + geometry.holeRadius + rc.dp(20f),
+                geometry.cameraY + geometry.holeRadius + rc.dp(12f),
+            )
+        }
         if (isBubbleVisible || bubbleWanted) {
             out.union(bubbleRect)
             bubbleTarget?.let { out.union(it.left, it.top, it.right, it.bottom) }
