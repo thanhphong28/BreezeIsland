@@ -173,6 +173,7 @@ data class IslandSettings(
 
     // Unlock animation (Face ID, Fingerprint, Padlock)
     val unlockAnimationEnabled: Boolean = true,
+    val unlockInAppBiometricEnabled: Boolean = true,
     val unlockMethodPreference: String = "auto",
     val unlockDurationMs: Long = 2050L,
 

@@ -321,7 +321,12 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         torch.refresh()
         calendar.start()
         screenshots.start()
-        if (s.unlockAnimationEnabled) unlock.start() else unlock.stop()
+        if (s.unlockAnimationEnabled) {
+            unlock.start()
+            unlock.refreshWatchers()
+        } else {
+            unlock.stop()
+        }
         graph.timers.resync()
         if (s.bluetoothEnabled && bluetooth.hasPermission()) bluetooth.start() else bluetooth.stop()
         if (s.debugHud) showHud() else hideHud()

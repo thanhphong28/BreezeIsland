@@ -51,14 +51,56 @@ object OnPhoneGranter {
         false
     }
 
+    fun hasReadLogsPermission(context: Context): Boolean =
+        context.checkSelfPermission(android.Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED
+
     /**
-     * Grants `WRITE_SECURE_SETTINGS` and `WRITE_SETTINGS` directly on the phone with 1 tap.
+     * Silently grants `READ_LOGS` and `PACKAGE_USAGE_STATS` if Shizuku is already running and authorized.
+     */
+    fun tryAutoGrantBiometricPermissions(context: Context) {
+        if (hasReadLogsPermission(context)) return
+        if (!isShizukuRunning()) return
+        try {
+            if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+                val pkg = context.packageName
+                Thread {
+                    runShizukuShell(
+                        "pm grant $pkg android.permission.READ_LOGS 2>/dev/null; " +
+                            "pm grant $pkg android.permission.PACKAGE_USAGE_STATS 2>/dev/null; " +
+                            "appops set $pkg GET_USAGE_STATS allow 2>/dev/null"
+                    )
+                }.start()
+            }
+        } catch (_: Throwable) {
+        }
+    }
+
+    /** Runs a command through Shizuku and returns its Process if Shizuku is running & permitted. */
+    fun openShizukuProcess(command: String): Process? = try {
+        if (!isShizukuRunning() || Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+            null
+        } else {
+            val method = Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java,
+            )
+            method.isAccessible = true
+            method.invoke(null, arrayOf("sh", "-c", command), null, null) as? Process
+        }
+    } catch (_: Throwable) {
+        null
+    }
+
+    /**
+     * Grants `WRITE_SECURE_SETTINGS`, `WRITE_SETTINGS`, and `READ_LOGS` directly on the phone with 1 tap.
      */
     fun grantOnPhone(context: Context, onResult: (Status) -> Unit = {}) {
         val appContext = context.applicationContext
-        if (StatusBarCleanup.canWrite(appContext) && StatusBarCleanup.canWriteSystem(appContext)) {
+        if (StatusBarCleanup.canWrite(appContext) && StatusBarCleanup.canWriteSystem(appContext) && hasReadLogsPermission(appContext)) {
             applyAllSettings(appContext)
-            toast(appContext, vi = "Đã kích hoạt quyền hiển thị đè lên trên thanh trạng thái!", en = "Top-most status bar permission is active!")
+            toast(appContext, vi = "Đã kích hoạt đầy đủ quyền hệ thống & nhận diện vân tay!", en = "System & fingerprint detection permissions are active!")
             onResult(Status.ALREADY_GRANTED)
             return
         }
@@ -128,6 +170,7 @@ object OnPhoneGranter {
             val pkg = context.packageName
             val cmd = buildString {
                 append("pm grant $pkg android.permission.WRITE_SECURE_SETTINGS; ")
+                append("pm grant $pkg android.permission.READ_LOGS 2>/dev/null; ")
                 append("pm grant $pkg android.permission.PACKAGE_USAGE_STATS 2>/dev/null; ")
                 append("appops set $pkg WRITE_SETTINGS allow 2>/dev/null; ")
                 append("appops set $pkg SYSTEM_ALERT_WINDOW allow 2>/dev/null; ")

@@ -213,6 +213,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val torchEnabled = booleanPreferencesKey("torch_enabled")
         val screenshotPreview = booleanPreferencesKey("screenshot_preview")
         val unlockAnimation = booleanPreferencesKey("unlock_animation_enabled")
+        val unlockInAppBiometric = booleanPreferencesKey("unlock_in_app_biometric_enabled")
         val unlockMethodPref = stringPreferencesKey("unlock_method_preference")
         val unlockDuration = longPreferencesKey("unlock_duration_ms")
         val mascotEnabled = booleanPreferencesKey("mascot_enabled")
@@ -360,6 +361,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             torchEnabled = p[K.torchEnabled] ?: d.torchEnabled,
             screenshotPreview = p[K.screenshotPreview] ?: d.screenshotPreview,
             unlockAnimationEnabled = p[K.unlockAnimation] ?: d.unlockAnimationEnabled,
+            unlockInAppBiometricEnabled = p[K.unlockInAppBiometric] ?: d.unlockInAppBiometricEnabled,
             unlockMethodPreference = p[K.unlockMethodPref] ?: d.unlockMethodPreference,
             unlockDurationMs = p[K.unlockDuration] ?: d.unlockDurationMs,
             mascotEnabled = p[K.mascotEnabled] ?: d.mascotEnabled,
@@ -490,6 +492,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.torchEnabled] = s.torchEnabled
         p[K.screenshotPreview] = s.screenshotPreview
         p[K.unlockAnimation] = s.unlockAnimationEnabled
+        p[K.unlockInAppBiometric] = s.unlockInAppBiometricEnabled
         p[K.unlockMethodPref] = s.unlockMethodPreference
         p[K.unlockDuration] = s.unlockDurationMs
         p[K.mascotEnabled] = s.mascotEnabled

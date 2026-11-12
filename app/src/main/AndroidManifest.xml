@@ -34,6 +34,9 @@
     <uses-permission
         android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.READ_LOGS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- Needed so the Per-App settings screen can list installed launcher apps + Shizuku on-phone grant -->
     <queries>
