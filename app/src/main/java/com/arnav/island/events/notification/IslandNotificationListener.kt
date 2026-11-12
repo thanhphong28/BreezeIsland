@@ -41,6 +41,7 @@ class IslandNotificationListener : NotificationListenerService() {
         registerWakeReceiver()
         ensureOverlayRunning()
         graph.notifications.attach(this)
+        graph.notifications.syncStatusBarNotifications()
         graph.media.refresh()
         try {
             activeNotifications?.forEach { graph.notifications.onPosted(it, currentRanking, initialScan = true) }

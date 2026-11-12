@@ -91,9 +91,8 @@ class NotificationProcessor(
         val n = sbn.notification ?: return
         val selectedSlots = parseCsv(s.statusBarIcons)
         if (isMedia(n)) {
-            if (shouldSuppressMediaChip(s, selectedSlots)) {
-                suppressStatusBarChip(sbn)
-            }
+            // Never snooze or cancel MediaStyle notifications: Android SystemUI's Media Player
+            // in the Notification Shade & Quick Settings Panel depends on this notification!
             return
         }
         if (isFlashlightNotification(sbn)) {
@@ -130,13 +129,20 @@ class NotificationProcessor(
             null
         } ?: return
         val selectedSlots = parseCsv(s.statusBarIcons)
+        // Restore any MediaStyle notifications that were previously snoozed so the Quick Settings
+        // & Notification Shade media player is always visible.
+        runCatching {
+            svc.snoozedNotifications?.forEach { snoozed ->
+                val n = snoozed.notification
+                if (n != null && isMedia(n)) {
+                    svc.snoozeNotification(snoozed.key, 1L)
+                }
+            }
+        }
         for (sbn in active) {
             if (sbn.packageName == context.packageName) continue
             val n = sbn.notification ?: continue
             if (isMedia(n)) {
-                if (shouldSuppressMediaChip(s, selectedSlots)) {
-                    suppressStatusBarChip(sbn)
-                }
                 continue
             }
             if (isFlashlightNotification(sbn)) {
@@ -740,8 +746,7 @@ class NotificationProcessor(
         // SystemPopups (heads_up_notifications_enabled = 0), allowing full native sound & vibration!
     }
 
-    private fun shouldSuppressMediaChip(s: IslandSettings, selectedSlots: Set<String>): Boolean =
-        s.enabled && s.mediaEnabled && (s.seamlessStatusBar || s.statusBarCleanup)
+    override fun toString(): String = "NotificationProcessor"
 
     /**
      * Snoozes or cancels a status bar notification so One UI removes its status bar chip/icon
