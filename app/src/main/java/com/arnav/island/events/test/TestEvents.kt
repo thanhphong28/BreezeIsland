@@ -9,6 +9,7 @@ import android.graphics.Shader
 import android.os.SystemClock
 import androidx.core.graphics.createBitmap
 import com.arnav.island.events.ActionStyle
+import com.arnav.island.events.AudioRecordPayload
 import com.arnav.island.events.BluetoothDeviceKind
 import com.arnav.island.events.BluetoothPayload
 import com.arnav.island.events.CalendarPayload
@@ -43,7 +44,11 @@ import com.arnav.island.events.TorchPayload
 import com.arnav.island.events.UnlockMethod
 import com.arnav.island.events.UnlockPayload
 import com.arnav.island.events.MascotMood
+import com.arnav.island.events.WeatherCondition
+import com.arnav.island.events.WeatherHourlyItem
+import com.arnav.island.events.WeatherPayload
 import com.arnav.island.events.system.MascotMonitor
+import com.arnav.island.island.render.presenters.AudioRecordPresenter
 import com.arnav.island.island.render.presenters.CalendarPresenter
 import com.arnav.island.island.render.presenters.CallPresenter
 import com.arnav.island.island.render.presenters.MediaPresenter
@@ -612,6 +617,79 @@ class TestEvents(private val engine: EventEngine, private val images: ImageStore
             colors = EventColors(accent = 0xFFFFD60A.toInt()), // Apple Warm Gold
         )
         engine.post(event)
+    }
+
+    fun voiceRecord(paused: Boolean = false) {
+        val now = System.currentTimeMillis()
+        val started = now - 14_000L
+        engine.post(
+            IslandEvent(
+                id = "test:audiorec",
+                source = EventSource.TEST,
+                type = EventType.AUDIO_RECORD,
+                timestamp = now,
+                persistent = true,
+                title = "Bản ghi âm 01",
+                subtitle = "Ghi âm",
+                icon = Glyph.MIC,
+                actions = listOf(
+                    IslandAction(AudioRecordPresenter.ACTION_TOGGLE, if (paused) "Resume" else "Pause", if (paused) Glyph.PLAY else Glyph.PAUSE) {
+                        voiceRecord(!paused)
+                    },
+                    IslandAction(AudioRecordPresenter.ACTION_STOP, "Stop", Glyph.STOP, ActionStyle.DESTRUCTIVE, collapses = true) {
+                        engine.remove("test:audiorec")
+                    },
+                ),
+                contentKey = "$paused",
+                payload = AudioRecordPayload(
+                    packageName = "test",
+                    appLabel = "Ghi âm",
+                    title = "Bản ghi âm 01",
+                    startedAt = started,
+                    elapsedWhenPausedMs = 14_000L,
+                    isPaused = paused,
+                ),
+            )
+        )
+    }
+
+    fun weather() {
+        val now = System.currentTimeMillis()
+        engine.post(
+            IslandEvent(
+                id = "test:weather",
+                source = EventSource.TEST,
+                type = EventType.WEATHER,
+                timestamp = now,
+                persistent = false,
+                durationMs = 6_500L,
+                title = "31°C · TP. Hồ Chí Minh",
+                subtitle = "Sắp có mưa rào · C:34° T:26°",
+                icon = Glyph.RAIN,
+                colors = EventColors(accent = 0xFF38BDF8.toInt()),
+                payload = WeatherPayload(
+                    cityName = "TP. Hồ Chí Minh",
+                    currentTempC = 31,
+                    feelsLikeC = 34,
+                    highTempC = 34,
+                    lowTempC = 26,
+                    condition = WeatherCondition.RAIN,
+                    conditionLabel = "Mưa rào rải rác",
+                    alertHeadline = "Sắp mưa trong 45 phút",
+                    humidityPercent = 78,
+                    windKmh = 14,
+                    uvIndex = 6f,
+                    rainProbPercent = 75,
+                    hourly = listOf(
+                        WeatherHourlyItem("14:00", 30, WeatherCondition.RAIN, 75),
+                        WeatherHourlyItem("16:00", 29, WeatherCondition.THUNDERSTORM, 80),
+                        WeatherHourlyItem("19:00", 27, WeatherCondition.CLOUDY, 35),
+                        WeatherHourlyItem("22:00", 26, WeatherCondition.CLEAR_NIGHT, 15),
+                    ),
+                    updatedAt = now,
+                ),
+            )
+        )
     }
 
     fun clear() {

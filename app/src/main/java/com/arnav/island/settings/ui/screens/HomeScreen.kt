@@ -52,6 +52,7 @@ import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Translate
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -257,6 +258,7 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
                 NavRow("Battery", "Low, full and power saving alerts", Icons.Rounded.BatteryFull, BadgeColors.Teal) { ui.go(Dest.BATTERY) }
                 NavRow("Bluetooth", "Earbuds, headphones, watch, car", Icons.Rounded.Bluetooth, BadgeColors.Blue) { ui.go(Dest.BLUETOOTH) }
                 NavRow("Timers & stopwatch", "Sync alarms, timers & stopwatch from phone Clock", Icons.Rounded.Timer, BadgeColors.Orange) { ui.go(Dest.TIMERS) }
+                NavRow(tr("Weather Island", "Thời tiết trên Đảo"), tr("Rain alerts, morning briefing & live forecast", "Cảnh báo mưa sắp tới, bản tin sáng & dự báo trực tiếp"), Icons.Rounded.WbSunny, BadgeColors.Yellow) { ui.go(Dest.WEATHER) }
                 NavRow("Apps", "Per-app rules, motion, fullscreen, Game Mode", Icons.Rounded.Apps, BadgeColors.Yellow) { ui.go(Dest.APPS) }
                 NavRow("Gallery", "Every activity, live, ready to pin", Icons.Rounded.GridView, BadgeColors.Violet) { ui.go(Dest.GALLERY) }
             }

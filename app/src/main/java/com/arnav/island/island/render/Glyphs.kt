@@ -266,6 +266,46 @@ class GlyphPainter {
         Glyph.LOCK_OPEN -> listOf(
             svg("M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h2c0-1.66 1.34-3 3-3s3 1.34 3 3v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z")
         )
+        Glyph.MIC -> listOf(
+            svg("M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z")
+        )
+        Glyph.SUN -> listOf(
+            Part(Path().apply { addCircle(12f, 12f, 4.5f, Path.Direction.CW) }, stroke = false),
+            Part(Path().apply {
+                for (i in 0 until 8) {
+                    val a = Math.toRadians(i * 45.0)
+                    val c = kotlin.math.cos(a).toFloat()
+                    val s = kotlin.math.sin(a).toFloat()
+                    moveTo(12f + c * 6.8f, 12f + s * 6.8f)
+                    lineTo(12f + c * 9.5f, 12f + s * 9.5f)
+                }
+            }, stroke = true, strokeWidth = 2.0f),
+        )
+        Glyph.CLOUD -> listOf(
+            svg("M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z")
+        )
+        Glyph.RAIN -> listOf(
+            svg("M19.35 8.04C18.67 4.59 15.64 2 12 2 9.11 2 6.6 3.64 5.35 6.04 2.34 6.36 0 8.91 0 12c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"),
+            Part(Path().apply {
+                moveTo(7.5f, 19.2f); lineTo(6.2f, 22.2f)
+                moveTo(12f, 19.2f); lineTo(10.7f, 22.2f)
+                moveTo(16.5f, 19.2f); lineTo(15.2f, 22.2f)
+            }, stroke = true, strokeWidth = 2.0f),
+        )
+        Glyph.STORM -> listOf(
+            svg("M19.35 8.04C18.67 4.59 15.64 2 12 2 9.11 2 6.6 3.64 5.35 6.04 2.34 6.36 0 8.91 0 12c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"),
+            Part(Path().apply {
+                moveTo(13.2f, 15.5f); lineTo(10.2f, 19.6f); lineTo(12.8f, 19.6f); lineTo(11.2f, 23.2f)
+            }, stroke = true, strokeWidth = 2.1f),
+        )
+        Glyph.SNOW -> listOf(
+            Part(Path().apply {
+                moveTo(12f, 3f); lineTo(12f, 21f)
+                moveTo(3f, 12f); lineTo(21f, 12f)
+                moveTo(5.6f, 5.6f); lineTo(18.4f, 18.4f)
+                moveTo(18.4f, 5.6f); lineTo(5.6f, 18.4f)
+            }, stroke = true, strokeWidth = 2.0f),
+        )
         Glyph.PLAY, Glyph.PAUSE -> emptyList()
     }
 }

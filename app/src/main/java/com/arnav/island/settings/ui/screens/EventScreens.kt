@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.FlashlightOn
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material.icons.rounded.Notifications
@@ -49,6 +50,7 @@ import androidx.compose.material.icons.rounded.Thermostat
 import androidx.compose.material.icons.rounded.Timelapse
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -113,6 +115,8 @@ fun EventsScreen(s: IslandSettings, p: PermissionSnapshot, ui: Ui) {
                 SwitchRow("Calls", s.callsEnabled, { v -> ui.update { it.copy(callsEnabled = v) }; if (v) ensureNotifAccess() }, "Incoming and ongoing calls", Icons.Rounded.Call, BadgeColors.Green)
                 SwitchRow("Timers", s.timersEnabled, { v -> ui.update { it.copy(timersEnabled = v) }; if (v) ensureNotifAccess() }, tr("Live countdown from your phone's Clock app", "Đồng bộ đếm ngược từ ứng dụng Đồng hồ của máy"), Icons.Rounded.Timer, BadgeColors.Orange)
                 SwitchRow("Stopwatch", s.stopwatchEnabled, { v -> ui.update { it.copy(stopwatchEnabled = v) }; if (v) ensureNotifAccess() }, tr("Live stopwatch from your phone's Clock app", "Đồng bộ bấm giờ từ ứng dụng Đồng hồ của máy"), Icons.Rounded.Timelapse, BadgeColors.Orange)
+                SwitchRow(tr("Voice recording", "Ghi âm (Voice Recorder)"), s.audioRecordEnabled, { v -> ui.update { it.copy(audioRecordEnabled = v) } }, tr("Live waveform & timer when recording audio in background", "Sóng âm đỏ & bộ đếm giờ trực tiếp khi ghi âm và thoát ra ngoài"), Icons.Rounded.Mic, BadgeColors.Red)
+                NavRow(tr("Weather Island", "Thời tiết trên Đảo"), tr("Smart rain alerts, morning briefing & live weather pill", "Cảnh báo mưa sắp tới, bản tin sáng & viên thuốc thời tiết"), Icons.Rounded.WbSunny, BadgeColors.Yellow) { ui.go(Dest.WEATHER) }
                 SwitchRow("Navigation", s.navigationEnabled, { v -> ui.update { it.copy(navigationEnabled = v) }; if (v) ensureNotifAccess() }, "Turn-by-turn from navigation apps", Icons.Rounded.Navigation, BadgeColors.Blue)
                 SwitchRow("Downloads & progress", s.progressEnabled, { v -> ui.update { it.copy(progressEnabled = v) }; if (v) ensureNotifAccess() }, "Any notification that reports progress", Icons.Rounded.Download, BadgeColors.Cyan)
                 SwitchRow("Deliveries & rides", s.liveUpdatesEnabled, { v -> ui.update { it.copy(liveUpdatesEnabled = v) }; if (v) ensureNotifAccess() },

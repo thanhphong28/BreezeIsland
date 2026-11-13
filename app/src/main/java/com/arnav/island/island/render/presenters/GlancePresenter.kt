@@ -39,11 +39,14 @@ class GlancePresenter(rc: RenderContext) : Presenter(rc) {
         ring.animateTo((p?.batteryLevel ?: 0) / 100f)
 
         chips.clear()
+        if (p?.weatherSummary != null) {
+            chips += (p.weatherGlyph ?: Glyph.SUN) to p.weatherSummary
+        }
         val alarm = p?.nextAlarmAt
         if (alarm != null) {
             val time = DateFormat.getTimeFormat(rc.context).format(Date(alarm))
             chips += Glyph.ALARM to "$time · in ${Formatters.humanDuration(alarm - rc.clock())}"
-        } else {
+        } else if (p?.weatherSummary == null) {
             chips += Glyph.BELL_OFF to "No alarm set"
         }
         if (p != null && p.runningTimers > 0) chips += Glyph.TIMER to if (p.runningTimers == 1) "1 timer" else "${p.runningTimers} timers"

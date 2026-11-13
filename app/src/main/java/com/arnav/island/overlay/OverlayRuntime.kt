@@ -98,6 +98,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
     private val calendar = CalendarMonitor(service, graph.events, scope, settingsFn)
     private val screenshots = ScreenshotMonitor(service, graph.events, graph.images, scope, settingsFn)
     private val unlock = com.arnav.island.events.system.UnlockMonitor(service, graph.events, scope, settingsFn)
+    private val audioRecording = com.arnav.island.events.system.AudioRecordingMonitor(service, graph.events, settingsFn)
     private val mascot = com.arnav.island.events.system.MascotMonitor(graph.events, scope, settingsFn) {
         val st = controller.state
         st == IslandState.Idle || st is IslandState.Compact || st is IslandState.Split
@@ -172,6 +173,8 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         battery.start()
         system.start()
         recording.start()
+        if (settings.audioRecordEnabled) audioRecording.start()
+        if (settings.weatherEnabled) graph.weather.start()
         if (settings.bluetoothEnabled && bluetooth.hasPermission()) bluetooth.start()
         graph.media.start()
         if (settings.torchEnabled) torch.start()
@@ -194,6 +197,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
                         forcedMood = command.mood,
                         forceMusicGroove = command.withMusic,
                     )
+                    is IslandCommand.ShowWeather -> graph.weather.showNow(command.headline)
                 }
             }
         }
@@ -210,11 +214,14 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
             // Unlock bloom: the island greets you with a ring of the system accent when unlock animation is not active.
             var wasLocked = screen.state.value.locked
             screen.state.collect { st ->
-                if (wasLocked && st.usable && settings.unlockBloom && !settings.unlockAnimationEnabled) {
-                    view.post {
-                        view.scene.unlockBloom()
-                        view.requestFrame()
+                if (wasLocked && st.usable) {
+                    if (settings.unlockBloom && !settings.unlockAnimationEnabled) {
+                        view.post {
+                            view.scene.unlockBloom()
+                            view.requestFrame()
+                        }
                     }
+                    graph.weather.onUserPresent()
                 }
                 wasLocked = st.locked || !st.interactive
             }
@@ -236,6 +243,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
                         graph.media.refresh()
                         battery.refresh()
                         system.refresh()
+                        audioRecording.refresh()
                     }
                     applyRenderSettings()
                     updateVisibility()
@@ -269,6 +277,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         graph.media.refresh()
         battery.refresh()
         system.refresh()
+        audioRecording.refresh()
         applyRenderSettings()
         updateVisibility()
         view.resumeRendering()
@@ -282,6 +291,8 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         calendar.stop()
         screenshots.stop()
         unlock.stop()
+        audioRecording.stop()
+        graph.weather.stop()
         mascot.stop()
         tilt.setActive(false)
         sounds.release()
@@ -317,6 +328,18 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         system.refresh()
         battery.refresh()
         graph.media.refresh()
+        if (s.audioRecordEnabled) {
+            audioRecording.start()
+            audioRecording.refresh()
+        } else {
+            audioRecording.stop()
+        }
+        if (s.weatherEnabled) {
+            graph.weather.start()
+        } else {
+            graph.weather.stop()
+        }
+        graph.weather.onSettingsChanged(s)
         if (s.torchEnabled) torch.start() else torch.stop()
         torch.refresh()
         calendar.start()
@@ -373,6 +396,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
         val playing = (media?.payload as? MediaPayload)?.takeIf { it.isPlaying }?.let { m ->
             if (m.artist.isBlank()) m.title else "${m.title} · ${m.artist}"
         }
+        val weatherChip = graph.weather.glanceSummary()
         return IslandEvent(
             id = GLANCE_ID,
             source = EventSource.SYSTEM,
@@ -383,7 +407,15 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
             title = "Glance",
             icon = Glyph.CALENDAR,
             animation = EntranceAnimation.BLOOM,
-            payload = GlancePayload(battery.level, battery.isCharging, alarm, timers, playing),
+            payload = GlancePayload(
+                batteryLevel = battery.level,
+                isCharging = battery.isCharging,
+                nextAlarmAt = alarm,
+                runningTimers = timers,
+                nowPlaying = playing,
+                weatherSummary = weatherChip?.second,
+                weatherGlyph = weatherChip?.first,
+            ),
         )
     }
 

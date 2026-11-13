@@ -1,6 +1,7 @@
 package com.arnav.island.island.render
 
 import com.arnav.island.events.EventType
+import com.arnav.island.island.render.presenters.AudioRecordPresenter
 import com.arnav.island.island.render.presenters.BluetoothPresenter
 import com.arnav.island.island.render.presenters.CalendarPresenter
 import com.arnav.island.island.render.presenters.CallPresenter
@@ -21,6 +22,7 @@ import com.arnav.island.island.render.presenters.TimerPresenter
 import com.arnav.island.island.render.presenters.TorchPresenter
 import com.arnav.island.island.render.presenters.UnlockPresenter
 import com.arnav.island.island.render.presenters.MascotPresenter
+import com.arnav.island.island.render.presenters.WeatherPresenter
 
 /** Maps an event type to the renderer that draws its compact, bubble, toast and expanded forms. */
 object PresenterFactory {
@@ -45,6 +47,8 @@ object PresenterFactory {
         EventType.CONFIRM -> ConfirmPresenter(rc)
         EventType.UNLOCK -> UnlockPresenter(rc)
         EventType.MASCOT -> MascotPresenter(rc)
+        EventType.AUDIO_RECORD -> AudioRecordPresenter(rc)
+        EventType.WEATHER -> WeatherPresenter(rc)
     }
 
     /** Presenters are reusable across event types that share a renderer class. */

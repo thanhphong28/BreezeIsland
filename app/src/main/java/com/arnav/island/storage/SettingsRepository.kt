@@ -287,7 +287,17 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val rotation = booleanPreferencesKey("rotation_enabled")
         val hotspot = booleanPreferencesKey("hotspot_enabled")
         val screenRecord = booleanPreferencesKey("screen_record_enabled")
+        val audioRecord = booleanPreferencesKey("audio_record_enabled")
         val clipboard = booleanPreferencesKey("clipboard_enabled")
+
+        val weatherEnabled = booleanPreferencesKey("weather_enabled")
+        val weatherRainAlerts = booleanPreferencesKey("weather_rain_alerts")
+        val weatherMorningBriefing = booleanPreferencesKey("weather_morning_briefing")
+        val weatherMorningHour = intPreferencesKey("weather_morning_hour")
+        val weatherLivePill = booleanPreferencesKey("weather_live_pill")
+        val weatherCityName = stringPreferencesKey("weather_city_name")
+        val weatherLat = floatPreferencesKey("weather_lat")
+        val weatherLon = floatPreferencesKey("weather_lon")
 
         val split = booleanPreferencesKey("split_enabled")
 
@@ -420,7 +430,16 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             rotationEnabled = p[K.rotation] ?: d.rotationEnabled,
             hotspotEnabled = p[K.hotspot] ?: d.hotspotEnabled,
             screenRecordEnabled = p[K.screenRecord] ?: d.screenRecordEnabled,
+            audioRecordEnabled = p[K.audioRecord] ?: d.audioRecordEnabled,
             clipboardEnabled = p[K.clipboard] ?: d.clipboardEnabled,
+            weatherEnabled = p[K.weatherEnabled] ?: d.weatherEnabled,
+            weatherRainAlerts = p[K.weatherRainAlerts] ?: d.weatherRainAlerts,
+            weatherMorningBriefing = p[K.weatherMorningBriefing] ?: d.weatherMorningBriefing,
+            weatherMorningHour = p[K.weatherMorningHour] ?: d.weatherMorningHour,
+            weatherLivePill = p[K.weatherLivePill] ?: d.weatherLivePill,
+            weatherCityName = p[K.weatherCityName] ?: d.weatherCityName,
+            weatherLat = p[K.weatherLat] ?: d.weatherLat,
+            weatherLon = p[K.weatherLon] ?: d.weatherLon,
             splitEnabled = p[K.split] ?: d.splitEnabled,
             fullscreenMode = p.enum(K.fullscreenMode, d.fullscreenMode),
             gameMode = p[K.gameMode] ?: d.gameMode,
@@ -559,7 +578,16 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.rotation] = s.rotationEnabled
         p[K.hotspot] = s.hotspotEnabled
         p[K.screenRecord] = s.screenRecordEnabled
+        p[K.audioRecord] = s.audioRecordEnabled
         p[K.clipboard] = s.clipboardEnabled
+        p[K.weatherEnabled] = s.weatherEnabled
+        p[K.weatherRainAlerts] = s.weatherRainAlerts
+        p[K.weatherMorningBriefing] = s.weatherMorningBriefing
+        p[K.weatherMorningHour] = s.weatherMorningHour
+        p[K.weatherLivePill] = s.weatherLivePill
+        p[K.weatherCityName] = s.weatherCityName
+        p[K.weatherLat] = s.weatherLat
+        p[K.weatherLon] = s.weatherLon
         p[K.split] = s.splitEnabled
         p[K.fullscreenMode] = s.fullscreenMode.name
         p[K.gameMode] = s.gameMode

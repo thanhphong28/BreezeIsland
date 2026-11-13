@@ -56,7 +56,7 @@ data class IslandEvent(
     }
 }
 
-enum class EventSource { MEDIA, NOTIFICATION, BATTERY, BLUETOOTH, TIMER, STOPWATCH, CALL, NAVIGATION, PROGRESS, SYSTEM, MONITOR, API, TEST }
+enum class EventSource { MEDIA, NOTIFICATION, BATTERY, BLUETOOTH, TIMER, STOPWATCH, CALL, NAVIGATION, PROGRESS, SYSTEM, MONITOR, API, TEST, AUDIO_RECORD, WEATHER }
 
 /**
  * Priority order from the brief. Higher [rank] wins; ties go to the most recent event.
@@ -108,6 +108,12 @@ enum class EventType(val defaultPriority: EventPriority) {
     /** Breeze Mascot (interactive & periodic notch companion). */
     MASCOT(EventPriority.CHARGING),
 
+    /** Voice / Audio Recording live activity (Samsung Voice Recorder, Google Recorder, etc.). */
+    AUDIO_RECORD(EventPriority.TIMER),
+
+    /** Weather Live Activity & Forecast alert (Rain alert, Morning briefing, UV/Temp, or Live Pill). */
+    WEATHER(EventPriority.CHARGING),
+
     /** Synthetic: the stack of every running activity (never posted by a source). */
     STACK(EventPriority.BACKGROUND_ACTIVITY),
 }
@@ -133,6 +139,7 @@ enum class Glyph {
     STOP, FLAG, INFO, WARNING, SPARK, MESSAGE, OPEN, REPLY, CALENDAR, ALARM,
     FLASHLIGHT, LEAF, SCREENSHOT, SCOOTER, SHARE, EDIT,
     FACE_ID, FINGERPRINT, LOCK, LOCK_OPEN,
+    MIC, SUN, CLOUD, RAIN, STORM, SNOW,
 }
 
 enum class ActionStyle { DEFAULT, PRIMARY, POSITIVE, DESTRUCTIVE }

@@ -6,6 +6,7 @@ import com.arnav.island.events.media.MediaSessionMonitor
 import com.arnav.island.events.notification.NotificationProcessor
 import com.arnav.island.events.test.TestEvents
 import com.arnav.island.events.timer.TimerManager
+import com.arnav.island.events.weather.WeatherMonitor
 import com.arnav.island.island.CutoutSource
 import com.arnav.island.overlay.StatusBarCleanup
 import com.arnav.island.overlay.SystemPopups
@@ -63,6 +64,7 @@ class AppGraph(val app: Application) {
     val timers = TimerManager(app, scope, events, currentSettings)
     val notifications = NotificationProcessor(app, events, images, apps, scope, currentSettings)
     val media = MediaSessionMonitor(app, events, images, apps, scope, currentSettings)
+    val weather = WeatherMonitor(app, events, scope, currentSettings)
     val testEvents = TestEvents(events, images, scope)
 
     val runtime = MutableStateFlow(RuntimeStatus(deviceProfile = DeviceProfiles.detect().displayName))
@@ -74,6 +76,9 @@ class AppGraph(val app: Application) {
     val commands = MutableSharedFlow<IslandCommand>(extraBufferCapacity = 8)
 
     init {
+        notifications.onWeatherNotification = { title, text ->
+            weather.onExternalWeatherNotification(title, text)
+        }
         // Status bar control and pop-up replacement follow the settings whether or not the
         // overlay is running; pop-ups are only suppressed while the island is actually showing.
         val showing = runtime.map { it.serviceRunning && it.hiddenReason == null }.distinctUntilChanged()
@@ -96,4 +101,5 @@ sealed interface IslandCommand {
         val mood: com.arnav.island.events.MascotMood? = null,
         val withMusic: Boolean = false,
     ) : IslandCommand
+    data class ShowWeather(val headline: String? = null) : IslandCommand
 }

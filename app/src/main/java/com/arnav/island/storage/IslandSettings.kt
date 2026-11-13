@@ -170,7 +170,18 @@ data class IslandSettings(
     val rotationEnabled: Boolean = false,
     val hotspotEnabled: Boolean = false,
     val screenRecordEnabled: Boolean = true,
+    val audioRecordEnabled: Boolean = true,
     val clipboardEnabled: Boolean = false,
+
+    // Weather Island (Smart Weather Alerts, Morning Briefing & Live Pill)
+    val weatherEnabled: Boolean = true,
+    val weatherRainAlerts: Boolean = true,
+    val weatherMorningBriefing: Boolean = true,
+    val weatherMorningHour: Int = 7,
+    val weatherLivePill: Boolean = false,
+    val weatherCityName: String = "TP. Hồ Chí Minh",
+    val weatherLat: Float = 10.7769f,
+    val weatherLon: Float = 106.7009f,
 
     // Unlock animation (Face ID, Fingerprint, Padlock)
     val unlockAnimationEnabled: Boolean = true,

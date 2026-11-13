@@ -240,6 +240,58 @@ data class GlancePayload(
     val nextAlarmAt: Long?,
     val runningTimers: Int,
     val nowPlaying: String?,
+    val weatherSummary: String? = null,
+    val weatherGlyph: Glyph? = null,
+) : EventPayload
+
+/** Voice / Audio Recording live activity payload. */
+data class AudioRecordPayload(
+    val packageName: String?,
+    val appLabel: String,
+    val title: String,
+    /** Wall-clock timestamp when the recording started (or adjusted for elapsed time). */
+    val startedAt: Long,
+    /** Elapsed duration captured when paused. */
+    val elapsedWhenPausedMs: Long = 0L,
+    val isPaused: Boolean = false,
+) : EventPayload {
+    fun elapsedAt(now: Long): Long =
+        if (isPaused) elapsedWhenPausedMs else (now - startedAt).coerceAtLeast(0L)
+}
+
+enum class WeatherCondition {
+    CLEAR_DAY,
+    CLEAR_NIGHT,
+    PARTLY_CLOUDY,
+    CLOUDY,
+    RAIN,
+    HEAVY_RAIN,
+    THUNDERSTORM,
+    SNOW,
+}
+
+data class WeatherHourlyItem(
+    val hourLabel: String,
+    val tempC: Int,
+    val condition: WeatherCondition,
+    val rainProbPercent: Int,
+)
+
+data class WeatherPayload(
+    val cityName: String,
+    val currentTempC: Int,
+    val feelsLikeC: Int,
+    val highTempC: Int,
+    val lowTempC: Int,
+    val condition: WeatherCondition,
+    val conditionLabel: String,
+    val alertHeadline: String? = null,
+    val humidityPercent: Int = 0,
+    val windKmh: Int = 0,
+    val uvIndex: Float = 0f,
+    val rainProbPercent: Int = 0,
+    val hourly: List<WeatherHourlyItem> = emptyList(),
+    val updatedAt: Long = 0L,
 ) : EventPayload
 
 /** Every running activity, shown as a stack of cards. */

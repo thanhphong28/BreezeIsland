@@ -15,6 +15,7 @@ import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import androidx.core.os.BundleCompat
 import com.arnav.island.events.ActionStyle
+import com.arnav.island.events.AudioRecordPayload
 import com.arnav.island.events.CallPayload
 import com.arnav.island.events.CallState
 import com.arnav.island.events.EntranceAnimation
@@ -35,6 +36,8 @@ import com.arnav.island.events.ProgressPayload
 import com.arnav.island.events.StopwatchPayload
 import com.arnav.island.events.TimerPayload
 import com.arnav.island.events.navigation.NavigationRegistry
+import com.arnav.island.events.system.AudioRecordingMonitor
+import com.arnav.island.island.render.presenters.AudioRecordPresenter
 import com.arnav.island.island.render.presenters.CallPresenter
 import com.arnav.island.island.render.presenters.NotificationPresenter
 import com.arnav.island.island.render.presenters.TimerPresenter
@@ -77,6 +80,7 @@ class NotificationProcessor(
     private val lastProgress = HashMap<String, Float>()
     private val clockTotalMs = HashMap<String, Long>()
     private val clockLaps = HashMap<String, MutableList<Long>>()
+    var onWeatherNotification: ((title: String, text: String) -> Unit)? = null
 
     val isConnected: Boolean get() = listener != null
 
@@ -91,7 +95,8 @@ class NotificationProcessor(
             it.source == EventSource.CALL ||
                 it.source == EventSource.NAVIGATION ||
                 it.source == EventSource.PROGRESS ||
-                it.id.startsWith("clock-")
+                it.id.startsWith("clock-") ||
+                it.id.startsWith("audiorec:")
         }
     }
 
@@ -108,6 +113,14 @@ class NotificationProcessor(
         }
         if (isClockAppNotification(sbn)) {
             handleClockNotification(sbn, s)
+            return
+        }
+        if (isVoiceRecorderNotification(sbn)) {
+            handleVoiceRecorderNotification(sbn, s)
+            return
+        }
+        if (!initialScan && isWeatherNotification(sbn)) {
+            handleWeatherNotification(sbn, s)
             return
         }
         if (isFlashlightNotification(sbn)) {
@@ -149,7 +162,7 @@ class NotificationProcessor(
         runCatching {
             svc.snoozedNotifications?.forEach { snoozed ->
                 val n = snoozed.notification
-                if (n != null && (isMedia(n) || isClockAppNotification(snoozed))) {
+                if (n != null && (isMedia(n) || isClockAppNotification(snoozed) || isVoiceRecorderNotification(snoozed))) {
                     svc.snoozeNotification(snoozed.key, 1L)
                 }
             }
@@ -162,6 +175,10 @@ class NotificationProcessor(
             }
             if (isClockAppNotification(sbn)) {
                 handleClockNotification(sbn, s)
+                continue
+            }
+            if (isVoiceRecorderNotification(sbn)) {
+                handleVoiceRecorderNotification(sbn, s)
                 continue
             }
             if (isFlashlightNotification(sbn)) {
@@ -184,6 +201,7 @@ class NotificationProcessor(
         engine.remove(clockTimerId(key))
         engine.remove(clockStopwatchId(key))
         engine.remove(clockAlarmId(key))
+        engine.remove(audioRecordId(key))
         clockTotalMs.remove(key)
         clockLaps.remove(key)
         lastProgress.remove(key)?.let { last ->
@@ -1126,6 +1144,170 @@ class NotificationProcessor(
     }
 
     // ---------------------------------------------------------------------------------------------
+    // Voice Recorder & Weather app notifications
+    // ---------------------------------------------------------------------------------------------
+
+    fun isVoiceRecorderNotification(sbn: StatusBarNotification): Boolean {
+        val pkg = sbn.packageName.lowercase()
+        if (pkg in VOICE_RECORDER_PACKAGES) return true
+        if (pkg.contains("voicenote") || pkg.contains("soundrecorder") || pkg.contains("audiorecorder")) return true
+        return false
+    }
+
+    private fun handleVoiceRecorderNotification(sbn: StatusBarNotification, s: IslandSettings) {
+        if (!s.audioRecordEnabled) {
+            engine.remove(audioRecordId(sbn.key))
+            return
+        }
+        val n = sbn.notification ?: return
+        val ongoing = n.flags and (Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE) != 0
+        val rawTitle = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim().orEmpty()
+        val rawText = (
+            n.extras.getCharSequence(Notification.EXTRA_TEXT)
+                ?: n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+                ?: n.extras.getCharSequence(Notification.EXTRA_SUB_TEXT)
+            )?.toString()?.trim().orEmpty()
+        val actionTitles = n.actions.orEmpty().mapNotNull { it.title?.toString()?.lowercase() }.joinToString(" ")
+        val meta = "${rawTitle.lowercase()} ${rawText.lowercase()} $actionTitles"
+
+        val hasRecordControls = meta.contains("stop") ||
+            meta.contains("pause") ||
+            meta.contains("resume") ||
+            meta.contains("dừng") ||
+            meta.contains("tạm dừng") ||
+            meta.contains("tiếp tục") ||
+            meta.contains("recording") ||
+            meta.contains("đang ghi") ||
+            meta.contains("ghi âm")
+
+        if (!ongoing && !hasRecordControls) {
+            engine.remove(audioRecordId(sbn.key))
+            return
+        }
+
+        // Remove fallback AudioRecordingMonitor event since we have the rich notification with actions
+        engine.remove(AudioRecordingMonitor.ID)
+
+        val now = System.currentTimeMillis()
+        val parsedMs = parseDurationMs(rawTitle) ?: parseDurationMs(rawText)
+        val isPaused = actionTitles.contains("resume") ||
+            actionTitles.contains("tiếp tục") ||
+            rawTitle.lowercase().contains("paused") ||
+            rawText.lowercase().contains("paused") ||
+            rawTitle.lowercase().contains("tạm dừng") ||
+            rawText.lowercase().contains("tạm dừng")
+
+        val chronometerBase = if (n.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER) && n.`when` > 0L && n.`when` <= now) {
+            n.`when`
+        } else {
+            null
+        }
+        val elapsedMs = when {
+            parsedMs != null -> parsedMs
+            chronometerBase != null -> (now - chronometerBase).coerceAtLeast(0L)
+            sbn.postTime in 1..now -> (now - sbn.postTime).coerceAtLeast(0L)
+            else -> 0L
+        }
+        val startedAt = (now - elapsedMs).coerceAtMost(now)
+
+        val pkg = sbn.packageName
+        val appLabel = apps.label(pkg).ifBlank {
+            if (s.language == AppLanguage.VIETNAMESE) "Ghi âm" else "Voice Recorder"
+        }
+        val displayTitle = rawTitle
+            .takeIf { it.isNotBlank() && parseDurationMs(it) == null }
+            ?: rawText.takeIf { it.isNotBlank() && parseDurationMs(it) == null }
+            ?: if (s.language == AppLanguage.VIETNAMESE) "Bản ghi âm" else "Voice Memo"
+
+        val actions = ArrayList<IslandAction>(3)
+        for (a in n.actions.orEmpty()) {
+            val intent = a.actionIntent ?: continue
+            val t = a.title?.toString()?.trim().orEmpty()
+            val tl = t.lowercase()
+            when {
+                tl.contains("pause") || tl.contains("resume") || tl.contains("tạm dừng") || tl.contains("tiếp tục") -> {
+                    if (actions.none { it.id == AudioRecordPresenter.ACTION_TOGGLE }) {
+                        actions += IslandAction(
+                            id = AudioRecordPresenter.ACTION_TOGGLE,
+                            label = t,
+                            glyph = if (isPaused) Glyph.PLAY else Glyph.PAUSE,
+                        ) {
+                            Launch.send(context, intent)
+                        }
+                    }
+                }
+                tl.contains("stop") || tl.contains("save") || tl.contains("dừng") || tl.contains("lưu") || tl.contains("hoàn tất") -> {
+                    if (actions.none { it.id == AudioRecordPresenter.ACTION_STOP }) {
+                        actions += IslandAction(
+                            id = AudioRecordPresenter.ACTION_STOP,
+                            label = t,
+                            glyph = Glyph.STOP,
+                            style = ActionStyle.DESTRUCTIVE,
+                            collapses = true,
+                        ) {
+                            Launch.send(context, intent)
+                            engine.remove(audioRecordId(sbn.key))
+                        }
+                    }
+                }
+            }
+        }
+
+        val openAction = IslandAction(
+            id = AudioRecordPresenter.ACTION_OPEN,
+            label = if (s.language == AppLanguage.VIETNAMESE) "Mở Ghi âm" else "Open Recorder",
+            glyph = Glyph.OPEN,
+            collapses = true,
+        ) {
+            Launch.send(context, n.contentIntent) || Launch.openApp(context, pkg)
+        }
+        if (actions.isEmpty()) {
+            actions += openAction
+        }
+
+        engine.post(
+            IslandEvent(
+                id = audioRecordId(sbn.key),
+                source = EventSource.AUDIO_RECORD,
+                type = EventType.AUDIO_RECORD,
+                priority = EventPriority.TIMER,
+                timestamp = now,
+                persistent = true,
+                title = displayTitle,
+                subtitle = appLabel,
+                icon = Glyph.MIC,
+                actions = actions,
+                tapAction = openAction,
+                contentKey = "$isPaused",
+                payload = AudioRecordPayload(
+                    packageName = pkg,
+                    appLabel = appLabel,
+                    title = displayTitle,
+                    startedAt = startedAt,
+                    elapsedWhenPausedMs = elapsedMs,
+                    isPaused = isPaused,
+                ),
+            )
+        )
+    }
+
+    fun isWeatherNotification(sbn: StatusBarNotification): Boolean {
+        val pkg = sbn.packageName.lowercase()
+        return pkg in WEATHER_PACKAGES || pkg.contains(".weather")
+    }
+
+    private fun handleWeatherNotification(sbn: StatusBarNotification, s: IslandSettings) {
+        if (!s.weatherEnabled) return
+        val n = sbn.notification ?: return
+        val content = extractContent(n)
+        if (content.title.isBlank() && content.text.isBlank()) return
+        val hash = (content.title + '\u0000' + content.text).hashCode()
+        if (seen[sbn.key] == hash) return
+        seen[sbn.key] = hash
+        onWeatherNotification?.invoke(content.title, content.text)
+    }
+
+    // ---------------------------------------------------------------------------------------------
 
     private fun cancel(key: String) {
         try {
@@ -1251,6 +1433,7 @@ class NotificationProcessor(
     private fun clockTimerId(key: String) = "clock-timer:$key"
     private fun clockStopwatchId(key: String) = "clock-stopwatch:$key"
     private fun clockAlarmId(key: String) = "clock-alarm:$key"
+    private fun audioRecordId(key: String) = "audiorec:$key"
 
     companion object {
         private const val ICON_PX = 144
@@ -1269,6 +1452,24 @@ class NotificationProcessor(
             "com.android.bbkclock",
             "com.asus.deskclock",
             "com.lge.clock",
+        )
+        private val VOICE_RECORDER_PACKAGES = setOf(
+            "com.sec.android.app.voicenote",
+            "com.samsung.android.app.voicenote",
+            "com.google.android.apps.recorder",
+            "com.android.soundrecorder",
+            "com.miui.soundrecorder",
+            "com.coloros.soundrecorder",
+            "com.oplus.soundrecorder",
+            "com.oneplus.soundrecorder",
+            "com.asus.soundrecorder",
+        )
+        private val WEATHER_PACKAGES = setOf(
+            "com.sec.android.daemonapp",
+            "com.samsung.android.weather",
+            "com.miui.weather2",
+            "com.coloros.weather2",
+            "com.huawei.android.totemweather",
         )
         private val CLOCK_HMS_REGEX = Regex("""\b(\d{1,2}):(\d{2})(?::(\d{2}))?(?:[.,](\d{1,2}))?\b""")
 
