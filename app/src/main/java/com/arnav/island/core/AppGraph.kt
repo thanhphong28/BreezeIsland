@@ -100,6 +100,7 @@ sealed interface IslandCommand {
     data class SummonMascot(
         val mood: com.arnav.island.events.MascotMood? = null,
         val withMusic: Boolean = false,
+        val withAssistant: Boolean = false,
     ) : IslandCommand
     data class ShowWeather(val headline: String? = null) : IslandCommand
 }

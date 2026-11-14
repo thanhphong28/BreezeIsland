@@ -83,7 +83,7 @@ class AudioRecordingMonitor(
         val hasNotifRecording = engine.current().live.any {
             it.type == EventType.AUDIO_RECORD && it.id != ID
         }
-        if (hasNotifRecording) {
+        if (hasNotifRecording || MascotMonitor.isAssistantSessionActive || MascotMonitor.isGeminiRecentlyActive()) {
             handler.removeCallbacks(clearRunnable)
             engine.remove(ID)
             return

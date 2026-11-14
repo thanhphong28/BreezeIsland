@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SentimentVerySatisfied
@@ -44,9 +45,19 @@ fun MascotScreen(s: IslandSettings, ui: Ui) {
         ui.graph.testEvents.clear()
     }
 
-    fun triggerMascot(mood: MascotMood = s.mascotMood, withMusic: Boolean = false) {
-        preview?.tests?.mascot(mood, s.mascotDurationMs, withMusic = withMusic)
-        ui.graph.commands.tryEmit(IslandCommand.SummonMascot(mood, withMusic = withMusic))
+    fun triggerMascot(
+        mood: MascotMood = s.mascotMood,
+        withMusic: Boolean = false,
+        withAssistant: Boolean = false,
+    ) {
+        preview?.tests?.mascot(mood, s.mascotDurationMs, withMusic = withMusic, withAssistant = withAssistant)
+        ui.graph.commands.tryEmit(
+            IslandCommand.SummonMascot(
+                mood = mood,
+                withMusic = withMusic,
+                withAssistant = withAssistant,
+            )
+        )
     }
 
     SettingsPage("Breeze Mascot", onBack = ui::back) {
@@ -86,6 +97,16 @@ fun MascotScreen(s: IslandSettings, ui: Ui) {
                         "Chạm vào vùng camera khi Island đang rảnh để Mascot xuất hiện ngay",
                         Icons.Rounded.TouchApp,
                         BadgeColors.Blue,
+                    )
+                }
+                Reveal(s.mascotEnabled) {
+                    SwitchRow(
+                        "Xuất hiện khi gọi \"OK Google\" / Gemini",
+                        s.mascotOnAssistantEnabled,
+                        { v -> ui.update { it.copy(mascotOnAssistantEnabled = v) } },
+                        "Khi bạn nói \"OK Google\" hoặc gọi trợ lý Gemini ra dùng, Breeze Mascot tự động xuất hiện cùng hiệu ứng sao Gemini ✦",
+                        Icons.Rounded.Mic,
+                        BadgeColors.Pink,
                     )
                 }
                 Reveal(s.mascotEnabled) {
@@ -161,6 +182,13 @@ fun MascotScreen(s: IslandSettings, ui: Ui) {
                     icon = Icons.Rounded.MusicNote,
                     iconColor = BadgeColors.Violet,
                     onClick = { triggerMascot(s.mascotMood, withMusic = true) },
+                )
+                SettingRow(
+                    title = "Thử gọi Mascot cùng \"OK Google\" / Gemini",
+                    subtitle = "Mascot xuất hiện với sóng âm lắng nghe & hiệu ứng sao AI Gemini ✦",
+                    icon = Icons.Rounded.Mic,
+                    iconColor = BadgeColors.Cyan,
+                    onClick = { triggerMascot(MascotMood.EXCITED, withAssistant = true) },
                 )
             }
         }

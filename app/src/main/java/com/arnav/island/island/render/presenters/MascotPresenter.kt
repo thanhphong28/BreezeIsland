@@ -135,7 +135,11 @@ class MascotPresenter(rc: RenderContext) : Presenter(rc) {
 
     override fun measure(event: IslandEvent, mode: PresentMode): Pair<Float, Float> {
         val p = event.payload as? MascotPayload
-        val extraW = if (p?.isMusicPlaying == true) dp(24f) else 0f
+        val extraW = when {
+            p?.isAssistantActive == true -> dp(28f)
+            p?.isMusicPlaying == true -> dp(24f)
+            else -> 0f
+        }
         return when (mode) {
             PresentMode.EXPANDED -> {
                 val w = dp(220f) + extraW
@@ -215,8 +219,10 @@ class MascotPresenter(rc: RenderContext) : Presenter(rc) {
         val centerAreaY = camSafeTop + (h - camSafeTop) * 0.48f
         val cx = w / 2f
 
-        // 3. If Music is playing alongside Mascot, draw dancing music waves & floating notes!
-        if (payload.isMusicPlaying) {
+        // 3. If Gemini / "OK Google" is active or Music is playing alongside Mascot, draw companion effects!
+        if (payload.isAssistantActive) {
+            drawAssistantCompanion(canvas, w, h, cx, centerAreaY, elapsedS, scaleFactor, alpha)
+        } else if (payload.isMusicPlaying) {
             drawMusicCompanion(canvas, w, h, cx, centerAreaY, elapsedS, scaleFactor, alpha)
         }
 
@@ -391,6 +397,58 @@ class MascotPresenter(rc: RenderContext) : Presenter(rc) {
         // Pure white eye core
         eyeCorePaint.alpha = (255 * alpha).toInt().coerceIn(0, 255)
         canvas.drawRoundRect(eyeRect, rx, rx, eyeCorePaint)
+    }
+
+    /**
+     * Draws Gemini AI 4-point sparkles (`✦`) and voice-listening aura bars when Mascot appears
+     * together with "OK Google" / Gemini Assistant!
+     */
+    private fun drawAssistantCompanion(
+        canvas: Canvas,
+        w: Float,
+        h: Float,
+        cx: Float,
+        cy: Float,
+        t: Float,
+        scaleFactor: Float,
+        alpha: Float,
+    ) {
+        // 1. Voice-listening equalizer bars on both sides in Gemini gradient colors
+        val barCount = 4
+        val barW = dp(2.5f) * scaleFactor
+        val barGap = dp(4.2f) * scaleFactor
+        val maxBarH = dp(15f) * scaleFactor
+        val edgeInset = dp(16f) * scaleFactor
+        val geminiPalette = intArrayOf(
+            0xFF4CC9F0.toInt(),
+            0xFF4895EF.toInt(),
+            0xFF7209B7.toInt(),
+            0xFFF72585.toInt(),
+        )
+
+        for (side in -1..1 step 2) {
+            val baseX = if (side < 0) edgeInset else w - edgeInset
+            for (i in 0 until barCount) {
+                val x = baseX - side * (i * barGap)
+                val wave = 0.25f + 0.75f * abs(sin(t * (6.4f + i * 1.4f) + i * 0.85f + if (side > 0) 0.9f else 0f))
+                val bh = max(barW, maxBarH * wave)
+                decoPaint.color = geminiPalette[i % geminiPalette.size]
+                decoPaint.alpha = (215 * alpha).toInt().coerceIn(0, 255)
+                eyeRect.set(x - barW / 2f, cy - bh / 2f, x + barW / 2f, cy + bh / 2f)
+                canvas.drawRoundRect(eyeRect, barW / 2f, barW / 2f, decoPaint)
+            }
+        }
+
+        // 2. Signature Gemini 4-point AI stars (✦) twinkling around Mascot
+        for (i in 0..1) {
+            val dir = if (i == 0) -1f else 1f
+            val pulse = 0.68f + 0.32f * sin(t * 5.2f + i * 1.7f)
+            val sx = cx + dir * dp(35f) * scaleFactor
+            val sy = cy - dp(4f) * scaleFactor + cos(t * 3.8f + i) * dp(2.5f)
+            val sr = dp(5.6f) * scaleFactor * pulse
+            val starColor = if (i == 0) 0xFF70F8FF.toInt() else 0xFFD08BFF.toInt()
+            drawSparkle(canvas, sx, sy, sr, starColor, alpha * (0.75f + 0.25f * pulse))
+        }
     }
 
     /**

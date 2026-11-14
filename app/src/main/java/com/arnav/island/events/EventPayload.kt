@@ -311,6 +311,7 @@ data class MascotPayload(
     val seed: Int = 0,
     val interactiveCount: Int = 0,
     val isMusicPlaying: Boolean = false,
+    val isAssistantActive: Boolean = false,
     val mediaTitle: String? = null,
     val mediaAccent: Int = 0,
 ) : EventPayload

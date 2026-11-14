@@ -192,6 +192,7 @@ data class IslandSettings(
     // Breeze Mascot (Interactive & periodic notch companion)
     val mascotEnabled: Boolean = true,
     val mascotTapToSummon: Boolean = true,
+    val mascotOnAssistantEnabled: Boolean = true,
     val mascotPeriodicEnabled: Boolean = true,
     val mascotIntervalMinutes: Int = 15,
     val mascotDurationMs: Long = 4500L,

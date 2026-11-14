@@ -99,7 +99,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
     private val screenshots = ScreenshotMonitor(service, graph.events, graph.images, scope, settingsFn)
     private val unlock = com.arnav.island.events.system.UnlockMonitor(service, graph.events, scope, settingsFn)
     private val audioRecording = com.arnav.island.events.system.AudioRecordingMonitor(service, graph.events, settingsFn)
-    private val mascot = com.arnav.island.events.system.MascotMonitor(graph.events, scope, settingsFn) {
+    private val mascot = com.arnav.island.events.system.MascotMonitor(service, graph.events, scope, settingsFn) {
         val st = controller.state
         st == IslandState.Idle || st is IslandState.Compact || st is IslandState.Split
     }
@@ -196,6 +196,7 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
                         nextMood = true,
                         forcedMood = command.mood,
                         forceMusicGroove = command.withMusic,
+                        forceAssistantMode = command.withAssistant,
                     )
                     is IslandCommand.ShowWeather -> graph.weather.showNow(command.headline)
                 }
