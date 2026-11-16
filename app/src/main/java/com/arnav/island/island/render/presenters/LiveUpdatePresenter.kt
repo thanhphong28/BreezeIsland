@@ -110,8 +110,10 @@ class LiveUpdatePresenter(rc: RenderContext) : Presenter(rc) {
         val p = payload ?: return
         val status = p.shortText
         if (status != null) {
-            rc.numberPaint.textSize = rc.sp(15f)
-            shortText.set(rc.ellipsize(status, rc.numberPaint, sideSpace(w) - inset), direction = -1, animate = true)
+            rc.numberPaint.textSize = rc.sp(14f)
+            val ellipsized = rc.ellipsize(status, rc.numberPaint, compactRightAvailableWidth(w, right))
+            fitCompactRightText(ellipsized, rc.numberPaint, w, right, rc.sp(14f))
+            shortText.set(ellipsized, direction = -1, animate = true)
             shortText.draw(canvas, rc, right, rc.baseline(rc.numberPaint, cy), rc.numberPaint, accent, a, Paint.Align.RIGHT)
         } else if (p.progress != null) {
             rc.glyphs.drawRing(canvas, w - h / 2f + rc.burnInX, cy, s / 2f - dp(1.5f), dp(2.6f), position.value, accent, IslandColors.TRACK, a)

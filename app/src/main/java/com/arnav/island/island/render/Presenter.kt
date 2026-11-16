@@ -170,7 +170,57 @@ abstract class Presenter(protected val rc: RenderContext) {
     /** Space available on the right side of the camera for compact trailing content. */
     protected fun sideSpace(w: Float): Float {
         val rightOfCamera = if (rc.cameraXInShape > 0f && rc.cameraXInShape < w) w - rc.cameraXInShape else w / 2f
-        return (rightOfCamera - rc.geometry.cameraExclusionHalfWidth).coerceAtLeast(0f)
+        return (rightOfCamera - rc.geometry.cameraExclusionHalfWidth - dp(2f)).coerceAtLeast(0f)
+    }
+
+    /** Leftmost X coordinate on the right wing that stays clear of the physical camera hole. */
+    protected fun compactRightMinX(w: Float): Float {
+        val camX = if (rc.cameraXInShape > 0f && rc.cameraXInShape < w) rc.cameraXInShape else w / 2f
+        return camX + rc.geometry.cameraExclusionHalfWidth
+    }
+
+    /** Available width for text on the right wing between the camera exclusion zone and [rightEdge]. */
+    protected fun compactRightAvailableWidth(w: Float, rightEdge: Float): Float =
+        (rightEdge - compactRightMinX(w)).coerceAtLeast(dp(16f))
+
+    /**
+     * Shrinks [paint].textSize if needed so [text] drawn with Align.RIGHT at [rightEdge] never
+     * extends leftward into the camera cutout.
+     */
+    protected fun fitCompactRightText(
+        text: String,
+        paint: android.graphics.Paint,
+        w: Float,
+        rightEdge: Float,
+        baseSizePx: Float,
+    ) {
+        paint.textSize = baseSizePx
+        val avail = compactRightAvailableWidth(w, rightEdge)
+        val measured = paint.measureText(text)
+        if (measured > avail && measured > 0f) {
+            paint.textSize = (baseSizePx * (avail / measured)).coerceAtLeast(rc.sp(9.5f))
+        }
+    }
+
+    /**
+     * Computes a 100% symmetrical compact pill size `(width, height)` around the camera so that
+     * [sampleRightText] fits comfortably on the right wing without touching the camera cutout.
+     */
+    protected fun symmetricCompactSize(
+        sampleRightText: String,
+        paint: android.graphics.Paint,
+        baseSizePx: Float,
+    ): Pair<Float, Float> {
+        val g = rc.geometry
+        val h = g.compactHeight
+        val s = slot(h)
+        val inset = (h - s) / 2f
+        paint.textSize = baseSizePx
+        val rightWingNeeded = g.cameraExclusionHalfWidth + paint.measureText(sampleRightText) + inset + dp(4f)
+        val leftWingNeeded = g.cameraExclusionHalfWidth + s + inset + dp(2f)
+        val symWidth = (maxOf(rightWingNeeded, leftWingNeeded) * 2f)
+            .coerceIn(g.compactWidth, g.compactWidth + dp(20f))
+        return symWidth to h
     }
 
     /** Content fades as the pill gets too narrow to hold it (e.g. mid-morph from idle). */

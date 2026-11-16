@@ -134,11 +134,13 @@ class SystemPresenter(rc: RenderContext) : Presenter(rc) {
         drawAnimatedGlyph(canvas, h / 2f + rc.burnInX, cy, s * 0.92f, a)
         val right = w - inset - dp(2f) + rc.burnInX
         if (isRecording) {
-            rc.numberPaint.textSize = rc.sp(15f)
-            rc.text(canvas, Formatters.elapsed(now - event.timestamp), right, rc.baseline(rc.numberPaint, cy), rc.numberPaint, IslandColors.RED, a, Paint.Align.RIGHT)
+            val recText = Formatters.elapsed(now - event.timestamp)
+            fitCompactRightText(recText, rc.numberPaint, w, right, rc.sp(14f))
+            rc.text(canvas, recText, right, rc.baseline(rc.numberPaint, cy), rc.numberPaint, IslandColors.RED, a, Paint.Align.RIGHT)
         } else {
-            rc.labelPaint.textSize = rc.sp(15f)
-            val text = rc.ellipsize(label, rc.labelPaint, sideSpace(w) - inset)
+            rc.labelPaint.textSize = rc.sp(14f)
+            val text = rc.ellipsize(label, rc.labelPaint, compactRightAvailableWidth(w, right))
+            fitCompactRightText(text, rc.labelPaint, w, right, rc.sp(14f))
             rc.text(canvas, text, right, rc.baseline(rc.labelPaint, cy), rc.labelPaint, color(), a, Paint.Align.RIGHT)
         }
     }

@@ -80,11 +80,12 @@ class WeatherPresenter(rc: RenderContext) : Presenter(rc) {
         drawAnimatedWeatherIcon(canvas, lx, cy, s * 0.48f, p.condition, a)
 
         val right = w - inset - dp(2f) + bx
-        rc.numberPaint.textSize = rc.sp(14.5f)
+        val tempText = "${p.currentTempC}°"
+        fitCompactRightText(tempText, rc.numberPaint, w, right, rc.sp(14f))
         val tempColor = accentColorFor(p.condition)
         rc.text(
             canvas,
-            "${p.currentTempC}°",
+            tempText,
             right,
             rc.baseline(rc.numberPaint, cy),
             rc.numberPaint,

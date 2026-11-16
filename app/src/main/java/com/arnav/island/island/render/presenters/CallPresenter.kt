@@ -109,9 +109,10 @@ class CallPresenter(rc: RenderContext) : Presenter(rc) {
             rc.glyphs.draw(canvas, Glyph.PHONE, right - s / 2f, cy, s * 0.62f, IslandColors.TEXT, a)
             canvas.restore()
         } else {
-            rc.numberPaint.textSize = rc.sp(15f)
             val label = durationText(now) ?: "Call"
-            rc.text(canvas, label, right - dp(2f), rc.baseline(rc.numberPaint, cy), rc.numberPaint, IslandColors.GREEN, a, Paint.Align.RIGHT)
+            val rightEdge = right - dp(2f)
+            fitCompactRightText(label, rc.numberPaint, w, rightEdge, rc.sp(14f))
+            rc.text(canvas, label, rightEdge, rc.baseline(rc.numberPaint, cy), rc.numberPaint, IslandColors.GREEN, a, Paint.Align.RIGHT)
         }
     }
 

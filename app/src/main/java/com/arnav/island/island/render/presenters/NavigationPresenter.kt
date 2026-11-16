@@ -69,9 +69,11 @@ class NavigationPresenter(rc: RenderContext) : Presenter(rc) {
         val cy = h / 2f + rc.burnInY
         if (maneuver.hasImage) maneuver.draw(canvas, inset + rc.burnInX, inset + rc.burnInY, s, s * 0.2f, a)
         else rc.glyphs.draw(canvas, Glyph.NAV_ARROW, h / 2f + rc.burnInX, cy, s * 0.9f, tint, a)
-        rc.numberPaint.textSize = rc.sp(15f)
-        val text = rc.ellipsize(nav?.distance?.ifBlank { null } ?: event.title, rc.numberPaint, sideSpace(w) - inset)
-        rc.text(canvas, text, w - inset - dp(2f) + rc.burnInX, rc.baseline(rc.numberPaint, cy), rc.numberPaint, IslandColors.TEXT, a, Paint.Align.RIGHT)
+        val right = w - inset - dp(2f) + rc.burnInX
+        rc.numberPaint.textSize = rc.sp(14f)
+        val text = rc.ellipsize(nav?.distance?.ifBlank { null } ?: event.title, rc.numberPaint, compactRightAvailableWidth(w, right))
+        fitCompactRightText(text, rc.numberPaint, w, right, rc.sp(14f))
+        rc.text(canvas, text, right, rc.baseline(rc.numberPaint, cy), rc.numberPaint, IslandColors.TEXT, a, Paint.Align.RIGHT)
     }
 
     private fun drawExpanded(canvas: Canvas, alpha: Float) {

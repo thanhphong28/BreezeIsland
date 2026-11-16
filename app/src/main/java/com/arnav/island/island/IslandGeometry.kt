@@ -131,7 +131,7 @@ class IslandGeometry(
     val compactWidth: Float = if (config.compactWidthDp > 0f) {
         dp(config.compactWidthDp)
     } else if (config.splitBubbleOnLeft) {
-        (screen.widthPx * 0.355f).coerceIn(dp(126f), dp(136f))
+        (screen.widthPx * 0.328f).coerceIn(dp(120f), dp(126f))
     } else {
         (screen.widthPx * 0.40f).coerceIn(dp(144f), dp(176f))
     }.coerceIn(holeRadius * 2f + dp(48f), maxWidth)
@@ -179,17 +179,8 @@ class IslandGeometry(
         IdleStyle.HIDDEN -> ShapeFrame(anchorX, cameraY, 0f, 0f, 0f)
     }
 
-    fun compactFrame(widthPx: Float = compactWidth): ShapeFrame {
-        val frame = placed(widthPx, compactHeight)
-        if (!config.splitBubbleOnLeft || config.compactWidthDp > 0f || !screen.isPortrait) return frame
-        // Keep the right edge of the compact pill clear of One UI's right-side system icon cluster (🏢 🔇 🛜 📶 🔋).
-        val maxRight = (anchorX + dp(58f)).coerceAtMost(screen.widthPx * 0.66f)
-        val overflowRight = frame.right - maxRight
-        if (overflowRight <= 0f) return frame
-        val minCenterX = (anchorX - frame.width / 2f + holeRadius + dp(28f))
-        val shiftedCx = (frame.centerX - overflowRight).coerceAtLeast(minCenterX)
-        return frame.copy(centerX = shiftedCx)
-    }
+    fun compactFrame(widthPx: Float = compactWidth): ShapeFrame =
+        placed(widthPx, compactHeight)
 
     fun frameFor(widthPx: Float, heightPx: Float): ShapeFrame = placed(widthPx, heightPx)
 

@@ -79,6 +79,8 @@ class IslandGeometryTest {
         val g = geometry(GeometryConfig(splitBubbleOnLeft = true))
         val compact = g.compactFrame()
         val (main, bubble) = g.splitFrames()
+        assertEquals(g.anchorX, compact.centerX, 0.001f)
+        assertEquals(g.anchorX - compact.left, compact.right - g.anchorX, 0.001f)
         assertTrue(bubble.right < main.left)
         assertTrue(bubble.left > screen.widthPx * 0.12f)
         assertTrue(compact.right <= screen.widthPx * 0.665f)

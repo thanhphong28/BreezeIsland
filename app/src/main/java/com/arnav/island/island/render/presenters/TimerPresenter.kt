@@ -35,6 +35,7 @@ class TimerPresenter(rc: RenderContext) : Presenter(rc) {
 
     override fun measure(event: IslandEvent, mode: PresentMode): Pair<Float, Float> = when (mode) {
         PresentMode.EXPANDED, PresentMode.TOAST -> expandedWidth to (bandInset + dp(if (event.type == EventType.TIMER_DONE) 76f else 86f))
+        PresentMode.COMPACT -> symmetricCompactSize("00:00", rc.numberPaint, rc.sp(14f))
         else -> super.measure(event, mode)
     }
 
@@ -153,26 +154,30 @@ class TimerPresenter(rc: RenderContext) : Presenter(rc) {
         val cy = h / 2f + by
         val right = w - (h - s) / 2f - dp(2f) + bx
 
-        rc.numberPaint.textSize = rc.sp(15f)
         when {
             isRinging -> {
                 val pulse = 1f + 0.08f * sin(rc.animTime * 9f)
                 rc.glyphs.draw(canvas, Glyph.TIMER, lx, cy, s * 0.92f * pulse, accent, a)
-                rc.labelPaint.textSize = rc.sp(15f)
-                rc.text(canvas, "Done", right, rc.baseline(rc.labelPaint, cy), rc.labelPaint, accent, a, Paint.Align.RIGHT)
+                val doneLabel = "Done"
+                fitCompactRightText(doneLabel, rc.labelPaint, w, right, rc.sp(13.5f))
+                rc.text(canvas, doneLabel, right, rc.baseline(rc.labelPaint, cy), rc.labelPaint, accent, a, Paint.Align.RIGHT)
             }
             isStopwatch -> {
                 val sw = stopwatch ?: return
                 drawLapDial(canvas, sw, lx, cy, s / 2f - dp(1f), now, a)
                 val color = ColorExtractor.blend(if (sw.isRunning) IslandColors.TEXT else IslandColors.TEXT_SECONDARY, accent, lapFlash.value)
-                compactText.set(Formatters.elapsed(sw.elapsedAt(now)), direction = 1, animate = true)
+                val timeStr = Formatters.elapsed(sw.elapsedAt(now))
+                fitCompactRightText(timeStr, rc.numberPaint, w, right, rc.sp(14f))
+                compactText.set(timeStr, direction = 1, animate = true)
                 compactText.draw(canvas, rc, right, rc.baseline(rc.numberPaint, cy), rc.numberPaint, color, a, Paint.Align.RIGHT)
             }
             else -> {
                 val t = timer ?: return
                 val (color, pulse) = countdownStyle(now, if (t.isPaused) IslandColors.TEXT_SECONDARY else accent)
                 rc.glyphs.drawRing(canvas, lx, cy, s / 2f - dp(1.5f), dp(2.6f), t.fractionRemaining(now), color, IslandColors.TRACK, a)
-                compactText.set(Formatters.countdown(t.remainingAt(now)), direction = -1, animate = true)
+                val timeStr = Formatters.countdown(t.remainingAt(now))
+                fitCompactRightText(timeStr, rc.numberPaint, w, right, rc.sp(14f))
+                compactText.set(timeStr, direction = -1, animate = true)
                 canvas.save()
                 canvas.scale(pulse, pulse, right, cy)
                 compactText.draw(canvas, rc, right, rc.baseline(rc.numberPaint, cy), rc.numberPaint, color, a, Paint.Align.RIGHT)

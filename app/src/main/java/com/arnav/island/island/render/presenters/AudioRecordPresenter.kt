@@ -38,6 +38,7 @@ class AudioRecordPresenter(rc: RenderContext) : Presenter(rc) {
 
     override fun measure(event: IslandEvent, mode: PresentMode): Pair<Float, Float> = when (mode) {
         PresentMode.EXPANDED, PresentMode.TOAST -> expandedWidth to (bandInset + dp(122f))
+        PresentMode.COMPACT -> symmetricCompactSize("00:00", rc.numberPaint, rc.sp(14f))
         else -> super.measure(event, mode)
     }
 
@@ -119,8 +120,8 @@ class AudioRecordPresenter(rc: RenderContext) : Presenter(rc) {
 
         // Right: Elapsed recording timer + mini red dot
         val right = w - inset - dp(2f) + bx
-        rc.numberPaint.textSize = rc.sp(14.5f)
         val timeStr = Formatters.elapsed(p.elapsedAt(now))
+        fitCompactRightText(timeStr, rc.numberPaint, w, right, rc.sp(14f))
         val color = if (p.isPaused) IslandColors.TEXT_SECONDARY else IslandColors.RED
         compactTimer.set(timeStr, direction = 1, animate = true)
         compactTimer.draw(canvas, rc, right, rc.baseline(rc.numberPaint, cy), rc.numberPaint, color, a, Paint.Align.RIGHT)

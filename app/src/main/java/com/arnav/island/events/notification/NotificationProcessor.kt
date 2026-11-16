@@ -79,6 +79,10 @@ class NotificationProcessor(
     }
     private val lastProgress = HashMap<String, Float>()
     private val clockTotalMs = HashMap<String, Long>()
+    private val clockEndsAt = HashMap<String, Long>()
+    private val clockPausedRemainingMs = HashMap<String, Long>()
+    private val clockStopwatchStartMs = HashMap<String, Long>()
+    private val clockStopwatchPausedMs = HashMap<String, Long>()
     private val clockLaps = HashMap<String, MutableList<Long>>()
     var onWeatherNotification: ((title: String, text: String) -> Unit)? = null
 
@@ -203,6 +207,10 @@ class NotificationProcessor(
         engine.remove(clockAlarmId(key))
         engine.remove(audioRecordId(key))
         clockTotalMs.remove(key)
+        clockEndsAt.remove(key)
+        clockPausedRemainingMs.remove(key)
+        clockStopwatchStartMs.remove(key)
+        clockStopwatchPausedMs.remove(key)
         clockLaps.remove(key)
         lastProgress.remove(key)?.let { last ->
             engine.remove(progressId(key))
@@ -778,47 +786,228 @@ class NotificationProcessor(
         return pkg in CLOCK_PACKAGES || pkg.endsWith(".clockpackage") || pkg.endsWith(".deskclock") || pkg.endsWith(".alarmclock")
     }
 
-    private fun handleClockNotification(sbn: StatusBarNotification, s: IslandSettings) {
-        val n = sbn.notification ?: return
-        val key = sbn.key
-        val pkg = sbn.packageName
+    private data class ClockExtractedInfo(
+        val rawTitle: String,
+        val rawText: String,
+        val subText: String,
+        val actionTitles: String,
+        val allTexts: List<String>,
+        val chronoBase: Long?,
+        val chronoStarted: Boolean?,
+        val chronoCountDown: Boolean?,
+        val extraFutureMs: Long?,
+    )
+
+    @Suppress("DEPRECATION")
+    private fun extractClockInfo(sbn: StatusBarNotification): ClockExtractedInfo {
+        val n = sbn.notification
         val extras = n.extras
-        val channel = n.channelId.orEmpty().lowercase()
-        val tag = sbn.tag.orEmpty().lowercase()
         val rawTitle = (extras.getCharSequence(Notification.EXTRA_TITLE_BIG) ?: extras.getCharSequence(Notification.EXTRA_TITLE))?.toString()?.trim().orEmpty()
         val rawText = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()?.trim().orEmpty()
         val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.trim().orEmpty()
-        val actionTitles = n.actions.orEmpty().mapNotNull { it.title?.toString()?.lowercase() }.joinToString(" ")
-        val meta = "$channel $tag ${rawTitle.lowercase()} ${rawText.lowercase()} ${subText.lowercase()} $actionTitles"
+        val infoText = extras.getCharSequence(Notification.EXTRA_INFO_TEXT)?.toString()?.trim().orEmpty()
+        val summaryText = extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString()?.trim().orEmpty()
+        val shortCrit = extras.getCharSequence("android.shortCriticalText")?.toString()?.trim().orEmpty()
+        val ticker = n.tickerText?.toString()?.trim().orEmpty()
+        val actionTitleSet = n.actions.orEmpty().mapNotNull { it.title?.toString()?.trim() }.toSet()
+        val actionTitles = actionTitleSet.joinToString(" ") { it.lowercase() }
 
-        val isCountDownChrono = extras.getBoolean("android.chronometerCountDown", false)
-        val usesChrono = extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false)
+        val texts = LinkedHashSet<String>()
+        listOf(rawTitle, rawText, subText, shortCrit, infoText, summaryText, ticker).forEach {
+            if (it.isNotBlank() && it !in actionTitleSet) texts.add(it)
+        }
 
-        val isStopwatch = meta.contains("stopwatch") ||
-            meta.contains("bấm giờ") ||
-            actionTitles.contains("lap") ||
-            actionTitles.contains("vòng") ||
-            (usesChrono && !isCountDownChrono && n.`when` in 1..System.currentTimeMillis() && !meta.contains("timer") && !meta.contains("hẹn giờ") && !meta.contains("alarm") && !meta.contains("báo thức"))
+        val nowWall = System.currentTimeMillis()
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
+        var chronoBase: Long? = null
+        var chronoStarted: Boolean? = null
+        var chronoCountDown: Boolean? = if (extras.containsKey("android.chronometerCountDown")) {
+            extras.getBoolean("android.chronometerCountDown", false)
+        } else {
+            null
+        }
+        var extraFutureMs: Long? = null
 
-        val isTimer = !isStopwatch && (
-            isCountDownChrono ||
-                meta.contains("timer") ||
-                meta.contains("hẹn giờ") ||
-                meta.contains("đếm ngược") ||
-                meta.contains("countdown")
+        // Scan all Bundle extras for custom Samsung/OEM timer fields & text strings
+        runCatching {
+            for (k in extras.keySet()) {
+                val kl = k.lowercase()
+                if (kl == "android.template" || kl == "android.substname") continue
+                val v = extras.get(k) ?: continue
+                when (v) {
+                    is CharSequence -> {
+                        val s = v.toString().trim()
+                        if (s.isNotBlank() && s !in actionTitleSet) texts.add(s)
+                    }
+                    is Long -> {
+                        when {
+                            (kl.contains("remain") || kl.contains("left")) && v in 500L..MAX_CLOCK_MS ->
+                                extraFutureMs = v
+                            v in (nowWall + 500L)..(nowWall + MAX_CLOCK_MS) ->
+                                extraFutureMs = v - nowWall
+                            v in (nowElapsed + 500L)..(nowElapsed + MAX_CLOCK_MS) ->
+                                extraFutureMs = v - nowElapsed
+                        }
+                    }
+                }
+            }
+        }
+
+        // Inspect RemoteViews (Samsung Clock & OEM Clock custom notification layouts)
+        val remoteViewsList = listOfNotNull(n.bigContentView, n.contentView, n.headsUpContentView)
+        for (rv in remoteViewsList) {
+            // 1. Direct inspection of RemoteViews.mActions (fast, works on all custom RemoteViews via HiddenApiBypass)
+            runCatching {
+                var c: Class<*>? = rv.javaClass
+                var actionsField: java.lang.reflect.Field? = null
+                while (c != null && actionsField == null) {
+                    actionsField = c.declaredFields.firstOrNull { it.name == "mActions" }
+                    c = c.superclass
+                }
+                actionsField?.isAccessible = true
+                val actionsList = actionsField?.get(rv) as? Iterable<*>
+                actionsList?.forEach { act ->
+                    if (act == null) return@forEach
+                    val actClass = act.javaClass
+                    val actName = actClass.simpleName.lowercase()
+                    var methodName: String? = null
+                    var methodValue: Any? = null
+
+                    var cur: Class<*>? = actClass
+                    while (cur != null && cur != Any::class.java) {
+                        for (f in cur.declaredFields) {
+                            runCatching {
+                                f.isAccessible = true
+                                val fname = f.name.lowercase()
+                                val fval = f.get(act)
+                                when {
+                                    actName.contains("chronometer") && (fname == "base" || fname == "mbase") && fval is Long -> {
+                                        if (fval > 0L) chronoBase = fval
+                                    }
+                                    actName.contains("chronometer") && (fname == "started" || fname == "mstarted") && fval is Boolean -> {
+                                        chronoStarted = fval
+                                    }
+                                    actName.contains("chronometer") && (fname == "countdown" || fname == "mcountdown") && fval is Boolean -> {
+                                        chronoCountDown = fval
+                                    }
+                                    (fname == "methodname" || fname == "mmethodname") && fval is String -> {
+                                        methodName = fval
+                                    }
+                                    fname == "value" || fname == "mvalue" -> {
+                                        methodValue = fval
+                                    }
+                                    fval is CharSequence -> {
+                                        val str = fval.toString().trim()
+                                        if (str.isNotBlank() && !str.startsWith("set") && str !in actionTitleSet) {
+                                            texts.add(str)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        cur = cur.superclass
+                    }
+
+                    when (methodName) {
+                        "setBase" -> (methodValue as? Number)?.toLong()?.takeIf { it > 0L }?.let { chronoBase = it }
+                        "setStarted" -> (methodValue as? Boolean)?.let { chronoStarted = it }
+                        "setCountDown" -> (methodValue as? Boolean)?.let { chronoCountDown = it }
+                        "setText", "setFormat", "setContentDescription" -> {
+                            val str = methodValue?.toString()?.trim().orEmpty()
+                            if (str.isNotBlank() && str !in actionTitleSet) texts.add(str)
+                        }
+                    }
+                }
+            }
+
+            // 2. Fallback view-tree inflation if chronoBase or duration text wasn't found yet
+            if (chronoBase == null) {
+                runCatching {
+                    val pkgCtx = runCatching { context.createPackageContext(sbn.packageName, 0) }.getOrDefault(context)
+                    val root = rv.apply(pkgCtx, android.widget.FrameLayout(pkgCtx))
+                    fun walk(v: android.view.View) {
+                        when (v) {
+                            is android.widget.Chronometer -> {
+                                if (v.base > 0L) chronoBase = v.base
+                                chronoCountDown = v.isCountDown
+                                val t = v.text?.toString()?.trim().orEmpty()
+                                if (t.isNotBlank() && t !in actionTitleSet) texts.add(t)
+                            }
+                            is android.widget.Button -> Unit
+                            is android.widget.TextView -> {
+                                val t = v.text?.toString()?.trim().orEmpty()
+                                if (t.isNotBlank() && t !in actionTitleSet) texts.add(t)
+                            }
+                            is android.view.ViewGroup -> {
+                                for (i in 0 until v.childCount) {
+                                    walk(v.getChildAt(i))
+                                }
+                            }
+                        }
+                    }
+                    walk(root)
+                }
+            }
+        }
+
+        return ClockExtractedInfo(
+            rawTitle = rawTitle,
+            rawText = rawText,
+            subText = subText,
+            actionTitles = actionTitles,
+            allTexts = texts.toList(),
+            chronoBase = chronoBase,
+            chronoStarted = chronoStarted,
+            chronoCountDown = chronoCountDown,
+            extraFutureMs = extraFutureMs,
+        )
+    }
+
+    private fun handleClockNotification(sbn: StatusBarNotification, s: IslandSettings) {
+        val n = sbn.notification ?: return
+        val key = sbn.key
+        val extras = n.extras
+        val channel = n.channelId.orEmpty().lowercase()
+        val tag = sbn.tag.orEmpty().lowercase()
+        val info = extractClockInfo(sbn)
+        val joinedTexts = info.allTexts.joinToString(" ").lowercase()
+        val meta = "$channel $tag $joinedTexts ${info.actionTitles}"
+
+        val isCountDownChrono = info.chronoCountDown == true
+        val usesChrono = extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false) || info.chronoBase != null
+
+        val isKnownTimer = clockEndsAt.containsKey(key) || clockPausedRemainingMs.containsKey(key) || clockTotalMs.containsKey(key)
+        val isKnownStopwatch = clockStopwatchStartMs.containsKey(key) || clockStopwatchPausedMs.containsKey(key)
+
+        val hasTimerKeywords = isCountDownChrono ||
+            meta.contains("timer") ||
+            meta.contains("hẹn giờ") ||
+            meta.contains("bộ hẹn giờ") ||
+            meta.contains("đếm ngược") ||
+            meta.contains("countdown")
+
+        val isStopwatch = !hasTimerKeywords && !isKnownTimer && (
+            isKnownStopwatch ||
+                meta.contains("stopwatch") ||
+                meta.contains("bấm giờ") ||
+                info.actionTitles.contains("lap") ||
+                info.actionTitles.contains("vòng") ||
+                (usesChrono && !isCountDownChrono && !meta.contains("alarm") && !meta.contains("báo thức"))
             )
+
+        val isTimer = !isStopwatch && (hasTimerKeywords || isKnownTimer)
 
         when {
             isStopwatch -> {
-                if (s.stopwatchEnabled) handleClockStopwatch(sbn, rawTitle, rawText, actionTitles)
+                if (s.stopwatchEnabled) handleClockStopwatch(sbn, info)
                 else engine.remove(clockStopwatchId(key))
             }
             isTimer -> {
-                if (s.timersEnabled) handleClockTimer(sbn, rawTitle, rawText, subText, actionTitles, isCountDownChrono, usesChrono)
+                if (s.timersEnabled) handleClockTimer(sbn, info, isCountDownChrono, usesChrono)
                 else engine.remove(clockTimerId(key))
             }
             else -> {
-                if (s.alarmsEnabled) handleClockAlarm(sbn, rawTitle, rawText, s)
+                if (s.alarmsEnabled) handleClockAlarm(sbn, info.rawTitle, info.rawText, s)
                 else engine.remove(clockAlarmId(key))
             }
         }
@@ -826,17 +1015,15 @@ class NotificationProcessor(
 
     private fun handleClockTimer(
         sbn: StatusBarNotification,
-        rawTitle: String,
-        rawText: String,
-        subText: String,
-        actionTitles: String,
+        info: ClockExtractedInfo,
         isCountDownChrono: Boolean,
         usesChrono: Boolean,
     ) {
         val n = sbn.notification
         val key = sbn.key
         val pkg = sbn.packageName
-        val now = System.currentTimeMillis()
+        val nowWall = System.currentTimeMillis()
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
         val actions = n.actions.orEmpty()
 
         fun findAction(vararg words: String): Notification.Action? = actions.firstOrNull { a ->
@@ -848,33 +1035,89 @@ class NotificationProcessor(
         val cancelStopAction = findAction("cancel", "hủy", "delete", "xóa", "dismiss", "bỏ qua", "stop", "dừng", "reset", "đặt lại")
         val addAction = findAction("+1", "add", "thêm", "1:00", "1 min", "1 phút", "restart", "khởi động lại")
 
-        val isPaused = actionTitles.contains("resume") ||
-            actionTitles.contains("tiếp tục") ||
-            rawTitle.lowercase().contains("paused") ||
-            rawText.lowercase().contains("paused") ||
-            rawTitle.lowercase().contains("tạm dừng") ||
-            rawText.lowercase().contains("tạm dừng")
+        val allLower = info.allTexts.joinToString(" ").lowercase()
+        val isPaused = info.chronoStarted == false ||
+            info.actionTitles.contains("resume") ||
+            info.actionTitles.contains("tiếp tục") ||
+            allLower.contains("paused") ||
+            allLower.contains("tạm dừng")
 
-        val parsedMs = parseDurationMs(rawTitle) ?: parseDurationMs(rawText) ?: parseDurationMs(subText)
-        val chronoRemainingMs = if ((usesChrono || isCountDownChrono) && n.`when` > now) (n.`when` - now) else null
-        val remainingMs = chronoRemainingMs ?: parsedMs ?: 0L
+        // 1. Duration from RemoteViews Chronometer base (elapsedRealtime or wall-clock)
+        val chronoRemainingMs: Long? = info.chronoBase?.let { base ->
+            when {
+                base in (nowElapsed + 100L)..(nowElapsed + MAX_CLOCK_MS) -> base - nowElapsed
+                base in (nowWall + 100L)..(nowWall + MAX_CLOCK_MS) -> base - nowWall
+                else -> null
+            }
+        }
 
+        // 2. Duration from Notification.when (wall-clock or elapsedRealtime)
+        val whenRemainingMs: Long? = n.`when`.takeIf { it > 0L }?.let { w ->
+            when {
+                w in (nowWall + 100L)..(nowWall + MAX_CLOCK_MS) -> w - nowWall
+                (usesChrono || isCountDownChrono) && w in (nowElapsed + 100L)..(nowElapsed + MAX_CLOCK_MS) -> w - nowElapsed
+                else -> null
+            }
+        }
+
+        // 3. Duration parsed from any text in RemoteViews / extras (preferring 3-part HH:MM:SS first)
+        val parsedMs: Long? = info.allTexts
+            .mapNotNull { t -> parseDurationMs(t)?.let { ms -> t to ms } }
+            .sortedByDescending { (t, _) -> t.count { c -> c == ':' } }
+            .firstOrNull { (_, ms) -> ms > 0L }
+            ?.second
+            ?: info.allTexts.firstNotNullOfOrNull(::parseDurationMs)
+
+        // 4. Resolve effective remaining time (preserving active countdown across metadata updates & pauses)
+        val freshRemaining = chronoRemainingMs ?: whenRemainingMs ?: info.extraFutureMs ?: parsedMs?.takeIf { it > 0L }
+        val cachedRunningRemaining = clockEndsAt[key]?.let { (it - nowWall).coerceAtLeast(0L) }?.takeIf { it > 0L }
+        val cachedPausedRemaining = clockPausedRemainingMs[key]?.takeIf { it > 0L }
+
+        val remainingMs = if (isPaused) {
+            (parsedMs?.takeIf { it > 0L } ?: freshRemaining ?: cachedRunningRemaining ?: cachedPausedRemaining ?: 0L).also { rem ->
+                if (rem > 0L) clockPausedRemainingMs[key] = rem
+                clockEndsAt.remove(key)
+            }
+        } else {
+            (freshRemaining ?: cachedRunningRemaining ?: cachedPausedRemaining ?: 0L).also { rem ->
+                if (rem > 0L) {
+                    clockEndsAt[key] = nowWall + rem
+                    clockPausedRemainingMs.remove(key)
+                }
+            }
+        }
+
+        // A timer is ringing ONLY when it has no Pause/Resume control or explicitly announces completion
+        val explicitRingingText = allLower.contains("time's up") ||
+            allLower.contains("hết giờ") ||
+            allLower.contains("đã hết thời gian") ||
+            allLower.contains("timer expired") ||
+            allLower.contains("-00:")
         val isRinging = !isPaused && (
             n.fullScreenIntent != null ||
                 n.category == Notification.CATEGORY_ALARM ||
-                (remainingMs <= 0L && (parsedMs == 0L || actionTitles.contains("dismiss") || actionTitles.contains("bỏ qua") || actionTitles.contains("stop") || actionTitles.contains("dừng"))) ||
-                rawTitle.lowercase().contains("time's up") ||
-                rawText.lowercase().contains("time's up") ||
-                rawTitle.lowercase().contains("hết giờ") ||
-                rawText.lowercase().contains("hết giờ")
+                explicitRingingText ||
+                (remainingMs <= 0L && pauseResumeAction == null && (
+                    info.actionTitles.contains("dismiss") ||
+                        info.actionTitles.contains("bỏ qua") ||
+                        info.actionTitles.contains("stop") ||
+                        info.actionTitles.contains("dừng") ||
+                        info.actionTitles.contains("restart") ||
+                        info.actionTitles.contains("khởi động lại")
+                    ))
             )
+
+        if (isRinging) {
+            clockEndsAt.remove(key)
+            clockPausedRemainingMs.remove(key)
+        }
 
         val prevTotal = clockTotalMs[key] ?: 0L
         val totalMs = maxOf(prevTotal, remainingMs, 1_000L)
         clockTotalMs[key] = totalMs
 
-        val endsAt = if (chronoRemainingMs != null) n.`when` else now + remainingMs
-        val cleanLabel = listOf(rawTitle, rawText, subText)
+        val endsAt = clockEndsAt[key] ?: (nowWall + remainingMs)
+        val cleanLabel = info.allTexts
             .firstOrNull { it.isNotBlank() && parseDurationMs(it) == null }
             ?.takeIf { it.length <= 32 }
             ?: if (settings().language == AppLanguage.VIETNAMESE) "Hẹn giờ" else "Timer"
@@ -928,7 +1171,7 @@ class NotificationProcessor(
                 id = clockTimerId(key),
                 source = EventSource.TIMER,
                 type = if (isRinging) EventType.TIMER_DONE else EventType.TIMER,
-                timestamp = now,
+                timestamp = nowWall,
                 persistent = true,
                 title = cleanLabel,
                 icon = Glyph.TIMER,
@@ -946,7 +1189,7 @@ class NotificationProcessor(
                     remainingWhenPausedMs = remainingMs,
                     isPaused = isPaused,
                     isRinging = isRinging,
-                    ringingSince = if (isRinging) now else 0L,
+                    ringingSince = if (isRinging) nowWall else 0L,
                 ),
             )
         )
@@ -954,14 +1197,13 @@ class NotificationProcessor(
 
     private fun handleClockStopwatch(
         sbn: StatusBarNotification,
-        rawTitle: String,
-        rawText: String,
-        actionTitles: String,
+        info: ClockExtractedInfo,
     ) {
         val n = sbn.notification
         val key = sbn.key
         val pkg = sbn.packageName
-        val now = System.currentTimeMillis()
+        val nowWall = System.currentTimeMillis()
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
         val extras = n.extras
         val usesChrono = extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false)
         val actions = n.actions.orEmpty()
@@ -971,22 +1213,48 @@ class NotificationProcessor(
             words.any { w -> t.contains(w) }
         }
 
-        val isRunning = !(
-            actionTitles.contains("resume") ||
-                actionTitles.contains("tiếp tục") ||
-                actionTitles.contains("start") ||
-                actionTitles.contains("bắt đầu") ||
-                rawTitle.lowercase().contains("paused") ||
-                rawText.lowercase().contains("paused") ||
-                rawTitle.lowercase().contains("tạm dừng") ||
-                rawText.lowercase().contains("tạm dừng")
+        val allLower = info.allTexts.joinToString(" ").lowercase()
+        val isRunning = info.chronoStarted != false && !(
+            info.actionTitles.contains("resume") ||
+                info.actionTitles.contains("tiếp tục") ||
+                info.actionTitles.contains("start") ||
+                info.actionTitles.contains("bắt đầu") ||
+                allLower.contains("paused") ||
+                allLower.contains("tạm dừng")
             )
 
-        val parsedMs = parseDurationMs(rawTitle) ?: parseDurationMs(rawText)
-        val chronoElapsedMs = if (usesChrono && n.`when` in 1..now) (now - n.`when`) else null
-        val elapsedMs = chronoElapsedMs ?: parsedMs ?: 0L
+        val chronoElapsedMs: Long? = info.chronoBase?.let { base ->
+            when {
+                base in 1..nowElapsed && (nowElapsed - base) <= MAX_CLOCK_MS -> nowElapsed - base
+                base in 1..nowWall && (nowWall - base) <= MAX_CLOCK_MS -> nowWall - base
+                else -> null
+            }
+        } ?: if (usesChrono && n.`when` in 1..nowWall && (nowWall - n.`when`) <= MAX_CLOCK_MS) {
+            nowWall - n.`when`
+        } else {
+            null
+        }
 
-        val runningSince = if (isRunning) (now - elapsedMs) else now
+        val parsedMs: Long? = info.allTexts
+            .mapNotNull(::parseDurationMs)
+            .firstOrNull { it > 0L }
+            ?: info.allTexts.firstNotNullOfOrNull(::parseDurationMs)
+
+        val cachedRunningElapsed = clockStopwatchStartMs[key]?.let { (nowWall - it).coerceAtLeast(0L) }
+        val cachedPausedElapsed = clockStopwatchPausedMs[key]
+
+        val elapsedMs = if (isRunning) {
+            (chronoElapsedMs ?: parsedMs ?: cachedRunningElapsed ?: cachedPausedElapsed ?: 0L).also { el ->
+                clockStopwatchStartMs[key] = nowWall - el
+                clockStopwatchPausedMs.remove(key)
+            }
+        } else {
+            (parsedMs ?: chronoElapsedMs ?: cachedRunningElapsed ?: cachedPausedElapsed ?: 0L).also { el ->
+                clockStopwatchPausedMs[key] = el
+            }
+        }
+
+        val runningSince = if (isRunning) (nowWall - elapsedMs) else nowWall
         val accumulatedMs = if (isRunning) 0L else elapsedMs
 
         val laps = clockLaps.getOrPut(key) { ArrayList() }
@@ -1035,7 +1303,7 @@ class NotificationProcessor(
                 id = clockStopwatchId(key),
                 source = EventSource.STOPWATCH,
                 type = EventType.STOPWATCH,
-                timestamp = now,
+                timestamp = nowWall,
                 persistent = true,
                 title = if (settings().language == AppLanguage.VIETNAMESE) "Bấm giờ" else "Stopwatch",
                 icon = Glyph.STOPWATCH,
@@ -1128,17 +1396,41 @@ class NotificationProcessor(
 
     private fun parseDurationMs(text: String): Long? {
         if (text.isBlank()) return null
-        CLOCK_HMS_REGEX.find(text)?.let { m ->
-            val p1 = m.groupValues[1].toLongOrNull() ?: return null
-            val p2 = m.groupValues[2].toLongOrNull() ?: return null
-            val p3 = m.groupValues[3].takeIf { it.isNotEmpty() }?.toLongOrNull()
-            val hundredths = m.groupValues[4].takeIf { it.isNotEmpty() }?.padEnd(2, '0')?.take(2)?.toLongOrNull() ?: 0L
+        val trimmed = text.trim()
+        if (trimmed.startsWith("+")) return null // ignore "+1:00" / "+ 00:01:00" action button labels
+        val matches = CLOCK_HMS_REGEX.findAll(trimmed).toList()
+        // Prefer 3-part HH:MM:SS matches over 2-part MM:SS when multiple colon groups exist in the same string
+        val bestMatch = matches.firstOrNull { it.groupValues[3].isNotEmpty() } ?: matches.firstOrNull()
+        if (bestMatch != null) {
+            val p1 = bestMatch.groupValues[1].toLongOrNull() ?: return null
+            val p2 = bestMatch.groupValues[2].toLongOrNull() ?: return null
+            val p3 = bestMatch.groupValues[3].takeIf { it.isNotEmpty() }?.toLongOrNull()
+            val hundredths = bestMatch.groupValues[4].takeIf { it.isNotEmpty() }?.padEnd(2, '0')?.take(2)?.toLongOrNull() ?: 0L
             val totalSeconds = if (p3 != null) {
                 p1 * 3600L + p2 * 60L + p3
             } else {
                 p1 * 60L + p2
             }
             return totalSeconds * 1_000L + hundredths * 10L
+        }
+
+        // Fallback for verbal timer strings (e.g. "5 phút 30 giây", "5m 30s", "45 giây", "5 min")
+        var verbalSeconds = 0L
+        var matchedVerbal = false
+        CLOCK_HOURS_WORD_REGEX.find(trimmed)?.groupValues?.getOrNull(1)?.toLongOrNull()?.let {
+            verbalSeconds += it * 3600L
+            matchedVerbal = true
+        }
+        CLOCK_MINUTES_WORD_REGEX.find(trimmed)?.groupValues?.getOrNull(1)?.toLongOrNull()?.let {
+            verbalSeconds += it * 60L
+            matchedVerbal = true
+        }
+        CLOCK_SECONDS_WORD_REGEX.find(trimmed)?.groupValues?.getOrNull(1)?.toLongOrNull()?.let {
+            verbalSeconds += it
+            matchedVerbal = true
+        }
+        if (matchedVerbal && verbalSeconds > 0L) {
+            return verbalSeconds * 1_000L
         }
         return null
     }
@@ -1440,6 +1732,7 @@ class NotificationProcessor(
         private const val AVATAR_PX = 96
         private const val MAX_SENDERS = 3
         private const val CHIP_SNOOZE_MS = 3_600_000L
+        private const val MAX_CLOCK_MS = 100L * 3_600_000L
 
         private val CLOCK_PACKAGES = setOf(
             "com.sec.android.app.clockpackage",
@@ -1472,6 +1765,9 @@ class NotificationProcessor(
             "com.huawei.android.totemweather",
         )
         private val CLOCK_HMS_REGEX = Regex("""\b(\d{1,2}):(\d{2})(?::(\d{2}))?(?:[.,](\d{1,2}))?\b""")
+        private val CLOCK_HOURS_WORD_REGEX = Regex("""\b(\d{1,2})\s*(?:giờ|h|hr|hrs|hour|hours)\b""", RegexOption.IGNORE_CASE)
+        private val CLOCK_MINUTES_WORD_REGEX = Regex("""\b(\d{1,3})\s*(?:phút|p|m|min|mins|minute|minutes)\b""", RegexOption.IGNORE_CASE)
+        private val CLOCK_SECONDS_WORD_REGEX = Regex("""\b(\d{1,2})\s*(?:giây|s|sec|secs|second|seconds)\b""", RegexOption.IGNORE_CASE)
 
         private val DELIVERY_APPS = setOf(
             "in.swiggy.android", "com.application.zomato", "com.ubercab.eats", "com.grofers.customerapp",

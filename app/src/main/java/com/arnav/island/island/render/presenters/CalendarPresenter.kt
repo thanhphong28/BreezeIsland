@@ -118,9 +118,11 @@ class CalendarPresenter(rc: RenderContext) : Presenter(rc) {
         val s = slot(h)
         val cy = h / 2f + rc.burnInY
         rc.glyphs.draw(canvas, Glyph.CALENDAR, h / 2f + rc.burnInX, cy, s * 0.86f, color, a)
-        rc.numberPaint.textSize = rc.sp(15f)
-        countdown.set(label(now), direction = -1, animate = true)
-        countdown.draw(canvas, rc, w - (h - s) / 2f - dp(2f) + rc.burnInX, rc.baseline(rc.numberPaint, cy), rc.numberPaint, color, a, Paint.Align.RIGHT)
+        val right = w - (h - s) / 2f - dp(2f) + rc.burnInX
+        val lbl = label(now)
+        fitCompactRightText(lbl, rc.numberPaint, w, right, rc.sp(14f))
+        countdown.set(lbl, direction = -1, animate = true)
+        countdown.draw(canvas, rc, right, rc.baseline(rc.numberPaint, cy), rc.numberPaint, color, a, Paint.Align.RIGHT)
     }
 
     private fun drawCard(canvas: Canvas, alpha: Float, now: Long) {
