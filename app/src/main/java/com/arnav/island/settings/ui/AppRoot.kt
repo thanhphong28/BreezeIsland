@@ -48,6 +48,7 @@ import com.arnav.island.settings.ui.screens.BlendScreen
 import com.arnav.island.settings.ui.screens.BluetoothScreen
 import com.arnav.island.settings.ui.screens.CalibrationScreen
 import com.arnav.island.settings.ui.screens.ChargingScreen
+import com.arnav.island.settings.ui.screens.CoverScreenSettingsScreen
 import com.arnav.island.settings.ui.screens.DeveloperScreen
 import com.arnav.island.settings.ui.screens.DiagnosticsScreen
 import com.arnav.island.settings.ui.screens.EventsScreen
@@ -73,7 +74,7 @@ import kotlinx.coroutines.launch
 enum class Dest {
     HOME, ISLAND, SOUND_ISLAND, CALIBRATION, EVENTS, APPS, MEDIA, NOTIFICATIONS, BATTERY, CHARGING, BLUETOOTH, TIMERS,
     GESTURES, APPEARANCE, PERFORMANCE, PRIVACY, ADVANCED, DEVELOPER, ABOUT,
-    STUDIO, WHATS_NEW, STATUS_BAR, BLEND, GALLERY, DIAGNOSTICS, UNLOCK, MASCOT, WEATHER,
+    STUDIO, WHATS_NEW, STATUS_BAR, BLEND, GALLERY, DIAGNOSTICS, UNLOCK, MASCOT, WEATHER, COVER_SCREEN,
 }
 
 /** Everything a screen needs besides the settings snapshot. */
@@ -252,6 +253,7 @@ fun IslandRoot(graph: AppGraph, initial: Dest?, sharedSetup: String? = null, onS
                 Dest.UNLOCK -> UnlockScreen(settings, ui)
                 Dest.MASCOT -> MascotScreen(settings, ui)
                 Dest.WEATHER -> WeatherScreen(settings, ui)
+                Dest.COVER_SCREEN -> CoverScreenSettingsScreen(settings, ui)
             }
         }
     }

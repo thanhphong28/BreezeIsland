@@ -18,6 +18,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.arnav.island.IslandApp
 import com.arnav.island.R
+import com.arnav.island.coverscreen.CoverScreenController
 import com.arnav.island.settings.MainActivity
 import com.arnav.island.soundisland.SoundIslandController
 import com.arnav.island.util.Diagnostics
@@ -36,6 +37,7 @@ class IslandOverlayService : Service() {
 
     private var runtime: OverlayRuntime? = null
     private var soundIsland: SoundIslandController? = null
+    private var coverScreen: CoverScreenController? = null
     private var settingsJob: Job? = null
 
     override fun onCreate() {
@@ -51,9 +53,14 @@ class IslandOverlayService : Service() {
             it.start()
             activeSoundIsland = it
         }
+        coverScreen = CoverScreenController(this, graph) { graph.settings.state.value }.also {
+            it.start()
+            activeCoverScreen = it
+        }
         settingsJob = graph.scope.launch {
             graph.settings.flow.collect { s ->
                 soundIsland?.updateSettings(s)
+                coverScreen?.updateSettings(s)
             }
         }
         _running.value = true
@@ -97,6 +104,11 @@ class IslandOverlayService : Service() {
             activeSoundIsland = null
         }
         soundIsland = null
+        coverScreen?.stop()
+        if (activeCoverScreen === coverScreen) {
+            activeCoverScreen = null
+        }
+        coverScreen = null
         settingsJob?.cancel()
         settingsJob = null
         _running.value = false
@@ -140,6 +152,9 @@ class IslandOverlayService : Service() {
         val running: StateFlow<Boolean> = _running.asStateFlow()
 
         var activeSoundIsland: SoundIslandController? = null
+            internal set
+
+        var activeCoverScreen: CoverScreenController? = null
             internal set
 
         fun ensureChannel(context: Context) {
