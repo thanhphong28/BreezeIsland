@@ -19,9 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.arnav.island.overlay.ForegroundAppMonitor
 import com.arnav.island.permissions.OnPhoneGranter
-import com.arnav.island.permissions.Permissions
 import com.arnav.island.settings.ui.Ui
 import com.arnav.island.settings.ui.components.Group
 import com.arnav.island.settings.ui.components.InfoCard
@@ -45,9 +43,6 @@ fun UnlockScreen(s: IslandSettings, ui: Ui) {
 
     val hasHardwareLog = remember(permTick) {
         OnPhoneGranter.hasReadLogsPermission(context)
-    }
-    val hasUsageAccess = remember(permTick) {
-        ForegroundAppMonitor.hasUsageAccess(context)
     }
 
     SettingsPage(
@@ -110,11 +105,11 @@ fun UnlockScreen(s: IslandSettings, ui: Ui) {
         if (s.unlockAnimationEnabled && s.unlockInAppBiometricEnabled) {
             item {
                 Group(
-                    title = if (vi) "Độ nhạy nhận diện vân tay trong App" else "In-App Fingerprint Detection Engine",
+                    title = if (vi) "Nhận diện cảm biến vân tay" else "Hardware Fingerprint Detection",
                     footer = if (vi) {
-                        "Kết hợp cảm biến phần cứng (qua Shizuku/ADB) và Usage Access mà không dùng Accessibility Service."
+                        "Chỉ kích hoạt khi xác thực bằng cảm biến vân tay phần cứng (BIOMETRIC_STRONG), không kích hoạt nhầm khi mở khóa khuôn mặt, mã PIN hay chuyển trang trong ứng dụng."
                     } else {
-                        "Combines hardware biometric callbacks (via Shizuku/ADB) and Usage Access with zero Accessibility Service."
+                        "Strictly triggers on hardware fingerprint authentication (BIOMETRIC_STRONG), ignoring Face Unlock, PIN/Pattern, or normal app navigation."
                     }
                 ) {
                     SettingRow(
@@ -127,10 +122,10 @@ fun UnlockScreen(s: IslandSettings, ui: Ui) {
                         },
                         subtitle = if (vi) {
                             if (hasHardwareLog) "Bắt chính xác mọi lần chạm vân tay trong mọi app Ngân hàng, MoMo, Khóa ứng dụng (< 20ms)"
-                            else "Bấm để cấp quyền qua Shizuku giúp phát hiện 100% mọi lần quét vân tay trong Ngân hàng & App"
+                            else "Bấm để cấp quyền qua Shizuku giúp phát hiện 100% mọi lần quét vân tay"
                         } else {
                             if (hasHardwareLog) "Detects every fingerprint scan across all banking apps and app locks (< 20ms)"
-                            else "Tap to grant via Shizuku for instant 100% in-app fingerprint detection"
+                            else "Tap to grant via Shizuku for instant 100% fingerprint detection"
                         },
                         icon = if (hasHardwareLog) Icons.Rounded.CheckCircle else Icons.Rounded.VerifiedUser,
                         iconColor = if (hasHardwareLog) BadgeColors.Green else BadgeColors.Orange,
@@ -140,23 +135,6 @@ fun UnlockScreen(s: IslandSettings, ui: Ui) {
                             }
                         }
                     )
-
-                    if (!hasUsageAccess) {
-                        SettingRow(
-                            title = if (vi) "Cấp quyền Truy cập dữ liệu sử dụng (Dự phòng)" else "Grant Usage Access (Fallback)",
-                            subtitle = if (vi) {
-                                "Giúp nhận diện hộp thoại vân tay hệ thống ngay cả khi không bật Shizuku"
-                            } else {
-                                "Detects system biometric dialogs even without Shizuku"
-                            },
-                            icon = Icons.Rounded.Fingerprint,
-                            iconColor = BadgeColors.Blue,
-                            onClick = {
-                                runCatching { context.startActivity(Permissions.usageAccessSettings(context)) }
-                                    .onFailure { runCatching { context.startActivity(Permissions.usageAccessFallback()) } }
-                            }
-                        )
-                    }
                 }
             }
         }

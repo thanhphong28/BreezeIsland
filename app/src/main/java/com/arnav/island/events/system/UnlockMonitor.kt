@@ -1,8 +1,6 @@
 package com.arnav.island.events.system
 
 import android.app.KeyguardManager
-import android.app.usage.UsageEvents
-import android.app.usage.UsageStatsManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -23,7 +21,6 @@ import com.arnav.island.events.Glyph
 import com.arnav.island.events.IslandEvent
 import com.arnav.island.events.UnlockMethod
 import com.arnav.island.events.UnlockPayload
-import com.arnav.island.overlay.ForegroundAppMonitor
 import com.arnav.island.permissions.OnPhoneGranter
 import com.arnav.island.storage.IslandSettings
 import com.arnav.island.util.Diagnostics
@@ -36,24 +33,17 @@ import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.Locale
+import kotlin.math.abs
 
 /**
- * Monitors both:
- *  1. Device lockscreen unlocks ([Intent.ACTION_USER_PRESENT])
- *  2. In-app fingerprint & biometric authentications (Banking apps, e-wallets, App Lock, Passkeys)
- *     using a 5-layer zero-Accessibility detector:
- *      - Layer 1 (Android 15+ Official API): [BiometricManager.getLastAuthenticationTime] for
- *        `BIOMETRIC_STRONG` & `DEVICE_CREDENTIAL` (requires only install-time `USE_BIOMETRIC`).
- *      - Layer 2 (Shizuku Hardware/System Log Stream): Multi-buffer (`main,system,events`) log
- *        watcher running as UID 2000 (`shell`) to bypass Android 13+ `LogcatManagerService`.
- *      - Layer 3 (Biometric Activity & Foreground Service UsageEvents): Detects both Activity and
- *        ForegroundService (`FOREGROUND_SERVICE_START`/`STOP`) lifecycle of system biometric
- *        providers (`com.samsung.android.biometrics.app.setting`, `Samsung Pass`, `BiometricPrompt`).
- *      - Layer 4 (In-App Login -> Home Activity Transition): Detects banking & finance apps
- *        transitioning from a Login/Auth/Biometric Activity to their Main/Home/Dashboard Activity.
- *      - Layer 5 (Modal Biometric Overlay Pause/Resume): Detects when a foreground app briefly
- *        pauses (`ACTIVITY_PAUSED`) for a translucent biometric dialog and resumes (`ACTIVITY_RESUMED`)
- *        on the exact same Activity without switching apps.
+ * Monitors strictly hardware fingerprint authentications (both lockscreen fingerprint unlock and
+ * in-app fingerprint authentication) with zero false positives on Face Unlock, PIN/Pattern,
+ * Swipe-to-unlock, or normal app/dialog navigation:
+ *  - Layer 1 (Android 15+ Official API): [BiometricManager.getLastAuthenticationTime] for
+ *    [BiometricManager.Authenticators.BIOMETRIC_STRONG] ONLY (excludes `DEVICE_CREDENTIAL` and
+ *    `BIOMETRIC_WEAK` 2D Face Unlock).
+ *  - Layer 2 (Shizuku / READ_LOGS Hardware Fingerprint Stream): Watches explicit fingerprint HAL /
+ *    service authentication callbacks (`FingerprintService`, `SemFp`, `udfps`).
  */
 class UnlockMonitor(
     private val context: Context,
@@ -64,116 +54,30 @@ class UnlockMonitor(
     companion object {
         private const val TAG = "UnlockMonitor"
         const val EVENT_ID = "system:unlock"
-        private const val DEBOUNCE_MS = 1_800L
-        private const val POST_UNLOCK_GRACE_MS = 2_000L
+        private const val DEBOUNCE_MS = 2_000L
+        private const val FINGERPRINT_MATCH_WINDOW_MS = 3_000L
 
-        private val BIOMETRIC_PACKAGES = setOf(
-            "com.samsung.android.biometrics.app.setting",
-            "com.samsung.android.samsungpass",
-            "com.samsung.android.authfw",
-            "com.samsung.android.spay",
-            "com.vivo.fingerprint",
-            "com.vivo.secime.service",
-            "com.coloros.safecenter",
-            "com.oplus.safecenter",
-        )
-
-        private val BIOMETRIC_CLASS_KEYWORDS = listOf(
-            "biometricprompt",
-            "biometricactivity",
-            "biometricsysui",
-            "biometricfragment",
-            "authcredential",
-            "confirmdevicecredential",
-            "devicecredentialhandler",
-            "fingerprintdialog",
-            "fingerprintauth",
-            "applock",
-            "verifyfingerprint",
-            "fido",
-            "passkey",
-        )
-
-        private val LOGIN_ACTIVITY_KEYWORDS = listOf(
-            "login",
-            "signin",
-            "sign_in",
-            "auth",
-            "biometric",
-            "fingerprint",
-            "passcode",
-            "pinactivity",
-            "pinlock",
-            "lockactivity",
-            "lockscreen",
-            "unlockactivity",
-            "verify",
-            "credential",
-        )
-
-        private val NON_HOME_ACTIVITY_KEYWORDS = listOf(
-            "splash",
-            "launch",
-            "welcome",
-            "onboarding",
-            "intro",
-            "permission",
-            "login",
-            "signin",
-            "sign_in",
-            "auth",
-            "biometric",
-            "fingerprint",
-            "passcode",
-            "pinactivity",
-            "pinlock",
-            "lockactivity",
-            "lockscreen",
-            "unlockactivity",
-            "verify",
-            "credential",
-            "otp",
-            "register",
-            "signup",
-        )
-
-        private val LOG_TAG_KEYWORDS = listOf(
-            "biometric",
+        private val FINGERPRINT_LOG_TAG_KEYWORDS = listOf(
             "fingerprint",
             "semfp",
-            "sbiometric",
-            "sehbiometric",
-            "authcontroller",
-            "authcontainer",
-            "authbiometric",
-            "authsession",
-            "authenticationclient",
             "udfps",
-            "keyguardupdatemonitor",
-            "keystore2",
         )
 
-        private val LOG_SUCCESS_KEYWORDS = listOf(
-            "onauthenticated",
-            "handleauthenticated",
-            "handleonauthenticated",
+        private val FINGERPRINT_LOG_SUCCESS_KEYWORDS = listOf(
+            "onfingerprintauthenticated",
+            "handleauthenticated(true",
+            "handleauthenticated: true",
+            "onauthenticated(true",
+            "onauthenticated: true",
             "authenticationsucceeded",
             "onauthenticationsucceeded",
-            "onbiometricauthenticated",
-            "onfingerprintauthenticated",
-            "state_authenticated",
-            "msg_authenticated",
-            "msg_biometric_authenticated",
-            "deliverauthenticationresult",
             "sendauthenticated",
-            "sendresultandcleanup",
-            "authenticated(true",
-            "authenticated: true",
-            "authenticated=true",
-            "addauthtoken",
         )
 
-        private val LOG_IGNORE_KEYWORDS = listOf(
+        private val FINGERPRINT_LOG_IGNORE_KEYWORDS = listOf(
+            "face",
+            "weak",
+            "credential",
             "authenticated=false",
             "authenticated: false",
             "onauthenticated(false",
@@ -194,18 +98,20 @@ class UnlockMonitor(
     private val mainHandler = Handler(Looper.getMainLooper())
     private val powerManager = context.getSystemService(PowerManager::class.java)
     private val keyguardManager = context.getSystemService(KeyguardManager::class.java)
-    private val usageStats = context.getSystemService(UsageStatsManager::class.java)
     private val biometricManager = context.getSystemService(BiometricManager::class.java)
 
     private var registered = false
     private var isScreenInteractive = true
-    private var lastTriggerElapsed = 0L
-    private var lastDeviceUnlockElapsed = 0L
+    private var lastTriggerElapsed = -10_000L
+    private var lastDeviceUnlockElapsed = -10_000L
+    @Volatile
+    private var lastFingerprintHardwareElapsed = -10_000L
+    @Volatile
+    private var logcatActive = false
 
     private var biometricApiJob: Job? = null
     private var logcatJob: Job? = null
     private var logcatProcess: Process? = null
-    private var usageWatcherJob: Job? = null
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -213,17 +119,17 @@ class UnlockMonitor(
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     isScreenInteractive = false
-                    stopInAppWatchers()
+                    stopWatchers()
                 }
                 Intent.ACTION_SCREEN_ON -> {
                     isScreenInteractive = true
-                    startInAppWatchersIfNeeded()
+                    startWatchersIfNeeded()
                 }
                 Intent.ACTION_USER_PRESENT -> {
                     isScreenInteractive = true
                     lastDeviceUnlockElapsed = now
-                    onDeviceUnlocked(now)
-                    startInAppWatchersIfNeeded()
+                    verifyAndTriggerDeviceFingerprintUnlock(now)
+                    startWatchersIfNeeded()
                 }
             }
         }
@@ -242,7 +148,7 @@ class UnlockMonitor(
             ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
             registered = true
             if (isScreenInteractive) {
-                startInAppWatchersIfNeeded()
+                startWatchersIfNeeded()
             }
         } catch (t: Throwable) {
             Diagnostics.w(TAG, "Failed to start UnlockMonitor", t)
@@ -255,7 +161,7 @@ class UnlockMonitor(
             context.unregisterReceiver(receiver)
         } catch (_: Exception) {
         }
-        stopInAppWatchers()
+        stopWatchers()
         registered = false
     }
 
@@ -263,40 +169,37 @@ class UnlockMonitor(
         if (!registered) return
         OnPhoneGranter.tryAutoGrantBiometricPermissions(context)
         if (isScreenInteractive) {
-            startInAppWatchersIfNeeded()
+            startWatchersIfNeeded()
         } else {
-            stopInAppWatchers()
+            stopWatchers()
         }
     }
 
-    private fun startInAppWatchersIfNeeded() {
+    private fun startWatchersIfNeeded() {
         val s = settings()
-        if (!s.enabled || !s.unlockAnimationEnabled || !s.unlockInAppBiometricEnabled) {
-            stopInAppWatchers()
+        if (!s.enabled || !s.unlockAnimationEnabled) {
+            stopWatchers()
             return
         }
         startBiometricManagerWatcher()
         startLogcatWatcher()
-        startUsageEventsWatcher()
     }
 
-    private fun stopInAppWatchers() {
+    private fun stopWatchers() {
         biometricApiJob?.cancel()
         biometricApiJob = null
 
         logcatJob?.cancel()
         logcatJob = null
+        logcatActive = false
         runCatching { logcatProcess?.destroy() }
         logcatProcess = null
-
-        usageWatcherJob?.cancel()
-        usageWatcherJob = null
     }
 
     /**
-     * Layer 1: Official Android 15+ (API 35+) [BiometricManager.getLastAuthenticationTime] watcher.
-     * Requires ONLY `android.permission.USE_BIOMETRIC` (granted automatically at install time).
-     * Detects every strong biometric authentication across all banking apps and system prompts.
+     * Layer 1: Official Android 15+ (API 35+) [BiometricManager.getLastAuthenticationTime] watcher
+     * checking strictly [BiometricManager.Authenticators.BIOMETRIC_STRONG] (Fingerprint).
+     * Never checks `DEVICE_CREDENTIAL` (PIN/Pattern) or `BIOMETRIC_WEAK` (2D Face Unlock).
      */
     private fun startBiometricManagerWatcher() {
         if (Build.VERSION.SDK_INT < 35) return
@@ -304,31 +207,20 @@ class UnlockMonitor(
         val bm = biometricManager ?: return
 
         biometricApiJob = scope.launch(Dispatchers.Default) {
-            var lastStrongTime = queryLastAuthTime(bm, BiometricManager.Authenticators.BIOMETRIC_STRONG)
-            var lastCredTime = queryLastAuthTime(bm, BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            var lastStrongTime = queryLastStrongAuthTime(bm)
 
             while (isActive && isScreenInteractive) {
                 delay(180L)
                 val nowElapsed = SystemClock.elapsedRealtime()
+                val strongTime = queryLastStrongAuthTime(bm)
 
-                val strongTime = queryLastAuthTime(bm, BiometricManager.Authenticators.BIOMETRIC_STRONG)
                 if (strongTime > 0L && strongTime != lastStrongTime) {
                     val prev = lastStrongTime
                     lastStrongTime = strongTime
-                    if (prev >= 0L && nowElapsed - strongTime in -500L..3_500L) {
+                    if (prev >= 0L && nowElapsed - strongTime in -500L..FINGERPRINT_MATCH_WINDOW_MS) {
+                        lastFingerprintHardwareElapsed = strongTime
                         mainHandler.post {
-                            onInAppBiometricAuthenticated()
-                        }
-                    }
-                }
-
-                val credTime = queryLastAuthTime(bm, BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-                if (credTime > 0L && credTime != lastCredTime) {
-                    val prev = lastCredTime
-                    lastCredTime = credTime
-                    if (prev >= 0L && nowElapsed - credTime in -500L..3_500L) {
-                        mainHandler.post {
-                            onInAppBiometricAuthenticated()
+                            onFingerprintAuthenticated(nowElapsed)
                         }
                     }
                 }
@@ -336,24 +228,22 @@ class UnlockMonitor(
         }
     }
 
-    private fun queryLastAuthTime(bm: BiometricManager, authenticator: Int): Long {
-        if (Build.VERSION.SDK_INT < 35) return -1L
+    private fun queryLastStrongAuthTime(bm: BiometricManager? = biometricManager): Long {
+        if (Build.VERSION.SDK_INT < 35 || bm == null) return -1L
         return try {
-            bm.getLastAuthenticationTime(authenticator)
+            bm.getLastAuthenticationTime(BiometricManager.Authenticators.BIOMETRIC_STRONG)
         } catch (_: Throwable) {
             -1L
         }
     }
 
     /**
-     * Layer 2: Multi-buffer (`main,system,events`) Hardware/System Biometric Log Watcher.
-     * Uses Shizuku (`UID 2000` shell) on Android 13+ so `LogcatManagerService` never blocks
-     * background log reading or shows consent dialogs.
+     * Layer 2: Strict Fingerprint Hardware Log Watcher (via Shizuku or READ_LOGS).
      */
     private fun startLogcatWatcher() {
         if (logcatJob?.isActive == true) return
         logcatJob = scope.launch(Dispatchers.IO) {
-            val cmd = "logcat -b main,system,events -v brief -T 1 *:D"
+            val cmd = "logcat -b main,system -v brief -T 1 *:D"
 
             while (isActive && isScreenInteractive) {
                 val proc = OnPhoneGranter.openShizukuProcess(cmd)
@@ -364,25 +254,30 @@ class UnlockMonitor(
                     }
 
                 if (proc == null) {
+                    logcatActive = false
                     delay(3_500L)
                     continue
                 }
 
                 logcatProcess = proc
+                logcatActive = true
                 try {
                     BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
                         var line: String?
                         while (isActive && isScreenInteractive) {
                             line = reader.readLine() ?: break
-                            if (isBiometricSuccessLog(line!!)) {
+                            if (isFingerprintSuccessLog(line!!)) {
+                                val nowElapsed = SystemClock.elapsedRealtime()
+                                lastFingerprintHardwareElapsed = nowElapsed
                                 mainHandler.post {
-                                    onInAppBiometricAuthenticated()
+                                    onFingerprintAuthenticated(nowElapsed)
                                 }
                             }
                         }
                     }
                 } catch (_: Throwable) {
                 } finally {
+                    logcatActive = false
                     runCatching { proc.destroy() }
                     if (logcatProcess === proc) logcatProcess = null
                 }
@@ -391,162 +286,78 @@ class UnlockMonitor(
         }
     }
 
-    private fun isBiometricSuccessLog(line: String): Boolean {
+    internal fun isFingerprintSuccessLog(line: String): Boolean {
         val lower = line.lowercase(Locale.ROOT)
         val colonIdx = lower.indexOf(':')
         val tagPart = if (colonIdx > 0) lower.substring(0, colonIdx) else lower
 
-        val isBiometricTag = LOG_TAG_KEYWORDS.any { kw -> tagPart.contains(kw) }
-        if (!isBiometricTag) return false
+        val isFingerprintTag = FINGERPRINT_LOG_TAG_KEYWORDS.any { kw -> tagPart.contains(kw) }
+        if (!isFingerprintTag) return false
 
-        if (LOG_IGNORE_KEYWORDS.any { kw -> lower.contains(kw) }) {
+        if (FINGERPRINT_LOG_IGNORE_KEYWORDS.any { kw -> lower.contains(kw) }) {
             return false
         }
 
-        return LOG_SUCCESS_KEYWORDS.any { kw -> lower.contains(kw) }
+        return FINGERPRINT_LOG_SUCCESS_KEYWORDS.any { kw -> lower.contains(kw) }
     }
 
     /**
-     * Layer 3, 4 & 5: `UsageEvents` Watcher for:
-     *  - Layer 3: System Biometric Dialogs & UDFPS Foreground Services (`FOREGROUND_SERVICE_START` / `STOP`,
-     *    `ACTIVITY_RESUMED` / `PAUSED` / `STOPPED` on `com.samsung.android.biometrics.app.setting`, etc.)
-     *  - Layer 4: In-App Login/Auth Activity -> Home/Main Activity transitions inside banking & finance apps.
+     * Called when [Intent.ACTION_USER_PRESENT] fires. Verifies that an actual fingerprint
+     * (`BIOMETRIC_STRONG` or hardware fingerprint log) was used to unlock the device, ignoring
+     * Swipe, PIN/Pattern, Smart Lock, and 2D Face Unlock.
      */
-    private fun startUsageEventsWatcher() {
-        if (usageWatcherJob?.isActive == true) return
-        usageWatcherJob = scope.launch(Dispatchers.Default) {
-            var lastProcessedTime = System.currentTimeMillis()
-            var biometricPromptActiveAt = 0L
-            var currentPkg: String? = null
-            var currentLoginClass: String? = null
-            var currentLoginEnteredAt = 0L
-            var translucentPausedPkg: String? = null
-            var translucentPausedClass: String? = null
-            var translucentPausedAt = 0L
+    private fun verifyAndTriggerDeviceFingerprintUnlock(unlockElapsed: Long) {
+        val s = settings()
+        if (!s.enabled || !s.unlockAnimationEnabled) return
 
-            while (isActive && isScreenInteractive) {
-                delay(280L)
-                if (!ForegroundAppMonitor.hasUsageAccess(context)) {
-                    delay(2_000L)
-                    continue
+        if (wasRecentFingerprintAuth(unlockElapsed)) {
+            postUnlockAnimation(unlockElapsed, inAppAuth = false)
+            return
+        }
+
+        // On Android 15+, BiometricService may commit the BIOMETRIC_STRONG timestamp a few ms
+        // after ACTION_USER_PRESENT; re-check once after 160ms.
+        if (Build.VERSION.SDK_INT >= 35 || logcatActive) {
+            mainHandler.postDelayed({
+                val now = SystemClock.elapsedRealtime()
+                if (wasRecentFingerprintAuth(now)) {
+                    postUnlockAnimation(now, inAppAuth = false)
                 }
-                val nowWall = System.currentTimeMillis()
-                val fromWall = (nowWall - 3_200L).coerceAtMost(lastProcessedTime)
-
-                val eventsIter = try {
-                    usageStats?.queryEvents(fromWall, nowWall)
-                } catch (_: Throwable) {
-                    null
-                } ?: continue
-
-                val ev = UsageEvents.Event()
-                var maxSeenTime = lastProcessedTime
-                while (eventsIter.hasNextEvent()) {
-                    eventsIter.getNextEvent(ev)
-                    if (ev.timeStamp <= lastProcessedTime) continue
-                    if (ev.timeStamp > maxSeenTime) maxSeenTime = ev.timeStamp
-
-                    val pkg = ev.packageName ?: continue
-                    val cls = ev.className ?: ""
-
-                    // Layer 3: System Biometric Sheet / UDFPS Foreground Service
-                    if (isBiometricComponent(pkg, cls)) {
-                        when (ev.eventType) {
-                            UsageEvents.Event.ACTIVITY_RESUMED,
-                            UsageEvents.Event.FOREGROUND_SERVICE_START -> {
-                                biometricPromptActiveAt = ev.timeStamp
-                            }
-                            UsageEvents.Event.ACTIVITY_PAUSED,
-                            UsageEvents.Event.ACTIVITY_STOPPED,
-                            UsageEvents.Event.FOREGROUND_SERVICE_STOP -> {
-                                val started = biometricPromptActiveAt
-                                val duration = if (started > 0L) ev.timeStamp - started else 600L
-                                if (duration in 50L..35_000L) {
-                                    biometricPromptActiveAt = 0L
-                                    translucentPausedPkg = null
-                                    mainHandler.post {
-                                        onInAppBiometricAuthenticated()
-                                    }
-                                }
-                            }
-                        }
-                        continue
-                    }
-
-                    val isRegularApp = pkg != context.packageName &&
-                        !pkg.startsWith("com.android.systemui") &&
-                        !pkg.contains("launcher") &&
-                        !pkg.startsWith("com.android.permissioncontroller") &&
-                        !pkg.startsWith("com.google.android.permissioncontroller")
-
-                    if (isRegularApp) {
-                        when (ev.eventType) {
-                            UsageEvents.Event.ACTIVITY_PAUSED -> {
-                                translucentPausedPkg = pkg
-                                translucentPausedClass = cls
-                                translucentPausedAt = ev.timeStamp
-                            }
-                            UsageEvents.Event.ACTIVITY_STOPPED -> {
-                                // Fullscreen transition or app exit -> not a translucent biometric sheet
-                                if (pkg == translucentPausedPkg && cls == translucentPausedClass) {
-                                    translucentPausedPkg = null
-                                    translucentPausedClass = null
-                                }
-                            }
-                            UsageEvents.Event.ACTIVITY_RESUMED -> {
-                                // Layer 5: Translucent Biometric Dialog Pause -> Resume on the exact same Activity
-                                if (pkg == translucentPausedPkg && cls == translucentPausedClass) {
-                                    val pauseDuration = ev.timeStamp - translucentPausedAt
-                                    translucentPausedPkg = null
-                                    translucentPausedClass = null
-                                    if (pauseDuration in 250L..18_000L) {
-                                        mainHandler.post {
-                                            onInAppBiometricAuthenticated()
-                                        }
-                                    }
-                                } else {
-                                    translucentPausedPkg = null
-                                    translucentPausedClass = null
-                                }
-
-                                // Layer 4: Banking / App Login Activity -> Main/Home Activity transition
-                                val clsLower = cls.lowercase(Locale.ROOT)
-                                val isLoginScreen = LOGIN_ACTIVITY_KEYWORDS.any { kw -> clsLower.contains(kw) }
-                                val isNonHomeScreen = NON_HOME_ACTIVITY_KEYWORDS.any { kw -> clsLower.contains(kw) }
-
-                                if (isLoginScreen) {
-                                    currentPkg = pkg
-                                    currentLoginClass = cls
-                                    currentLoginEnteredAt = ev.timeStamp
-                                } else if (pkg == currentPkg && currentLoginClass != null && cls != currentLoginClass && !isNonHomeScreen) {
-                                    val spentOnLogin = ev.timeStamp - currentLoginEnteredAt
-                                    currentLoginClass = null
-                                    if (spentOnLogin in 300L..90_000L) {
-                                        mainHandler.post {
-                                            onInAppBiometricAuthenticated()
-                                        }
-                                    }
-                                } else if (pkg != currentPkg) {
-                                    currentPkg = pkg
-                                    currentLoginClass = null
-                                }
-                            }
-                        }
-                    }
-                }
-                lastProcessedTime = maxSeenTime
-            }
+            }, 160L)
         }
     }
 
-    private fun isBiometricComponent(pkg: String, cls: String): Boolean {
-        val pkgLower = pkg.lowercase(Locale.ROOT)
-        val clsLower = cls.lowercase(Locale.ROOT)
-        if (pkgLower in BIOMETRIC_PACKAGES) return true
-        return BIOMETRIC_CLASS_KEYWORDS.any { keyword -> clsLower.contains(keyword) }
+    private fun wasRecentFingerprintAuth(nowElapsed: Long): Boolean {
+        val strongTime = queryLastStrongAuthTime()
+        if (strongTime > 0L && abs(nowElapsed - strongTime) <= FINGERPRINT_MATCH_WINDOW_MS) {
+            lastFingerprintHardwareElapsed = strongTime
+            return true
+        }
+        if (lastFingerprintHardwareElapsed > 0L && abs(nowElapsed - lastFingerprintHardwareElapsed) <= FINGERPRINT_MATCH_WINDOW_MS) {
+            return true
+        }
+        return false
     }
 
-    private fun onDeviceUnlocked(nowElapsed: Long) {
+    /**
+     * Called when either [BiometricManager] (`BIOMETRIC_STRONG`) or the hardware fingerprint log
+     * stream reports a new fingerprint authentication.
+     */
+    private fun onFingerprintAuthenticated(nowElapsed: Long) {
+        val s = settings()
+        if (!s.enabled || !s.unlockAnimationEnabled) return
+
+        val isLockscreenUnlock = keyguardManager?.isKeyguardLocked == true ||
+            abs(nowElapsed - lastDeviceUnlockElapsed) <= FINGERPRINT_MATCH_WINDOW_MS
+
+        if (isLockscreenUnlock) {
+            postUnlockAnimation(nowElapsed, inAppAuth = false)
+        } else if (s.unlockInAppBiometricEnabled) {
+            postUnlockAnimation(nowElapsed, inAppAuth = true)
+        }
+    }
+
+    private fun postUnlockAnimation(nowElapsed: Long, inAppAuth: Boolean) {
         val s = settings()
         if (!s.enabled || !s.unlockAnimationEnabled) return
         if (nowElapsed - lastTriggerElapsed < DEBOUNCE_MS) return
@@ -555,28 +366,7 @@ class UnlockMonitor(
         val event = buildUnlockEvent(
             method = UnlockMethod.FINGERPRINT,
             durationMs = s.unlockDurationMs,
-            inAppAuth = false,
-        )
-        scope.launch {
-            events.removeWhere { it.source == EventSource.TEST }
-            events.post(event)
-        }
-    }
-
-    private fun onInAppBiometricAuthenticated() {
-        val s = settings()
-        if (!s.enabled || !s.unlockAnimationEnabled || !s.unlockInAppBiometricEnabled) return
-        if (keyguardManager?.isKeyguardLocked == true) return
-
-        val nowElapsed = SystemClock.elapsedRealtime()
-        if (nowElapsed - lastDeviceUnlockElapsed < POST_UNLOCK_GRACE_MS) return
-        if (nowElapsed - lastTriggerElapsed < DEBOUNCE_MS) return
-        lastTriggerElapsed = nowElapsed
-
-        val event = buildUnlockEvent(
-            method = UnlockMethod.FINGERPRINT,
-            durationMs = s.unlockDurationMs,
-            inAppAuth = true,
+            inAppAuth = inAppAuth,
         )
         scope.launch {
             events.removeWhere { it.source == EventSource.TEST }

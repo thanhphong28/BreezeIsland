@@ -2,7 +2,6 @@ package com.arnav.island.events.media
 
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.database.ContentObserver
 import android.graphics.Bitmap
 import android.media.AudioDeviceCallback
@@ -21,8 +20,6 @@ import android.provider.Settings
 import android.util.Log
 import android.util.LruCache
 import android.util.Size
-import android.view.KeyEvent
-import com.arnav.island.settings.MainActivity
 import com.arnav.island.events.EventEngine
 import com.arnav.island.events.EventSource
 import com.arnav.island.events.EventType
@@ -199,24 +196,10 @@ class MediaSessionMonitor(
             activePackage = null
             return
         }
-        val linked = settings().musicWidgetLinkedPkg.takeIf { it.isNotBlank() }
-        // Prefer active playing linked app, then any playing app, then linked paused app, else most recent.
-        val playingLinked = linked?.let { pkg ->
-            tracked.values.firstOrNull {
-                it.controller.packageName == pkg &&
-                    it.controller.playbackState.isPlayingish() &&
-                    it.controller.metadata != null
-            }
-        }
-        val playing = playingLinked ?: tracked.values.firstOrNull {
-            it.controller.playbackState.isPlayingish() && it.controller.metadata != null
-        }
-        val pausedLinked = linked?.let { pkg ->
-            tracked.values
-                .filter { it.controller.packageName == pkg && it.controller.metadata != null }
-                .maxByOrNull { it.lastPlayingAt }
-        }
-        val chosen = playing ?: pausedLinked ?: tracked.values
+        // Prefer whatever is playing (in the system's own priority order), else the most
+        // recently played paused session.
+        val playing = tracked.values.firstOrNull { it.controller.playbackState.isPlayingish() && it.controller.metadata != null }
+        val chosen = playing ?: tracked.values
             .filter { it.controller.metadata != null && it.lastPlayingAt > 0 }
             .maxByOrNull { it.lastPlayingAt }
         if (chosen == null) {
@@ -427,83 +410,10 @@ class MediaSessionMonitor(
         return "This phone" to OutputKind.SPEAKER
     }
 
-    /** Resolves the best MediaController for widget actions, prioritizing [preferredPkg] when idle. */
-    private fun resolveController(preferredPkg: String): MediaController? {
-        val list = if (tracked.isNotEmpty()) {
-            tracked.values.map { it.controller }
-        } else {
-            runCatching { manager.getActiveSessions(component) }.getOrNull().orEmpty()
-        }
-        val cleanPkg = preferredPkg.trim()
-        if (cleanPkg.isNotEmpty()) {
-            list.firstOrNull { it.packageName == cleanPkg && it.playbackState.isPlayingish() }?.let { return it }
-        }
-        list.firstOrNull { it.playbackState.isPlayingish() }?.let { return it }
-        if (cleanPkg.isNotEmpty()) {
-            list.firstOrNull { it.packageName == cleanPkg }?.let { return it }
-        }
-        return list.firstOrNull { it.metadata != null } ?: list.firstOrNull()
-    }
-
-    fun togglePlayPause(preferredPkg: String) {
-        val controller = resolveController(preferredPkg)
-        if (controller != null) {
-            val transport = controller.transportControls
-            if (controller.playbackState.isPlayingish()) transport.pause() else transport.play()
-            return
-        }
-        if (preferredPkg.isNotBlank()) {
-            Launch.openApp(context, preferredPkg)
-            return
-        }
-        dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-    }
-
-    fun skipPrevious(preferredPkg: String) {
-        val controller = resolveController(preferredPkg)
-        if (controller != null) {
-            controller.transportControls.skipToPrevious()
-            return
-        }
-        if (preferredPkg.isNotBlank()) Launch.openApp(context, preferredPkg)
-        else dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-    }
-
-    fun skipNext(preferredPkg: String) {
-        val controller = resolveController(preferredPkg)
-        if (controller != null) {
-            controller.transportControls.skipToNext()
-            return
-        }
-        if (preferredPkg.isNotBlank()) Launch.openApp(context, preferredPkg)
-        else dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT)
-    }
-
-    fun openActiveOrLinkedApp(preferredPkg: String) {
-        val controller = resolveController(preferredPkg)
-        if (controller != null) {
-            if (Launch.send(context, controller.sessionActivity)) return
-            if (Launch.openApp(context, controller.packageName)) return
-        }
-        if (preferredPkg.isNotBlank() && Launch.openApp(context, preferredPkg)) return
-        val intent = Intent(context, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            putExtra(MainActivity.EXTRA_DESTINATION, "music_widget")
-        }
-        Launch.startActivity(context, intent)
-    }
-
-    private fun dispatchMediaKey(keyCode: Int) {
-        runCatching {
-            audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-            audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
-        }
-    }
-
     companion object {
         const val ID = "media"
         private const val TAG = "IslandMedia"
-        private const val ART_SIZE_PX = 640
+        private const val ART_SIZE_PX = 256
 
         fun PlaybackState?.isPlayingish(): Boolean = when (this?.state) {
             PlaybackState.STATE_PLAYING,

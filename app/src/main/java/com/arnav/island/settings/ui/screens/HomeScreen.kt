@@ -53,7 +53,6 @@ import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.WbSunny
-import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AssistChip
@@ -238,15 +237,7 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
         }
 
         item {
-            val linkedMusicSubtitle = remember(settings.musicWidgetLinkedPkg) {
-                if (settings.musicWidgetLinkedPkg.isNotBlank()) {
-                    "Đã liên kết: ${ui.graph.apps.label(settings.musicWidgetLinkedPkg)} · Lyric đồng bộ 4×4"
-                } else {
-                    "Trình phát nhạc kính mờ 4×4 & Lyric cho màn ngoài"
-                }
-            }
             Group(title = "Island") {
-                NavRow("Widget Nhạc 4×4 (Màn ngoài)", linkedMusicSubtitle, Icons.Rounded.Widgets, BadgeColors.Pink) { ui.go(Dest.MUSIC_WIDGET) }
                 NavRow("Breeze Mascot", "Thú cưng Aurora dễ thương · chạm camera lúc nghỉ", Icons.Rounded.EmojiEmotions, BadgeColors.Cyan) { ui.go(Dest.MASCOT) }
                 NavRow("Blend with One UI 9 (Z Flip5)", "Seamless status bar, Now Bar fix & pop-up replacement", Icons.Rounded.PhoneAndroid, BadgeColors.Blue) { ui.go(Dest.BLEND) }
                 NavRow("Shape & motion", "Size, corners, springs, split island", Icons.Rounded.Crop169, BadgeColors.Graphite) { ui.go(Dest.ISLAND) }

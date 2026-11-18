@@ -187,38 +187,6 @@
                 <action android:name="com.breeze.island.action.DISMISS_ACTIVITY" />
             </intent-filter>
         </receiver>
-
-        <!-- 4x4 Glassmorphic Music Player & Live Lyrics Widget (Z Flip 5 Cover Screen + Home Screen) -->
-        <receiver
-            android:name=".widget.BreezeMusicWidgetProvider"
-            android:exported="true"
-            android:label="@string/music_widget_label">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/breeze_music_widget_info" />
-            <meta-data
-                android:name="com.samsung.android.appwidget.provider"
-                android:resource="@xml/samsung_music_widget_info" />
-        </receiver>
-
-        <!-- Dedicated Z Flip 5/6 Flex Window (sub_screen) entry matching Samsung's exact 352x339dp + keyguard spec -->
-        <receiver
-            android:name=".widget.BreezeMusicCoverWidgetProvider"
-            android:exported="true"
-            android:label="@string/music_widget_label">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/breeze_cover_music_widget_info" />
-            <meta-data
-                android:name="com.samsung.android.appwidget.provider"
-                android:resource="@xml/samsung_music_widget_info" />
-        </receiver>
     </application>
 
 </manifest>
