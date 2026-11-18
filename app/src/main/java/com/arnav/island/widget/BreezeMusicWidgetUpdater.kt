@@ -67,7 +67,14 @@ class BreezeMusicWidgetUpdater(
         scope.launch {
             combine(
                 events.schedule.map { sched -> sched.live.firstOrNull { it.type == EventType.MEDIA } },
-                settings.flow.map { Triple(it.musicWidgetLinkedPkg, it.musicWidgetShowLyrics, it.musicWidgetFullLyrics) }.distinctUntilChanged(),
+                settings.flow.map {
+                    listOf(
+                        it.musicWidgetLinkedPkg,
+                        it.musicWidgetShowLyrics,
+                        it.musicWidgetFullLyrics,
+                        it.musicWidgetTransparentBg,
+                    )
+                }.distinctUntilChanged(),
             ) { mediaEvent, prefs ->
                 mediaEvent to prefs
             }.collect { (mediaEvent, _) ->
@@ -113,7 +120,7 @@ class BreezeMusicWidgetUpdater(
         } else null
 
         val posMs = payload?.positionAt(SystemClock.elapsedRealtime()) ?: 0L
-        val lyricWindow = if (payload != null && settingsSnapshot.musicWidgetShowLyrics) {
+        val lyricWindow = if (payload != null) {
             LyricsRepository.resolveLines(
                 title = payload.title,
                 artist = payload.artist,
@@ -135,8 +142,9 @@ class BreezeMusicWidgetUpdater(
             linkedPackage = linkedPkg,
             linkedAppLabel = linkedLabel,
             linkedAppIcon = linkedIcon,
-            showLyrics = settingsSnapshot.musicWidgetShowLyrics,
+            showLyrics = true,
             fullLyrics = settingsSnapshot.musicWidgetFullLyrics,
+            transparentBg = settingsSnapshot.musicWidgetTransparentBg,
             lyrics = lyricWindow,
             positionMs = posMs,
         )

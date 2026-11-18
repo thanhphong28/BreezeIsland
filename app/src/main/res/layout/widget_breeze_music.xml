@@ -3,8 +3,8 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_music_placeholder_bg"
-    android:clipToOutline="true">
+    android:background="@android:color/transparent"
+    android:padding="0dp">
 
     <ImageView
         android:id="@+id/widget_canvas_image"
@@ -13,18 +13,18 @@
         android:contentDescription="@string/music_widget_label"
         android:scaleType="fitXY" />
 
-    <!-- Transparent interactive zones matching the 800x800 canvas weight grid (14 / 56 / 11 / 19) -->
+    <!-- Transparent interactive zones matching the 800x800 canvas weight grid (18 / 44 / 20 / 18) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:weightSum="100">
 
-        <!-- Band 1: Header (App Badge + Lyric Toggle) -->
+        <!-- Band 1 (0..144px): Top Header (Mini Art + Title/Artist on left, Expand/Mode buttons on right) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="14"
+            android:layout_weight="18"
             android:orientation="horizontal"
             android:weightSum="100">
 
@@ -32,36 +32,22 @@
                 android:id="@+id/btn_open_app"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="72"
+                android:layout_weight="68"
                 android:background="@android:color/transparent" />
 
             <FrameLayout
                 android:id="@+id/btn_toggle_lyrics"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="28"
+                android:layout_weight="32"
                 android:background="@android:color/transparent" />
         </LinearLayout>
 
-        <!-- Band 2: Album Art / Synced Lyrics Stage -->
-        <FrameLayout
-            android:id="@+id/btn_lyrics_area"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="56"
-            android:background="@android:color/transparent" />
-
-        <!-- Band 3: Progress Timeline (non-clickable visual zone) -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="11" />
-
-        <!-- Band 4: Transport Controls (Prev / Play-Pause / Next) -->
+        <!-- Band 2 (144..496px): Center Floating Transport Controls (Prev / Play-Pause / Next) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="19"
+            android:layout_weight="44"
             android:orientation="horizontal"
             android:weightSum="100">
 
@@ -69,22 +55,36 @@
                 android:id="@+id/btn_prev"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="32"
+                android:layout_weight="33"
                 android:background="@android:color/transparent" />
 
             <FrameLayout
                 android:id="@+id/btn_play_pause"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="36"
+                android:layout_weight="34"
                 android:background="@android:color/transparent" />
 
             <FrameLayout
                 android:id="@+id/btn_next"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="32"
+                android:layout_weight="33"
                 android:background="@android:color/transparent" />
         </LinearLayout>
+
+        <!-- Band 3 (496..656px): Synced Lyrics & Poster Expand Chevron Area -->
+        <FrameLayout
+            android:id="@+id/btn_lyrics_area"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="20"
+            android:background="@android:color/transparent" />
+
+        <!-- Band 4 (656..800px): Bottom Timeline Area -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="18" />
     </LinearLayout>
 </FrameLayout>

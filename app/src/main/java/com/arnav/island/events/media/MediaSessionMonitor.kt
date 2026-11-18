@@ -503,7 +503,7 @@ class MediaSessionMonitor(
     companion object {
         const val ID = "media"
         private const val TAG = "IslandMedia"
-        private const val ART_SIZE_PX = 256
+        private const val ART_SIZE_PX = 640
 
         fun PlaybackState?.isPlayingish(): Boolean = when (this?.state) {
             PlaybackState.STATE_PLAYING,

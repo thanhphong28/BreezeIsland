@@ -148,50 +148,56 @@ fun MusicWidgetScreen(settings: IslandSettings, permissions: PermissionSnapshot,
         settings.musicWidgetLinkedPkg,
         settings.musicWidgetShowLyrics,
         settings.musicWidgetFullLyrics,
+        settings.musicWidgetTransparentBg,
         showDemoTrack,
         tickCounter,
     ) {
         value = withContext(Dispatchers.Default) {
             val realState = ui.graph.widgetUpdater.buildRenderStateSnapshot(settings)
             val effectiveState = if (realState.media == null && showDemoTrack) {
-                val appTitle = if (linkedPkg.isNotBlank()) ui.graph.apps.label(linkedPkg) else "Spotify"
+                val appTitle = if (linkedPkg.isNotBlank()) ui.graph.apps.label(linkedPkg) else "Mochy"
                 MusicWidgetRenderState(
                     media = MediaPayload(
                         packageName = linkedPkg.ifBlank { "com.spotify.music" },
                         appLabel = appTitle,
-                        title = "Chúng Ta Của Tương Lai",
-                        artist = "Sơn Tùng M-TP",
-                        album = "Single · 2024",
-                        durationMs = 249_000L,
-                        positionMs = 94_000L,
+                        title = "Secondhand (cùng với Rema)",
+                        artist = "Don Toliver",
+                        album = "OCTANE",
+                        durationMs = 226_000L,
+                        positionMs = 69_000L,
                         positionUpdatedAt = 0L,
                         playbackSpeed = 1f,
                         isPlaying = true,
                         canSkipNext = true,
                         canSkipPrevious = true,
                         canSeek = true,
-                        accent = 0xFF38BDF8.toInt(),
-                        outputName = "Galaxy Buds2 Pro",
+                        accent = 0xFFFFFFFF.toInt(),
+                        volume = 0.55f,
+                        outputName = "SOUNDPEATS T3 Pro",
                     ),
-                    artwork = null,
+                    artwork = realState.artwork,
                     appIcon = realState.linkedAppIcon,
                     linkedPackage = linkedPkg,
                     linkedAppLabel = appTitle,
                     linkedAppIcon = realState.linkedAppIcon,
-                    showLyrics = settings.musicWidgetShowLyrics,
+                    showLyrics = true,
                     fullLyrics = settings.musicWidgetFullLyrics,
+                    transparentBg = settings.musicWidgetTransparentBg,
                     lyrics = LyricWindow(
-                        prevLine = "Liệu mai sau phai nhòa đi những ký ức...",
-                        currentLine = "Chẳng thể quay lại ngày hôm qua đâu em ơi",
-                        nextLine = "Nắm tay nhau đi qua giông bão giữa đời",
+                        prevLine = "Need each other",
+                        currentLine = if (settings.musicWidgetFullLyrics) {
+                            "How am I\nsupposed to let\nyou go?"
+                        } else {
+                            "Angel dust"
+                        },
+                        nextLine = "Shawty always got me trippin' like angel dust",
                         upcomingLines = listOf(
-                            "Nắm tay nhau đi qua giông bão giữa đời",
-                            "Giữ lấy ánh mắt ấy đừng buông lơi",
-                            "Và rồi thời gian sẽ trả lời...",
+                            "Shawty always got me trippin' like angel dust",
+                            "Everywhere she goes, you always see me",
                         ),
                         hasSynced = true,
                     ),
-                    positionMs = 94_000L,
+                    positionMs = 69_000L,
                 )
             } else {
                 realState
@@ -329,33 +335,31 @@ fun MusicWidgetScreen(settings: IslandSettings, permissions: PermissionSnapshot,
         // 4. Lyrics & Display Modes
         item {
             Group(
-                title = "Lời bài hát & Hiển thị 4×4",
-                footer = "Chạm trực tiếp vào chữ \"LYRIC\" ở góc trên phải widget hoặc chạm vào khung lời bài hát trên màn hình ngoài để chuyển nhanh giữa chế độ thường & Full Lyric 5 dòng.",
+                title = "Bố cục Full-Bleed & Lời bài hát",
+                footer = "Mẹo: Trên màn ngoài Z Flip 5, chạm nút tròn mở rộng (hoặc dấu ^ cạnh lời bài hát) để chuyển tức thì giữa Giao diện Điều khiển nổi (Hình 3) và Giao diện Poster Full Lyric chữ lớn (Hình 2). Đặt hình nền màn ngoài màu tối/đen hoặc bật 'Nền trong suốt' để tràn viền hoàn toàn.",
             ) {
                 SwitchRow(
-                    title = "Hiển thị lời bài hát đồng bộ (Live Lyrics)",
-                    checked = settings.musicWidgetShowLyrics,
-                    onCheckedChange = { on ->
-                        ui.update { it.copy(musicWidgetShowLyrics = on) }
+                    title = "Chế độ Poster Full Lyric chữ lớn (Kiểu Hình 2)",
+                    checked = settings.musicWidgetFullLyrics,
+                    onCheckedChange = { full ->
+                        ui.update { it.copy(musicWidgetFullLyrics = full, musicWidgetShowLyrics = true) }
                         ui.graph.widgetUpdater.pushNow()
                     },
-                    subtitle = "Tự động đồng bộ lời theo nhịp bài hát đang phát",
+                    subtitle = "Khi tắt sẽ hiện giao diện Điều khiển nổi + Lyric (Kiểu Hình 3); chạm trực tiếp trên widget để đổi qua lại",
                     icon = Icons.Rounded.Lyrics,
                     iconColor = BadgeColors.Cyan,
                 )
-                Reveal(settings.musicWidgetShowLyrics) {
-                    SwitchRow(
-                        title = "Chế độ Full Lyric (5 dòng nổi bật)",
-                        checked = settings.musicWidgetFullLyrics,
-                        onCheckedChange = { full ->
-                            ui.update { it.copy(musicWidgetFullLyrics = full) }
-                            ui.graph.widgetUpdater.pushNow()
-                        },
-                        subtitle = "Thu nhỏ ảnh bìa lên trên để dành trọn khung 4×4 cho lời bài hát",
-                        icon = Icons.Rounded.Widgets,
-                        iconColor = BadgeColors.Violet,
-                    )
-                }
+                SwitchRow(
+                    title = "Nền trong suốt hòa vào hình nền màn ngoài",
+                    checked = settings.musicWidgetTransparentBg,
+                    onCheckedChange = { trans ->
+                        ui.update { it.copy(musicWidgetTransparentBg = trans) }
+                        ui.graph.widgetUpdater.pushNow()
+                    },
+                    subtitle = "Làm mờ viền ảnh bìa hòa trực tiếp vào hình nền trang màn hình ngoài, xóa bỏ cảm giác khung hộp",
+                    icon = Icons.Rounded.Widgets,
+                    iconColor = BadgeColors.Violet,
+                )
             }
         }
 

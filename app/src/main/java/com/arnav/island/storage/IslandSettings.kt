@@ -256,6 +256,7 @@ data class IslandSettings(
     val musicWidgetLinkedPkg: String = "",
     val musicWidgetShowLyrics: Boolean = true,
     val musicWidgetFullLyrics: Boolean = false,
+    val musicWidgetTransparentBg: Boolean = false,
 
     /** versionCode whose "What's new" was last shown. */
     val lastSeenVersion: Int = 0,

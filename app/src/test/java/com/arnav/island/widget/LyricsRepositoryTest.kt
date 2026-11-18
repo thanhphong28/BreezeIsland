@@ -46,4 +46,11 @@ class LyricsRepositoryTest {
         assertEquals("Line three", mid.nextLine)
         assertEquals(listOf("Line three", "Line four", "Line five"), mid.upcomingLines)
     }
+
+    @Test
+    fun `normalizes Vietnamese and English collaboration suffixes in song titles`() {
+        assertEquals("Secondhand", LyricsRepository.normalizeTitle("Secondhand (cùng với Rema)"))
+        assertEquals("Blinding Lights", LyricsRepository.normalizeTitle("Blinding Lights (Official Video)"))
+        assertEquals("Die With A Smile", LyricsRepository.normalizeTitle("Die With A Smile (with Bruno Mars)"))
+    }
 }

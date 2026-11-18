@@ -42,7 +42,11 @@ object LyricsRepository {
     private val negativeUntil = ConcurrentHashMap<String, Long>()
 
     private val TIME_TAG_REGEX = Regex("""\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?]""")
-    private val TITLE_NOISE_REGEX = Regex("""\s*(\([^)]*(official|lyric|audio|video|mv|hd|4k|remaster|live|feat|ft)[^)]*\)|\[[^]]*])""", RegexOption.IGNORE_CASE)
+    private val TITLE_NOISE_REGEX = Regex(
+        """\s*(\([^)]*(official|lyric|audio|video|mv|hd|4k|remaster|live|feat|ft\.?|with|cùng\s+với|với|prod|version|ver|edit|mix|remix)[^)]*\)|\[[^]]*])""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val ANY_PAREN_SUFFIX_REGEX = Regex("""\s*(\([^)]*\)|\[[^]]*]|\s+-\s+.*)$""")
 
     fun resolveLines(
         title: String,
@@ -165,8 +169,19 @@ object LyricsRepository {
 
     private fun fetchFromLrclib(title: String, artist: String, album: String, durationMs: Long): TrackLyrics? {
         val normTitle = normalizeTitle(title)
-        val normArtist = artist.substringBefore(",").substringBefore(" - ").trim()
+        val normArtist = artist.substringBefore(",").substringBefore(" - ").substringBefore("&").trim()
 
+        fetchCandidate(normTitle, normArtist, album, durationMs)?.let { return it }
+
+        // If title still had parenthetical or dash suffixes, strip them and retry
+        val strippedTitle = normTitle.replace(ANY_PAREN_SUFFIX_REGEX, "").trim()
+        if (strippedTitle.isNotEmpty() && !strippedTitle.equals(normTitle, ignoreCase = true)) {
+            fetchCandidate(strippedTitle, normArtist, album, durationMs)?.let { return it }
+        }
+        return null
+    }
+
+    private fun fetchCandidate(normTitle: String, normArtist: String, album: String, durationMs: Long): TrackLyrics? {
         // 1) Exact match via /api/get
         if (normArtist.isNotEmpty()) {
             val sb = StringBuilder("https://lrclib.net/api/get?track_name=")
@@ -244,7 +259,7 @@ object LyricsRepository {
         }
     }
 
-    private fun normalizeTitle(raw: String): String =
+    internal fun normalizeTitle(raw: String): String =
         raw.replace(TITLE_NOISE_REGEX, "").trim().ifEmpty { raw.trim() }
 
     private fun cacheKey(title: String, artist: String): String =
