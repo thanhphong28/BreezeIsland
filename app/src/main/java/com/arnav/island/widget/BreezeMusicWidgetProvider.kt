@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
  * Supports playback transport, toggling live synced lyrics, and launching/resuming the
  * user's permanently linked music app.
  */
-class BreezeMusicWidgetProvider : AppWidgetProvider() {
+open class BreezeMusicWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         val graph = (context.applicationContext as? IslandApp)?.graph ?: return
@@ -86,3 +86,9 @@ class BreezeMusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_OPEN_APP = "com.arnav.island.widget.MUSIC_OPEN_APP"
     }
 }
+
+/**
+ * Dedicated Flex Window (sub_screen) provider using Samsung's exact 352x339dp + keyguard spec so
+ * Z Flip Cover Screen widget pickers always list BreezeMusic 4x4 reliably.
+ */
+class BreezeMusicCoverWidgetProvider : BreezeMusicWidgetProvider()

@@ -201,11 +201,7 @@ fun MusicWidgetScreen(settings: IslandSettings, permissions: PermissionSnapshot,
     }
 
     val widgetCount = remember(schedule.revision, tickCounter) {
-        runCatching {
-            AppWidgetManager.getInstance(context)
-                ?.getAppWidgetIds(ComponentName(context, BreezeMusicWidgetProvider::class.java))
-                ?.size ?: 0
-        }.getOrDefault(0)
+        ui.graph.widgetUpdater.activeWidgetCount()
     }
 
     SettingsPage("Widget Nhạc 4×4 (Màn ngoài)", onBack = { ui.back() }) {
@@ -391,9 +387,12 @@ fun MusicWidgetScreen(settings: IslandSettings, permissions: PermissionSnapshot,
                         pinFeedback = "Hãy nhấn giữ Màn hình chính hoặc vào Cài đặt → Màn hình ngoài → Tiện ích."
                     }
                 },
-                secondaryLabel = "Mở Cài đặt máy",
+                secondaryLabel = "Mở Cài đặt Màn ngoài",
                 onSecondary = {
-                    ui.open(Intent(Settings.ACTION_SETTINGS))
+                    ui.open(
+                        Intent("com.samsung.settings.SubScreenSettings"),
+                        Intent(Settings.ACTION_SETTINGS),
+                    )
                 },
             )
         }

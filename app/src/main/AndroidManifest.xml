@@ -203,6 +203,22 @@
                 android:name="com.samsung.android.appwidget.provider"
                 android:resource="@xml/samsung_music_widget_info" />
         </receiver>
+
+        <!-- Dedicated Z Flip 5/6 Flex Window (sub_screen) entry matching Samsung's exact 352x339dp + keyguard spec -->
+        <receiver
+            android:name=".widget.BreezeMusicCoverWidgetProvider"
+            android:exported="true"
+            android:label="@string/music_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/breeze_cover_music_widget_info" />
+            <meta-data
+                android:name="com.samsung.android.appwidget.provider"
+                android:resource="@xml/samsung_music_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

@@ -44,6 +44,7 @@ class BreezeMusicWidgetUpdater(
 ) {
     private val widgetManager: AppWidgetManager? by lazy { AppWidgetManager.getInstance(app) }
     private val providerComponent by lazy { ComponentName(app, BreezeMusicWidgetProvider::class.java) }
+    private val coverComponent by lazy { ComponentName(app, BreezeMusicCoverWidgetProvider::class.java) }
 
     private var tickerJob: Job? = null
     private var renderJob: Job? = null
@@ -144,8 +145,14 @@ class BreezeMusicWidgetUpdater(
     private fun currentMediaPayload(): MediaPayload? =
         events.current().live.firstOrNull { it.type == EventType.MEDIA }?.payload as? MediaPayload
 
-    private fun widgetIds(): IntArray =
-        runCatching { widgetManager?.getAppWidgetIds(providerComponent) }.getOrNull() ?: IntArray(0)
+    fun activeWidgetCount(): Int = widgetIds().size
+
+    private fun widgetIds(): IntArray {
+        val mgr = widgetManager ?: return IntArray(0)
+        val main = runCatching { mgr.getAppWidgetIds(providerComponent) }.getOrNull() ?: IntArray(0)
+        val cover = runCatching { mgr.getAppWidgetIds(coverComponent) }.getOrNull() ?: IntArray(0)
+        return main + cover
+    }
 
     private fun startTicker() {
         if (tickerJob?.isActive == true) return

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Dark glassmorphic card background -->
+    <path
+        android:fillColor="#FF0C0F1A"
+        android:pathData="M18,4 L182,4 A14,14 0 0 1 196,18 L196,182 A14,14 0 0 1 182,196 L18,196 A14,14 0 0 1 4,182 L4,18 A14,14 0 0 1 18,4 Z" />
+
+    <!-- Soft accent glow orb -->
+    <path
+        android:fillColor="#2838BDF8"
+        android:pathData="M50,48 m-42,0 a42,42 0 1,0 84,0 a42,42 0 1,0 -84,0" />
+
+    <!-- Border highlight -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeWidth="1.2"
+        android:strokeColor="#38FFFFFF"
+        android:pathData="M18,4.6 L182,4.6 A13.4,13.4 0 0 1 195.4,18 L195.4,182 A13.4,13.4 0 0 1 182,195.4 L18,195.4 A13.4,13.4 0 0 1 4.6,182 L4.6,18 A13.4,13.4 0 0 1 18,4.6 Z" />
+
+    <!-- Header left app pill & right LYRIC badge -->
+    <path
+        android:fillColor="#26FFFFFF"
+        android:pathData="M18,14 L92,14 A8,8 0 0 1 100,22 A8,8 0 0 1 92,30 L18,30 A8,8 0 0 1 10,22 A8,8 0 0 1 18,14 Z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M156,15 L182,15 A7,7 0 0 1 189,22 A7,7 0 0 1 182,29 L156,29 A7,7 0 0 1 149,22 A7,7 0 0 1 156,15 Z" />
+
+    <!-- Album artwork tile -->
+    <path
+        android:fillColor="#FF1D3557"
+        android:pathData="M22,38 L62,38 A10,10 0 0 1 72,48 L72,88 A10,10 0 0 1 62,98 L22,98 A10,10 0 0 1 12,88 L12,48 A10,10 0 0 1 22,38 Z" />
+    <path
+        android:fillColor="#7DD3FC"
+        android:pathData="M38,76 A6,6 0 1,0 44,82 A6,6 0 1,0 38,76 Z M42,56 L56,53 L56,74 L52,74 L52,58 L46,59.5 L46,76 L42,76 Z" />
+
+    <!-- Song title & artist placeholder bars -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M84,52 L172,52 A3,3 0 0 1 175,55 A3,3 0 0 1 172,58 L84,58 A3,3 0 0 1 81,55 A3,3 0 0 1 84,52 Z" />
+    <path
+        android:fillColor="#99CBD5E1"
+        android:pathData="M84,66 L142,66 A2.5,2.5 0 0 1 144.5,68.5 A2.5,2.5 0 0 1 142,71 L84,71 A2.5,2.5 0 0 1 81.5,68.5 A2.5,2.5 0 0 1 84,66 Z" />
+
+    <!-- Frosted Lyrics card -->
+    <path
+        android:fillColor="#1EFFFFFF"
+        android:pathData="M20,106 L180,106 A8,8 0 0 1 188,114 L188,136 A8,8 0 0 1 180,144 L20,144 A8,8 0 0 1 12,136 L12,114 A8,8 0 0 1 20,106 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M26,116 L154,116 A2.5,2.5 0 0 1 156.5,118.5 A2.5,2.5 0 0 1 154,121 L26,121 A2.5,2.5 0 0 1 23.5,118.5 A2.5,2.5 0 0 1 26,116 Z" />
+    <path
+        android:fillColor="#88E2E8F0"
+        android:pathData="M26,129 L126,129 A2,2 0 0 1 128,131 A2,2 0 0 1 126,133 L26,133 A2,2 0 0 1 24,131 A2,2 0 0 1 26,129 Z" />
+
+    <!-- Progress track + active bar -->
+    <path
+        android:fillColor="#33FFFFFF"
+        android:pathData="M14,154 L186,154 A2,2 0 0 1 188,156 A2,2 0 0 1 186,158 L14,158 A2,2 0 0 1 12,156 A2,2 0 0 1 14,154 Z" />
+    <path
+        android:fillColor="#FF38BDF8"
+        android:pathData="M14,154 L112,154 A2,2 0 0 1 114,156 A2,2 0 0 1 112,158 L14,158 A2,2 0 0 1 12,156 A2,2 0 0 1 14,154 Z" />
+
+    <!-- Transport buttons -->
+    <path
+        android:fillColor="#1EFFFFFF"
+        android:pathData="M24,166 L52,166 A8,8 0 0 1 60,174 A8,8 0 0 1 52,182 L24,182 A8,8 0 0 1 16,174 A8,8 0 0 1 24,166 Z" />
+    <path
+        android:fillColor="#FF38BDF8"
+        android:pathData="M80,164 L120,164 A10,10 0 0 1 130,174 A10,10 0 0 1 120,184 L80,184 A10,10 0 0 1 70,174 A10,10 0 0 1 80,164 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M96,168 L108,174 L96,180 Z" />
+    <path
+        android:fillColor="#1EFFFFFF"
+        android:pathData="M148,166 L176,166 A8,8 0 0 1 184,174 A8,8 0 0 1 176,182 L148,182 A8,8 0 0 1 140,174 A8,8 0 0 1 148,166 Z" />
+</vector>
