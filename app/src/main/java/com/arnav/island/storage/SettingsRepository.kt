@@ -15,7 +15,6 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.arnav.island.animation.MotionPreset
-import com.arnav.island.coverscreen.CoverPetBreed
 import com.arnav.island.events.MascotMood
 import com.arnav.island.events.NotificationPrivacy
 import com.arnav.island.util.Diagnostics
@@ -238,14 +237,6 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val soundIslandAutoDismiss = longPreferencesKey("sound_island_auto_dismiss_ms")
         val soundIslandWorkDnd = booleanPreferencesKey("sound_island_work_dnd")
         val soundIslandWorkMediaVol = intPreferencesKey("sound_island_work_media_vol")
-
-        val coverScreenEnabled = booleanPreferencesKey("cover_screen_enabled")
-        val coverPagesCsv = stringPreferencesKey("cover_pages_csv")
-        val coverPetBreed = stringPreferencesKey("cover_pet_breed")
-        val coverPetName = stringPreferencesKey("cover_pet_name")
-        val coverAppsCsv = stringPreferencesKey("cover_apps_csv")
-        val coverShakeEnabled = booleanPreferencesKey("cover_shake_enabled")
-        val coverShowStatusBar = booleanPreferencesKey("cover_show_status_bar")
 
         val haptics = booleanPreferencesKey("haptics")
         val tapAction = stringPreferencesKey("tap_action")
@@ -472,13 +463,6 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             soundIslandAutoDismissMs = p[K.soundIslandAutoDismiss] ?: d.soundIslandAutoDismissMs,
             soundIslandWorkDnd = p[K.soundIslandWorkDnd] ?: d.soundIslandWorkDnd,
             soundIslandWorkMediaVol = p[K.soundIslandWorkMediaVol] ?: d.soundIslandWorkMediaVol,
-            coverScreenEnabled = p[K.coverScreenEnabled] ?: d.coverScreenEnabled,
-            coverPagesCsv = p[K.coverPagesCsv] ?: d.coverPagesCsv,
-            coverPetBreed = p.enum(K.coverPetBreed, d.coverPetBreed),
-            coverPetName = p[K.coverPetName] ?: d.coverPetName,
-            coverAppsCsv = p[K.coverAppsCsv] ?: d.coverAppsCsv,
-            coverShakeEnabled = p[K.coverShakeEnabled] ?: d.coverShakeEnabled,
-            coverShowStatusBar = p[K.coverShowStatusBar] ?: d.coverShowStatusBar,
         )
     }
 
@@ -621,13 +605,6 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.monitorCpu] = s.monitorCpu
         p[K.monitorTemp] = s.monitorTemperature
         p[K.monitorFps] = s.monitorFps
-        p[K.coverScreenEnabled] = s.coverScreenEnabled
-        p[K.coverPagesCsv] = s.coverPagesCsv
-        p[K.coverPetBreed] = s.coverPetBreed.name
-        p[K.coverPetName] = s.coverPetName
-        p[K.coverAppsCsv] = s.coverAppsCsv
-        p[K.coverShakeEnabled] = s.coverShakeEnabled
-        p[K.coverShowStatusBar] = s.coverShowStatusBar
     }
 
     companion object {

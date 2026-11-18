@@ -2,7 +2,6 @@ package com.arnav.island.storage
 
 import com.arnav.island.animation.MotionPreset
 import com.arnav.island.animation.MotionProfile
-import com.arnav.island.coverscreen.CoverPetBreed
 import com.arnav.island.events.ChargingTheme
 import com.arnav.island.events.MascotMood
 import com.arnav.island.events.NotificationPrivacy
@@ -262,15 +261,6 @@ data class IslandSettings(
     val soundIslandAutoDismissMs: Long = 1800L,
     val soundIslandWorkDnd: Boolean = true,
     val soundIslandWorkMediaVol: Int = 30,
-
-    // Z Flip 5 Cover Screen (Custom Multi-Page Flex Window + Interactive 3D Pet)
-    val coverScreenEnabled: Boolean = false,
-    val coverPagesCsv: String = "PET_3D,MEDIA,APPS,WEATHER,CLOCK,NOTIFICATIONS",
-    val coverPetBreed: CoverPetBreed = CoverPetBreed.SHIBA,
-    val coverPetName: String = "Breeze Pup",
-    val coverAppsCsv: String = "",
-    val coverShakeEnabled: Boolean = true,
-    val coverShowStatusBar: Boolean = true,
 
     /** versionCode whose "What's new" was last shown. */
     val lastSeenVersion: Int = 0,

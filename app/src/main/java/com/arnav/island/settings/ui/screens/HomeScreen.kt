@@ -43,7 +43,6 @@ import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.Pets
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PhonelinkLock
 import androidx.compose.material.icons.rounded.Science
@@ -240,7 +239,6 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
 
         item {
             Group(title = "Island") {
-                NavRow("Màn hình ngoài Z Flip (3D Pet)", "Nuôi chó 3D tương tác & tự thiết lập các trang màn ngoài", Icons.Rounded.Pets, BadgeColors.Orange) { ui.go(Dest.COVER_SCREEN) }
                 NavRow("Breeze Mascot", "Thú cưng Aurora dễ thương · chạm camera lúc nghỉ", Icons.Rounded.EmojiEmotions, BadgeColors.Cyan) { ui.go(Dest.MASCOT) }
                 NavRow("Breeze Sound Island (Edge)", "Liquid Glass volume, silent & work mode edge notch", Icons.AutoMirrored.Rounded.VolumeUp, BadgeColors.Orange) { ui.go(Dest.SOUND_ISLAND) }
                 NavRow("Blend with One UI 9 (Z Flip5)", "Seamless status bar, Now Bar fix & pop-up replacement", Icons.Rounded.PhoneAndroid, BadgeColors.Blue) { ui.go(Dest.BLEND) }
