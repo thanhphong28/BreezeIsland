@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_music_placeholder_bg"
+    android:clipToOutline="true">
+
+    <ImageView
+        android:id="@+id/widget_canvas_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@string/music_widget_label"
+        android:scaleType="fitXY" />
+
+    <!-- Transparent interactive zones matching the 800x800 canvas weight grid (14 / 56 / 11 / 19) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:weightSum="100">
+
+        <!-- Band 1: Header (App Badge + Lyric Toggle) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="14"
+            android:orientation="horizontal"
+            android:weightSum="100">
+
+            <FrameLayout
+                android:id="@+id/btn_open_app"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="72"
+                android:background="@android:color/transparent" />
+
+            <FrameLayout
+                android:id="@+id/btn_toggle_lyrics"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="28"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
+
+        <!-- Band 2: Album Art / Synced Lyrics Stage -->
+        <FrameLayout
+            android:id="@+id/btn_lyrics_area"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="56"
+            android:background="@android:color/transparent" />
+
+        <!-- Band 3: Progress Timeline (non-clickable visual zone) -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="11" />
+
+        <!-- Band 4: Transport Controls (Prev / Play-Pause / Next) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="19"
+            android:orientation="horizontal"
+            android:weightSum="100">
+
+            <FrameLayout
+                android:id="@+id/btn_prev"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="32"
+                android:background="@android:color/transparent" />
+
+            <FrameLayout
+                android:id="@+id/btn_play_pause"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="36"
+                android:background="@android:color/transparent" />
+
+            <FrameLayout
+                android:id="@+id/btn_next"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="32"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

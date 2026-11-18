@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
         "blend" -> Dest.BLEND
         "gallery" -> Dest.GALLERY
         "diagnostics" -> Dest.DIAGNOSTICS
+        "music_widget" -> Dest.MUSIC_WIDGET
         else -> null
     }
 

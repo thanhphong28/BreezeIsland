@@ -14,6 +14,7 @@ import com.arnav.island.storage.IslandSettings
 import com.arnav.island.storage.SettingsRepository
 import com.arnav.island.util.AppInfoCache
 import com.arnav.island.util.ImageStore
+import com.arnav.island.widget.BreezeMusicWidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -66,6 +67,7 @@ class AppGraph(val app: Application) {
     val media = MediaSessionMonitor(app, events, images, apps, scope, currentSettings)
     val weather = WeatherMonitor(app, events, scope, currentSettings)
     val testEvents = TestEvents(events, images, scope)
+    val widgetUpdater = BreezeMusicWidgetUpdater(app, events, settings, media, images, apps, scope)
 
     val runtime = MutableStateFlow(RuntimeStatus(deviceProfile = DeviceProfiles.detect().displayName))
 

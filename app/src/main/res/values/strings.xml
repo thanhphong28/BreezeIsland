@@ -20,4 +20,7 @@
 
     <string name="api_permission_label">Show live activities in BreezeIsland</string>
     <string name="api_permission_description">Allows this app to post and update custom live activities on BreezeIsland.</string>
+
+    <string name="music_widget_label">BreezeMusic 4x4 (Lyric)</string>
+    <string name="music_widget_desc">Widget trình phát nhạc 4x4 hiện đại kèm lời bài hát đồng bộ cho Màn hình ngoài &amp; Màn hình chính</string>
 </resources>

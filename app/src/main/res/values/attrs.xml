@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Used by Samsung One UI Cover Screen (Flex Window) AppWidget metadata -->
+    <attr name="display" format="string" />
+</resources>

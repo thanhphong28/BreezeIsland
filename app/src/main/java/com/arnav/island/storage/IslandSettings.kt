@@ -252,6 +252,11 @@ data class IslandSettings(
     val statusBarIcons: String = "ongoing_activity,ongoing_activity_chip,sec_ongoing_activity,ongoing_call_chip,ongoing_privacy_chip,media_ongoing,live_notification,flashlight,torch,sec_flashlight,now_bar,alarm_clock,volume,zen,rotate,headset,bluetooth,hotspot",
     val statusBarBackup: String = BACKUP_NONE,
 
+    // 4x4 Cover Screen & Home Music Widget
+    val musicWidgetLinkedPkg: String = "",
+    val musicWidgetShowLyrics: Boolean = true,
+    val musicWidgetFullLyrics: Boolean = false,
+
     /** versionCode whose "What's new" was last shown. */
     val lastSeenVersion: Int = 0,
 ) {

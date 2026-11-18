@@ -231,6 +231,10 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val customHighlight = floatPreferencesKey("custom_highlight")
         val customRimWidthDp = floatPreferencesKey("custom_rim_width_dp")
 
+        val musicWidgetLinkedPkg = stringPreferencesKey("music_widget_linked_pkg")
+        val musicWidgetShowLyrics = booleanPreferencesKey("music_widget_show_lyrics")
+        val musicWidgetFullLyrics = booleanPreferencesKey("music_widget_full_lyrics")
+
         val haptics = booleanPreferencesKey("haptics")
         val tapAction = stringPreferencesKey("tap_action")
         val swipeToDismiss = booleanPreferencesKey("swipe_to_dismiss")
@@ -447,6 +451,9 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             monitorRam = p[K.monitorRam] ?: d.monitorRam,
             monitorNetwork = p[K.monitorNet] ?: d.monitorNetwork,
             monitorCpu = p[K.monitorCpu] ?: d.monitorCpu,
+            musicWidgetLinkedPkg = p[K.musicWidgetLinkedPkg] ?: d.musicWidgetLinkedPkg,
+            musicWidgetShowLyrics = p[K.musicWidgetShowLyrics] ?: d.musicWidgetShowLyrics,
+            musicWidgetFullLyrics = p[K.musicWidgetFullLyrics] ?: d.musicWidgetFullLyrics,
             monitorTemperature = p[K.monitorTemp] ?: d.monitorTemperature,
             monitorFps = p[K.monitorFps] ?: d.monitorFps,
         )
@@ -518,6 +525,9 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.customGlowColor] = s.customGlowColor
         p[K.customHighlight] = s.customHighlight
         p[K.customRimWidthDp] = s.customRimWidthDp
+        p[K.musicWidgetLinkedPkg] = s.musicWidgetLinkedPkg
+        p[K.musicWidgetShowLyrics] = s.musicWidgetShowLyrics
+        p[K.musicWidgetFullLyrics] = s.musicWidgetFullLyrics
         p[K.haptics] = s.haptics
         p[K.tapAction] = s.tapAction.name
         p[K.swipeToDismiss] = s.swipeToDismiss
