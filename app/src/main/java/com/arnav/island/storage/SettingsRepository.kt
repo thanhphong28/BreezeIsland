@@ -230,13 +230,6 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val customGlowColor = intPreferencesKey("custom_glow_color")
         val customHighlight = floatPreferencesKey("custom_highlight")
         val customRimWidthDp = floatPreferencesKey("custom_rim_width_dp")
-        val soundIslandEnabled = booleanPreferencesKey("sound_island_enabled")
-        val soundIslandSuppressStock = booleanPreferencesKey("sound_island_suppress_stock")
-        val soundIslandEdge = stringPreferencesKey("sound_island_edge")
-        val soundIslandYPercent = floatPreferencesKey("sound_island_y_percent")
-        val soundIslandAutoDismiss = longPreferencesKey("sound_island_auto_dismiss_ms")
-        val soundIslandWorkDnd = booleanPreferencesKey("sound_island_work_dnd")
-        val soundIslandWorkMediaVol = intPreferencesKey("sound_island_work_media_vol")
 
         val haptics = booleanPreferencesKey("haptics")
         val tapAction = stringPreferencesKey("tap_action")
@@ -456,13 +449,6 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             monitorCpu = p[K.monitorCpu] ?: d.monitorCpu,
             monitorTemperature = p[K.monitorTemp] ?: d.monitorTemperature,
             monitorFps = p[K.monitorFps] ?: d.monitorFps,
-            soundIslandEnabled = p[K.soundIslandEnabled] ?: d.soundIslandEnabled,
-            soundIslandSuppressStock = p[K.soundIslandSuppressStock] ?: d.soundIslandSuppressStock,
-            soundIslandEdge = p.enum(K.soundIslandEdge, d.soundIslandEdge),
-            soundIslandYPercent = p[K.soundIslandYPercent] ?: d.soundIslandYPercent,
-            soundIslandAutoDismissMs = p[K.soundIslandAutoDismiss] ?: d.soundIslandAutoDismissMs,
-            soundIslandWorkDnd = p[K.soundIslandWorkDnd] ?: d.soundIslandWorkDnd,
-            soundIslandWorkMediaVol = p[K.soundIslandWorkMediaVol] ?: d.soundIslandWorkMediaVol,
         )
     }
 
@@ -532,13 +518,6 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.customGlowColor] = s.customGlowColor
         p[K.customHighlight] = s.customHighlight
         p[K.customRimWidthDp] = s.customRimWidthDp
-        p[K.soundIslandEnabled] = s.soundIslandEnabled
-        p[K.soundIslandSuppressStock] = s.soundIslandSuppressStock
-        p[K.soundIslandEdge] = s.soundIslandEdge.name
-        p[K.soundIslandYPercent] = s.soundIslandYPercent
-        p[K.soundIslandAutoDismiss] = s.soundIslandAutoDismissMs
-        p[K.soundIslandWorkDnd] = s.soundIslandWorkDnd
-        p[K.soundIslandWorkMediaVol] = s.soundIslandWorkMediaVol
         p[K.haptics] = s.haptics
         p[K.tapAction] = s.tapAction.name
         p[K.swipeToDismiss] = s.swipeToDismiss

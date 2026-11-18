@@ -35,9 +35,9 @@ object SystemPopups {
         val suppress = s.replaceSystemPopups && islandShowing && s.enabled && s.notificationsEnabled
 
         // Privileged Shizuku path: toggle heads_up_notifications_enabled without killing notification sound/vibration!
-        if (com.arnav.island.soundisland.audio.VolumeSuppressor.canUseShizuku()) {
+        if (com.arnav.island.permissions.OnPhoneGranter.canUseShizuku()) {
             Thread {
-                com.arnav.island.soundisland.audio.VolumeSuppressor.runShizukuShell(
+                com.arnav.island.permissions.OnPhoneGranter.runShizukuShell(
                     "settings put global $KEY ${if (suppress) 0 else 1}"
                 )
             }.start()

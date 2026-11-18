@@ -51,6 +51,12 @@ object OnPhoneGranter {
         false
     }
 
+    fun canUseShizuku(): Boolean = try {
+        isShizukuRunning() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+    } catch (_: Throwable) {
+        false
+    }
+
     fun hasReadLogsPermission(context: Context): Boolean =
         context.checkSelfPermission(android.Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED
 
@@ -199,7 +205,7 @@ object OnPhoneGranter {
         }.start()
     }
 
-    private fun runShizukuShell(command: String): Boolean = try {
+    fun runShizukuShell(command: String): Boolean = try {
         val method = Shizuku::class.java.getDeclaredMethod(
             "newProcess",
             Array<String>::class.java,

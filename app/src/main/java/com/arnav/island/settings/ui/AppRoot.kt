@@ -60,7 +60,6 @@ import com.arnav.island.settings.ui.screens.MediaScreen
 import com.arnav.island.settings.ui.screens.NotificationsScreen
 import com.arnav.island.settings.ui.screens.PerformanceScreen
 import com.arnav.island.settings.ui.screens.PrivacyScreen
-import com.arnav.island.settings.ui.screens.SoundIslandScreen
 import com.arnav.island.settings.ui.screens.StatusBarScreen
 import com.arnav.island.settings.ui.screens.TimersScreen
 import com.arnav.island.settings.ui.screens.UnlockScreen
@@ -71,7 +70,7 @@ import com.arnav.island.storage.IslandSettings
 import kotlinx.coroutines.launch
 
 enum class Dest {
-    HOME, ISLAND, SOUND_ISLAND, CALIBRATION, EVENTS, APPS, MEDIA, NOTIFICATIONS, BATTERY, CHARGING, BLUETOOTH, TIMERS,
+    HOME, ISLAND, CALIBRATION, EVENTS, APPS, MEDIA, NOTIFICATIONS, BATTERY, CHARGING, BLUETOOTH, TIMERS,
     GESTURES, APPEARANCE, PERFORMANCE, PRIVACY, ADVANCED, DEVELOPER, ABOUT,
     STUDIO, WHATS_NEW, STATUS_BAR, BLEND, GALLERY, DIAGNOSTICS, UNLOCK, MASCOT, WEATHER,
 }
@@ -226,7 +225,6 @@ fun IslandRoot(graph: AppGraph, initial: Dest?, sharedSetup: String? = null, onS
             when (dest) {
                 Dest.HOME -> HomeScreen(settings, permissions, ui)
                 Dest.ISLAND -> IslandScreen(settings, ui)
-                Dest.SOUND_ISLAND -> SoundIslandScreen(settings, permissions, ui)
                 Dest.CALIBRATION -> CalibrationScreen(settings, ui)
                 Dest.EVENTS -> EventsScreen(settings, permissions, ui)
                 Dest.APPS -> AppsScreen(settings, permissions, ui)

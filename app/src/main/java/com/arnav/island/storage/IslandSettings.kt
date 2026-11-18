@@ -7,7 +7,6 @@ import com.arnav.island.events.MascotMood
 import com.arnav.island.events.NotificationPrivacy
 import com.arnav.island.island.GeometryConfig
 import com.arnav.island.island.IdleStyle
-import com.arnav.island.soundisland.render.ScreenEdge
 
 enum class AppLanguage(val label: String) { VIETNAMESE("Tiếng Việt"), ENGLISH("English") }
 
@@ -252,15 +251,6 @@ data class IslandSettings(
     val statusBarCleanup: Boolean = true,
     val statusBarIcons: String = "ongoing_activity,ongoing_activity_chip,sec_ongoing_activity,ongoing_call_chip,ongoing_privacy_chip,media_ongoing,live_notification,flashlight,torch,sec_flashlight,now_bar,alarm_clock,volume,zen,rotate,headset,bluetooth,hotspot",
     val statusBarBackup: String = BACKUP_NONE,
-
-    // Breeze Sound Island (Liquid Glass Edge Volume & Focus Island)
-    val soundIslandEnabled: Boolean = true,
-    val soundIslandSuppressStock: Boolean = false,
-    val soundIslandEdge: ScreenEdge = ScreenEdge.RIGHT,
-    val soundIslandYPercent: Float = 0.30f,
-    val soundIslandAutoDismissMs: Long = 1800L,
-    val soundIslandWorkDnd: Boolean = true,
-    val soundIslandWorkMediaVol: Int = 30,
 
     /** versionCode whose "What's new" was last shown. */
     val lastSeenVersion: Int = 0,
