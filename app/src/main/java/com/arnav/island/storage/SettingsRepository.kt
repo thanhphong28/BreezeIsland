@@ -231,6 +231,12 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val customHighlight = floatPreferencesKey("custom_highlight")
         val customRimWidthDp = floatPreferencesKey("custom_rim_width_dp")
 
+        val searchAutoLaunchEnabled = booleanPreferencesKey("search_auto_launch_enabled")
+        val searchAutoLaunchDelayMs = longPreferencesKey("search_auto_launch_delay_ms")
+        val searchAutoLaunchMinChars = intPreferencesKey("search_auto_launch_min_chars")
+        val searchAutoLaunchSkipWhenDeleting = booleanPreferencesKey("search_auto_launch_skip_when_deleting")
+        val searchAutoLaunchFeedback = booleanPreferencesKey("search_auto_launch_feedback")
+
         val haptics = booleanPreferencesKey("haptics")
         val tapAction = stringPreferencesKey("tap_action")
         val swipeToDismiss = booleanPreferencesKey("swipe_to_dismiss")
@@ -447,6 +453,11 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             monitorRam = p[K.monitorRam] ?: d.monitorRam,
             monitorNetwork = p[K.monitorNet] ?: d.monitorNetwork,
             monitorCpu = p[K.monitorCpu] ?: d.monitorCpu,
+            searchAutoLaunchEnabled = p[K.searchAutoLaunchEnabled] ?: d.searchAutoLaunchEnabled,
+            searchAutoLaunchDelayMs = (p[K.searchAutoLaunchDelayMs] ?: d.searchAutoLaunchDelayMs).coerceIn(0L, 1_000L),
+            searchAutoLaunchMinChars = (p[K.searchAutoLaunchMinChars] ?: d.searchAutoLaunchMinChars).coerceIn(1, 4),
+            searchAutoLaunchSkipWhenDeleting = p[K.searchAutoLaunchSkipWhenDeleting] ?: d.searchAutoLaunchSkipWhenDeleting,
+            searchAutoLaunchFeedback = p[K.searchAutoLaunchFeedback] ?: d.searchAutoLaunchFeedback,
             monitorTemperature = p[K.monitorTemp] ?: d.monitorTemperature,
             monitorFps = p[K.monitorFps] ?: d.monitorFps,
         )
@@ -518,6 +529,11 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.customGlowColor] = s.customGlowColor
         p[K.customHighlight] = s.customHighlight
         p[K.customRimWidthDp] = s.customRimWidthDp
+        p[K.searchAutoLaunchEnabled] = s.searchAutoLaunchEnabled
+        p[K.searchAutoLaunchDelayMs] = s.searchAutoLaunchDelayMs
+        p[K.searchAutoLaunchMinChars] = s.searchAutoLaunchMinChars
+        p[K.searchAutoLaunchSkipWhenDeleting] = s.searchAutoLaunchSkipWhenDeleting
+        p[K.searchAutoLaunchFeedback] = s.searchAutoLaunchFeedback
         p[K.haptics] = s.haptics
         p[K.tapAction] = s.tapAction.name
         p[K.swipeToDismiss] = s.swipeToDismiss

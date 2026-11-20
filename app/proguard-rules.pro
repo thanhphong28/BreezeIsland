@@ -8,4 +8,7 @@
 -keep class rikka.shizuku.** { *; }
 -dontwarn rikka.shizuku.**
 -keep class org.lsposed.hiddenapibypass.** { *; }
+-keep class com.arnav.island.search.ISearchAutoLaunchService** { *; }
+-keep class com.arnav.island.search.ISearchAutoLaunchCallback** { *; }
+-keep class com.arnav.island.search.SearchAutoLaunchUserService { *; }
 

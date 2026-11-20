@@ -10,6 +10,7 @@ import com.arnav.island.events.weather.WeatherMonitor
 import com.arnav.island.island.CutoutSource
 import com.arnav.island.overlay.StatusBarCleanup
 import com.arnav.island.overlay.SystemPopups
+import com.arnav.island.search.SearchAutoLaunchController
 import com.arnav.island.storage.IslandSettings
 import com.arnav.island.storage.SettingsRepository
 import com.arnav.island.util.AppInfoCache
@@ -66,6 +67,7 @@ class AppGraph(val app: Application) {
     val media = MediaSessionMonitor(app, events, images, apps, scope, currentSettings)
     val weather = WeatherMonitor(app, events, scope, currentSettings)
     val testEvents = TestEvents(events, images, scope)
+    val searchAutoLaunch = SearchAutoLaunchController(app, events, images, apps, settings, scope)
 
     val runtime = MutableStateFlow(RuntimeStatus(deviceProfile = DeviceProfiles.detect().displayName))
 

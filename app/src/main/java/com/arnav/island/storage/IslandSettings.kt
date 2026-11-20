@@ -252,6 +252,13 @@ data class IslandSettings(
     val statusBarIcons: String = "ongoing_activity,ongoing_activity_chip,sec_ongoing_activity,ongoing_call_chip,ongoing_privacy_chip,media_ongoing,live_notification,flashlight,torch,sec_flashlight,now_bar,alarm_clock,volume,zen,rotate,headset,bluetooth,hotspot",
     val statusBarBackup: String = BACKUP_NONE,
 
+    // Home / Finder Instant Search Auto-Launch (Zero AccessibilityService, powered by Shizuku)
+    val searchAutoLaunchEnabled: Boolean = false,
+    val searchAutoLaunchDelayMs: Long = 220L,
+    val searchAutoLaunchMinChars: Int = 2,
+    val searchAutoLaunchSkipWhenDeleting: Boolean = true,
+    val searchAutoLaunchFeedback: Boolean = true,
+
     /** versionCode whose "What's new" was last shown. */
     val lastSeenVersion: Int = 0,
 ) {

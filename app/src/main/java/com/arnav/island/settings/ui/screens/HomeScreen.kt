@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PhonelinkLock
 import androidx.compose.material.icons.rounded.Science
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -238,6 +239,16 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
 
         item {
             Group(title = "Island") {
+                NavRow(
+                    tr("Instant Search Launch", "Mở nhanh khi tìm App"),
+                    if (settings.searchAutoLaunchEnabled) {
+                        tr("Active · Auto-opens single matching app on Home search", "Đang bật · Gõ tìm còn 1 app tự mở ngay (không Trợ năng)")
+                    } else {
+                        tr("Auto-open app when Home search narrows to 1 result", "Vuốt lên tìm app còn 1 kết quả sẽ tự động mở luôn")
+                    },
+                    Icons.Rounded.Search,
+                    BadgeColors.Blue,
+                ) { ui.go(Dest.SEARCH_AUTO_LAUNCH) }
                 NavRow("Breeze Mascot", "Thú cưng Aurora dễ thương · chạm camera lúc nghỉ", Icons.Rounded.EmojiEmotions, BadgeColors.Cyan) { ui.go(Dest.MASCOT) }
                 NavRow("Blend with One UI 9 (Z Flip5)", "Seamless status bar, Now Bar fix & pop-up replacement", Icons.Rounded.PhoneAndroid, BadgeColors.Blue) { ui.go(Dest.BLEND) }
                 NavRow("Shape & motion", "Size, corners, springs, split island", Icons.Rounded.Crop169, BadgeColors.Graphite) { ui.go(Dest.ISLAND) }
