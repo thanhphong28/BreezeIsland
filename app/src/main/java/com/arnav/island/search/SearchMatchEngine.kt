@@ -3,6 +3,8 @@ package com.arnav.island.search
 import java.text.Normalizer
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
 data class AppEntry(
     val packageName: String,
@@ -15,6 +17,7 @@ data class AppEntry(
 
 data class UiNodeSnapshot(
     val nodeIndex: Int,
+    val parentIndex: Int = -1,
     val text: String,
     val contentDesc: String,
     val viewId: String,
@@ -38,7 +41,8 @@ data class UiNodeSnapshot(
 }
 
 data class VisualAppMatch(
-    val app: AppEntry,
+    val packageName: String?,
+    val label: String,
     val nodeIndex: Int,
     val isClickable: Boolean,
     val left: Int,
@@ -61,14 +65,54 @@ sealed interface SearchDecision {
 
 /**
  * Pure, deterministic UI-tree analyzer for Samsung One UI Home / Finder and Android launchers.
- * Given a flattened snapshot of visible UI nodes and the list of installed launchable apps,
- * determines whether an active search query currently narrows down to exactly ONE visible app.
+ *
+ * Design rule: DO NOT second-guess what the user typed (typos, category search like "ngân hàng",
+ * English/Vietnamese aliases like "photo" -> "Bộ sưu tập", etc.). If the search box has a real
+ * query and the launcher/Finder displays **exact 1 app result**, launch that app immediately.
  */
 object SearchMatchEngine {
 
     private val COMBINING_MARKS_REGEX = Regex("\\p{InCombiningDiacriticalMarks}+")
     private val ZERO_WIDTH_REGEX = Regex("[\\u200B-\\u200F\\uFEFF]")
     private val MULTI_SPACE_REGEX = Regex("\\s+")
+
+    /** Exact normalized titles of Samsung One UI / Android Launcher app-result cards. */
+    private val SEARCHED_APPS_HEADERS = setOf(
+        "ung dung da tim kiem",
+        "searched apps",
+        "app results",
+        "ket qua ung dung",
+        "ung dung",
+        "apps",
+    )
+
+    private val SUGGESTED_HEADERS = setOf(
+        "ung dung de xuat",
+        "suggested apps",
+        "goi y",
+        "suggestions",
+        "tim kiem gan day",
+        "recent searches",
+        "gan day",
+        "recents",
+    )
+
+    private val CARD_ACTION_LABELS = setOf(
+        "xem them",
+        "see more",
+        "show more",
+        "thu gon",
+        "collapse",
+        "show less",
+        "tat ca",
+        "view all",
+        "more",
+        "mo rong",
+        "tim kiem",
+        "search",
+        "xoa",
+        "clear",
+    )
 
     private val EXCLUDED_VIEW_ID_KEYWORDS = listOf(
         "search_src_text",
@@ -92,18 +136,20 @@ object SearchMatchEngine {
         "shortcut",
     )
 
-    private val STORE_OR_WEB_NOISE_PHRASES = listOf(
+    private val FOOTER_NOISE_PHRASES = listOf(
         "google play",
         "galaxy store",
-        "tìm trên",
-        "tìm trong",
+        "tim tren",
+        "tim trong",
         "search on",
         "search in",
         "search web",
-        "mở trong",
-        "xem thêm",
+        "mo trong",
+        "xem them",
         "see more",
         "show more",
+        "cai dat >",
+        "settings >",
     )
 
     fun normalize(raw: String): String {
@@ -129,7 +175,7 @@ object SearchMatchEngine {
         nodes: List<UiNodeSnapshot>,
         installedApps: List<AppEntry>,
         labelIndex: Map<String, List<AppEntry>> = buildIndex(installedApps),
-        minChars: Int = 2,
+        minChars: Int = 1,
     ): SearchDecision {
         val searchBox = findActiveSearchInput(nodes) ?: return SearchDecision.NoSearchActive
 
@@ -146,36 +192,190 @@ object SearchMatchEngine {
             return SearchDecision.QueryTooShort(rawQuery)
         }
 
+        // Priority 1: Samsung One UI Finder / Home "Ứng dụng đã tìm kiếm" / "Searched apps" card.
+        // Completely query-agnostic: whatever 1 app Samsung Finder displays in this card gets opened!
+        val searchedAppsHeader = findSearchedAppsHeader(nodes, searchBox)
+        if (searchedAppsHeader != null) {
+            val cardItems = collectAppItemsInSearchedCard(nodes, searchedAppsHeader, searchBox, installedApps, labelIndex)
+            return when (cardItems.size) {
+                0 -> SearchDecision.NoMatches(rawQuery)
+                1 -> SearchDecision.SingleMatch(rawQuery, cardItems.first())
+                else -> SearchDecision.MultipleMatches(rawQuery, cardItems.size)
+            }
+        }
+
+        // If Finder is explicitly showing a "Suggested apps" / "Recent" card with NO "Searched apps"
+        // card, then 0 apps matched the query — never auto-open a suggested app.
+        if (hasOnlySuggestedHeader(nodes)) {
+            return SearchDecision.NoMatches(rawQuery)
+        }
+
+        // Priority 2: Flat launcher app drawer search (no card header).
+        // Match visible clickable app icons against installed apps without restricting on query text,
+        // while ignoring Finder's bottom Settings/Store/Web-search cards.
+        val flatMatches = collectFlatLauncherMatches(nodes, searchBox, installedApps, labelIndex)
+        return when (flatMatches.size) {
+            0 -> SearchDecision.NoMatches(rawQuery)
+            1 -> SearchDecision.SingleMatch(rawQuery, flatMatches.first())
+            else -> SearchDecision.MultipleMatches(rawQuery, flatMatches.size)
+        }
+    }
+
+    /**
+     * Finds the "Ứng dụng đã tìm kiếm" / "Searched apps" header node in Samsung One UI Finder.
+     */
+    private fun findSearchedAppsHeader(nodes: List<UiNodeSnapshot>, searchBox: UiNodeSnapshot): UiNodeSnapshot? {
+        var genericCandidate: UiNodeSnapshot? = null
+        for (n in nodes) {
+            if (!n.isVisible || n.nodeIndex == searchBox.nodeIndex || n.isEditable) continue
+            val norm = normalize(n.text.ifBlank { n.contentDesc })
+            if (norm.isEmpty()) continue
+            if (norm == "ung dung da tim kiem" || norm == "searched apps" || norm == "app results" || norm == "ket qua ung dung") {
+                return n
+            }
+            if (norm in SEARCHED_APPS_HEADERS && genericCandidate == null) {
+                genericCandidate = n
+            }
+        }
+        return genericCandidate
+    }
+
+    private fun hasOnlySuggestedHeader(nodes: List<UiNodeSnapshot>): Boolean {
+        for (n in nodes) {
+            if (!n.isVisible || n.isEditable) continue
+            val norm = normalize(n.text.ifBlank { n.contentDesc })
+            if (norm in SUGGESTED_HEADERS) return true
+        }
+        return false
+    }
+
+    /**
+     * Finds the card container holding [header] ("Ứng dụng đã tìm kiếm") and returns all distinct
+     * clickable app items inside that card (below the header). Completely ignores Card 2 shortcuts,
+     * Card 3 Settings, and Store/Web footers outside Card 1.
+     */
+    private fun collectAppItemsInSearchedCard(
+        nodes: List<UiNodeSnapshot>,
+        header: UiNodeSnapshot,
+        searchBox: UiNodeSnapshot,
+        installedApps: List<AppEntry>,
+        labelIndex: Map<String, List<AppEntry>>,
+    ): List<VisualAppMatch> {
+        val byIndex = nodes.associateBy { it.nodeIndex }
+        val childrenMap = HashMap<Int, MutableList<UiNodeSnapshot>>()
+        for (n in nodes) {
+            childrenMap.getOrPut(n.parentIndex) { ArrayList() }.add(n)
+        }
+
+        // Walk up from header to find the tightest ancestor card that contains clickable items
+        // below header.bottom without absorbing the searchBox itself.
+        var cardRootIndex = header.parentIndex
+        var chosenRoot: Int = -1
+        var hops = 0
+        while (cardRootIndex >= 0 && hops < 5) {
+            val subtree = collectSubtree(cardRootIndex, childrenMap)
+            val containsSearchBox = subtree.any { it.nodeIndex == searchBox.nodeIndex }
+            if (containsSearchBox) break
+
+            val clickableBelow = subtree.any { n ->
+                n.isVisible && n.isClickable && n.nodeIndex != header.nodeIndex &&
+                    n.top >= header.bottom - 12 && n.width >= 40 && n.height >= 40 &&
+                    !isCardActionButton(n, header)
+            }
+            if (clickableBelow) {
+                chosenRoot = cardRootIndex
+                break
+            }
+            cardRootIndex = byIndex[cardRootIndex]?.parentIndex ?: -1
+            hops++
+        }
+
+        val scopeNodes = if (chosenRoot >= 0) {
+            collectSubtree(chosenRoot, childrenMap)
+        } else {
+            // Flat list fallback (no parentIndex supplied): take nodes below header and above the
+            // next card/section boundary or searchBox.
+            val nextBoundaryY = findNextSectionTopBelow(nodes, header, searchBox)
+            nodes.filter { n ->
+                n.isVisible && n.nodeIndex != header.nodeIndex && n.nodeIndex != searchBox.nodeIndex &&
+                    n.top >= header.bottom - 12 && n.bottom <= nextBoundaryY
+            }
+        }
+
+        val scopeIndexSet = scopeNodes.map { it.nodeIndex }.toHashSet()
+        val rawMatches = ArrayList<VisualAppMatch>()
+
+        // Prefer outermost clickable items inside Card 1 (each app icon tile in One UI Finder is 1 clickable container)
+        for (n in scopeNodes) {
+            if (!n.isVisible || !n.isClickable) continue
+            if (n.nodeIndex == header.nodeIndex || n.nodeIndex == searchBox.nodeIndex || n.isEditable) continue
+            if (n.top < header.bottom - 12) continue
+            if (n.width < 40 || n.height < 40) continue
+            if (isCardActionButton(n, header)) continue
+
+            // Skip nested clickable child if an ancestor inside Card 1 is already clickable
+            if (hasClickableAncestorInScope(n, byIndex, scopeIndexSet)) continue
+
+            val idLower = n.viewId.lowercase(Locale.ROOT)
+            if (EXCLUDED_VIEW_ID_KEYWORDS.any { idLower.contains(it) }) continue
+
+            val label = extractNodeOrSubtreeLabel(n, childrenMap)
+            val normLabel = normalize(label)
+            if (normLabel in CARD_ACTION_LABELS) continue
+
+            val resolvedApp = resolveInstalledApp(label, installedApps, labelIndex)
+            rawMatches.add(
+                VisualAppMatch(
+                    packageName = resolvedApp?.packageName,
+                    label = resolvedApp?.label ?: label.ifBlank { "App" },
+                    nodeIndex = n.nodeIndex,
+                    isClickable = true,
+                    left = n.left,
+                    top = n.top,
+                    right = n.right,
+                    bottom = n.bottom,
+                )
+            )
+        }
+
+        // If Card 1 used non-clickable containers with clickable text/icon leaves, deduplicate by bounding box
+        return deduplicateByBounds(rawMatches)
+    }
+
+    private fun collectFlatLauncherMatches(
+        nodes: List<UiNodeSnapshot>,
+        searchBox: UiNodeSnapshot,
+        installedApps: List<AppEntry>,
+        labelIndex: Map<String, List<AppEntry>>,
+    ): List<VisualAppMatch> {
         val rawMatches = ArrayList<VisualAppMatch>()
         for (node in nodes) {
-            if (!node.isVisible) continue
-            if (!node.isActionable) continue
-            if (node.nodeIndex == searchBox.nodeIndex) continue
-            if (node.isEditable) continue
+            if (!node.isVisible || !node.isActionable) continue
+            if (node.nodeIndex == searchBox.nodeIndex || node.isEditable) continue
             if (node.width <= 0 || node.height <= 0) continue
 
             val idLower = node.viewId.lowercase(Locale.ROOT)
             if (EXCLUDED_VIEW_ID_KEYWORDS.any { idLower.contains(it) }) continue
 
-            val labelCandidates = extractCandidateLabels(node)
-            if (labelCandidates.isEmpty()) continue
+            val candidates = extractCandidateLabels(node)
+            if (candidates.isEmpty()) continue
 
-            var matchedApp: AppEntry? = null
-            for (cand in labelCandidates) {
+            var resolved: AppEntry? = null
+            for (cand in candidates) {
                 val normCand = normalize(cand)
                 if (normCand.isEmpty()) continue
-                if (isNoisePhrase(normCand, normQuery)) continue
-                val entries = labelIndex[normCand] ?: continue
-                val matching = entries.firstOrNull { matchesQuery(it, normQuery, compactQuery) }
-                if (matching != null) {
-                    matchedApp = matching
+                if (isFooterNoise(normCand)) continue
+                val app = resolveInstalledApp(cand, installedApps, labelIndex)
+                if (app != null) {
+                    resolved = app
                     break
                 }
             }
-            if (matchedApp != null) {
+            if (resolved != null) {
                 rawMatches.add(
                     VisualAppMatch(
-                        app = matchedApp,
+                        packageName = resolved.packageName,
+                        label = resolved.label,
                         nodeIndex = node.nodeIndex,
                         isClickable = node.isClickable,
                         left = node.left,
@@ -186,59 +386,98 @@ object SearchMatchEngine {
                 )
             }
         }
-
-        val distinct = deduplicateVisualMatches(rawMatches)
-        return when (distinct.size) {
-            0 -> SearchDecision.NoMatches(rawQuery)
-            1 -> SearchDecision.SingleMatch(rawQuery, distinct.first())
-            else -> SearchDecision.MultipleMatches(rawQuery, distinct.size)
-        }
+        return deduplicateFlatMatches(rawMatches)
     }
 
-    internal fun matchesQuery(app: AppEntry, normQuery: String, compactQuery: String = normQuery.replace(" ", "")): Boolean {
-        if (compactQuery.isEmpty()) return false
-        if (app.normLabel.contains(normQuery)) return true
-        if (app.compactLabel.contains(compactQuery)) return true
-        if (app.initials.isNotEmpty() && app.initials.startsWith(compactQuery)) return true
-
-        val qWords = normQuery.split(' ').filter { it.isNotEmpty() }
-        if (qWords.size > 1 && app.words.size >= qWords.size) {
-            var wi = 0
-            var allMatched = true
-            for (qw in qWords) {
-                while (wi < app.words.size && !app.words[wi].startsWith(qw)) wi++
-                if (wi >= app.words.size) {
-                    allMatched = false
-                    break
-                }
-                wi++
-            }
-            if (allMatched) return true
-        }
-
-        if (compactQuery.length >= 3 && app.packageName.lowercase(Locale.ROOT).contains(compactQuery)) {
-            return true
-        }
-
-        if (compactQuery.length >= 2) {
-            val firstChar = compactQuery[0]
-            val startsAnyWord = app.compactLabel.startsWith(firstChar) || app.words.any { it.startsWith(firstChar) }
-            if (startsAnyWord && isSubsequence(compactQuery, app.compactLabel)) {
-                return true
+    private fun collectSubtree(rootIndex: Int, childrenMap: Map<Int, List<UiNodeSnapshot>>): List<UiNodeSnapshot> {
+        val out = ArrayList<UiNodeSnapshot>()
+        val queue = ArrayDeque<Int>()
+        queue.add(rootIndex)
+        while (queue.isNotEmpty()) {
+            val cur = queue.removeFirst()
+            val children = childrenMap[cur] ?: continue
+            for (c in children) {
+                out.add(c)
+                queue.add(c.nodeIndex)
             }
         }
+        return out
+    }
 
+    private fun hasClickableAncestorInScope(
+        node: UiNodeSnapshot,
+        byIndex: Map<Int, UiNodeSnapshot>,
+        scopeIndices: Set<Int>,
+    ): Boolean {
+        var p = node.parentIndex
+        var hops = 0
+        while (p in scopeIndices && hops < 6) {
+            val parentNode = byIndex[p] ?: break
+            if (parentNode.isClickable) return true
+            p = parentNode.parentIndex
+            hops++
+        }
         return false
     }
 
-    private fun isSubsequence(needle: String, haystack: String): Boolean {
-        var ni = 0
-        var hi = 0
-        while (ni < needle.length && hi < haystack.length) {
-            if (needle[ni] == haystack[hi]) ni++
-            hi++
+    private fun isCardActionButton(node: UiNodeSnapshot, header: UiNodeSnapshot): Boolean {
+        // Button sitting on the same horizontal line as the "Ứng dụng đã tìm kiếm" header (e.g. ">", "Xem thêm")
+        if (abs(node.centerY - header.centerY) < 42 && node.bottom <= header.bottom + 24) return true
+        val norm = normalize(node.text.ifBlank { node.contentDesc })
+        return norm in CARD_ACTION_LABELS
+    }
+
+    private fun findNextSectionTopBelow(
+        nodes: List<UiNodeSnapshot>,
+        header: UiNodeSnapshot,
+        searchBox: UiNodeSnapshot,
+    ): Int {
+        var limit = if (searchBox.top > header.bottom) searchBox.top else Int.MAX_VALUE
+        for (n in nodes) {
+            if (!n.isVisible || n.isClickable || n.nodeIndex == header.nodeIndex) continue
+            if (n.top <= header.bottom + 120) continue
+            val norm = normalize(n.text)
+            if (norm.isNotEmpty() && n.left <= header.left + 80 && n.top < limit) {
+                // Non-clickable left-aligned section header below Card 1
+                limit = n.top
+            }
         }
-        return ni == needle.length
+        return limit
+    }
+
+    private fun extractNodeOrSubtreeLabel(
+        node: UiNodeSnapshot,
+        childrenMap: Map<Int, List<UiNodeSnapshot>>,
+    ): String {
+        extractCandidateLabels(node).firstOrNull()?.let { return it }
+        val queue = ArrayDeque<Int>()
+        queue.add(node.nodeIndex)
+        while (queue.isNotEmpty()) {
+            val cur = queue.removeFirst()
+            for (c in childrenMap[cur].orEmpty()) {
+                extractCandidateLabels(c).firstOrNull()?.let { return it }
+                queue.add(c.nodeIndex)
+            }
+        }
+        return ""
+    }
+
+    private fun resolveInstalledApp(
+        rawLabel: String,
+        installedApps: List<AppEntry>,
+        labelIndex: Map<String, List<AppEntry>>,
+    ): AppEntry? {
+        val norm = normalize(rawLabel)
+        if (norm.isEmpty()) return null
+        labelIndex[norm]?.firstOrNull()?.let { return it }
+
+        // Support ellipsized launcher labels like "VCB Digib..." or "VCB Digib…"
+        val trimmedEllipsis = norm.removeSuffix("...").removeSuffix("…").trim()
+        if (trimmedEllipsis.length >= 4 && trimmedEllipsis.length < norm.length) {
+            val prefixMatches = installedApps.filter { it.normLabel.startsWith(trimmedEllipsis) }
+            if (prefixMatches.size == 1) return prefixMatches.first()
+        }
+        return null
     }
 
     private fun findActiveSearchInput(nodes: List<UiNodeSnapshot>): UiNodeSnapshot? {
@@ -273,32 +512,31 @@ object SearchMatchEngine {
         return out
     }
 
-    private fun isNoisePhrase(normCandidate: String, normQuery: String): Boolean {
-        for (phrase in STORE_OR_WEB_NOISE_PHRASES) {
-            val normPhrase = normalize(phrase)
-            if (normCandidate.contains(normPhrase) && !normPhrase.contains(normQuery)) {
-                return true
-            }
+    private fun isFooterNoise(normCandidate: String): Boolean =
+        FOOTER_NOISE_PHRASES.any { normCandidate.contains(it) } ||
+            normCandidate == "cai dat" || normCandidate == "settings" ||
+            normCandidate == "google"
+
+    private fun deduplicateByBounds(matches: List<VisualAppMatch>): List<VisualAppMatch> {
+        if (matches.size <= 1) return matches
+        val kept = ArrayList<VisualAppMatch>()
+        for (m in matches) {
+            val overlap = kept.any { k -> rectsOverlapSignificantly(k, m) }
+            if (!overlap) kept.add(m)
         }
-        return false
+        return kept
     }
 
-    /**
-     * Merges duplicate nodes for the same package (e.g., parent container + child TextView, OR
-     * Card 1 "Searched apps" icon + Card 2 "App Shortcuts" section header below it), while
-     * keeping side-by-side Dual Messenger icons in the same row separate so the user can choose.
-     */
-    private fun deduplicateVisualMatches(matches: List<VisualAppMatch>): List<VisualAppMatch> {
+    private fun deduplicateFlatMatches(matches: List<VisualAppMatch>): List<VisualAppMatch> {
         if (matches.size <= 1) return matches
         val kept = ArrayList<VisualAppMatch>()
         for (m in matches) {
             val existingIdx = kept.indexOfFirst { k ->
-                k.app.packageName == m.app.packageName && !isSideBySideDualIcon(k, m)
+                k.packageName != null && k.packageName == m.packageName && !isSideBySideDualIcon(k, m)
             }
             if (existingIdx < 0) {
                 kept.add(m)
             } else {
-                // Keep the topmost app icon (Card 1 "Searched apps"), preferring clickable container
                 val cur = kept[existingIdx]
                 val mIsHigher = m.top < cur.top - 40
                 val sameBandPreferClickable = abs(m.top - cur.top) <= 40 && !cur.isClickable && m.isClickable
@@ -310,10 +548,18 @@ object SearchMatchEngine {
         return kept
     }
 
-    /**
-     * Dual Messenger icons of the exact same app appear side-by-side in the same grid row
-     * (similar centerY, separated horizontally).
-     */
+    private fun rectsOverlapSignificantly(a: VisualAppMatch, b: VisualAppMatch): Boolean {
+        val interL = max(a.left, b.left)
+        val interT = max(a.top, b.top)
+        val interR = min(a.right, b.right)
+        val interB = min(a.bottom, b.bottom)
+        if (interR <= interL || interB <= interT) return false
+        val interArea = (interR - interL).toLong() * (interB - interT).toLong()
+        val areaA = ((a.right - a.left).coerceAtLeast(1)).toLong() * ((a.bottom - a.top).coerceAtLeast(1)).toLong()
+        val areaB = ((b.right - b.left).coerceAtLeast(1)).toLong() * ((b.bottom - b.top).coerceAtLeast(1)).toLong()
+        return interArea * 4 >= min(areaA, areaB)
+    }
+
     private fun isSideBySideDualIcon(a: VisualAppMatch, b: VisualAppMatch): Boolean {
         val dy = abs(a.centerY - b.centerY)
         val dx = abs(a.centerX - b.centerX)

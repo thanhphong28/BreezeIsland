@@ -190,9 +190,9 @@ fun SearchAutoLaunchScreen(s: IslandSettings, ui: Ui) {
                         selected = s.searchAutoLaunchMinChars,
                         label = { n ->
                             if (vi) {
-                                if (n == 2) "$n ký tự (Khuyên dùng)" else "$n ký tự"
+                                if (n == 1) "$n ký tự (Mặc định)" else "$n ký tự"
                             } else {
-                                "$n char${if (n > 1) "s" else ""}"
+                                if (n == 1) "1 char (Default)" else "$n chars"
                             }
                         },
                         onSelect = { n -> ui.update { it.copy(searchAutoLaunchMinChars = n) } },

@@ -48,7 +48,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
     private var delayMs: Long = 220L
 
     @Volatile
-    private var minChars: Int = 2
+    private var minChars: Int = 1
 
     @Volatile
     private var skipWhenDeleting: Boolean = true
@@ -261,7 +261,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         for (root in roots) {
             val liveNodes = ArrayList<AccessibilityNodeInfo>(192)
             val snapshots = ArrayList<UiNodeSnapshot>(192)
-            flattenTree(root, depth = 0, ancestorClickable = false, liveNodes, snapshots, maxNodes = 1_200)
+            flattenTree(root, parentIndex = -1, depth = 0, ancestorClickable = false, liveNodes, snapshots, maxNodes = 1_200)
 
             val candidate = SearchMatchEngine.evaluateSearchScreen(
                 nodes = snapshots,
@@ -316,10 +316,11 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
                 if (norm == lastLaunchedQuery && now - lastLaunchElapsed < SAME_QUERY_COOLDOWN_MS) return
 
                 val matched = decision.match
+                val matchKey = matched.packageName ?: matched.label
                 val effectiveDelay = delayMs
-                if (effectiveDelay > 0L && (!confirmPending || pendingQuery != norm || pendingPkg != matched.app.packageName)) {
+                if (effectiveDelay > 0L && (!confirmPending || pendingQuery != norm || pendingPkg != matchKey)) {
                     pendingQuery = norm
-                    pendingPkg = matched.app.packageName
+                    pendingPkg = matchKey
                     handler.removeCallbacks(confirmLaunchRunnable)
                     handler.postDelayed(confirmLaunchRunnable, effectiveDelay)
                     return
@@ -333,12 +334,12 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
                 lastLaunchElapsed = now
 
                 val clicked = performClickOnMatch(bestLiveNodes.getOrNull(matched.nodeIndex))
-                if (!clicked) {
-                    launchViaShell(matched.app.packageName)
+                if (!clicked && !matched.packageName.isNullOrBlank()) {
+                    launchViaShell(matched.packageName)
                 }
-                updateStatus("launched:${matched.app.label}")
+                updateStatus("launched:${matched.label}")
                 runCatching {
-                    callback?.onAppAutoLaunched(matched.app.packageName, matched.app.label, query, clicked)
+                    callback?.onAppAutoLaunched(matched.packageName.orEmpty(), matched.label, query, clicked)
                 }
 
                 handler.removeCallbacks(postLaunchDisconnectRunnable)
@@ -413,6 +414,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
 
     private fun flattenTree(
         node: AccessibilityNodeInfo,
+        parentIndex: Int,
         depth: Int,
         ancestorClickable: Boolean,
         liveOut: MutableList<AccessibilityNodeInfo>,
@@ -434,6 +436,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         snapOut.add(
             UiNodeSnapshot(
                 nodeIndex = idx,
+                parentIndex = parentIndex,
                 text = node.text?.toString().orEmpty(),
                 contentDesc = node.contentDescription?.toString().orEmpty(),
                 viewId = node.viewIdResourceName.orEmpty(),
@@ -455,7 +458,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         for (i in 0 until childCount) {
             if (liveOut.size >= maxNodes) break
             val child = runCatching { node.getChild(i) }.getOrNull() ?: continue
-            flattenTree(child, depth + 1, actionable, liveOut, snapOut, maxNodes)
+            flattenTree(child, idx, depth + 1, actionable, liveOut, snapOut, maxNodes)
         }
     }
 

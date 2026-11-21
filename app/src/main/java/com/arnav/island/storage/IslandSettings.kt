@@ -255,7 +255,7 @@ data class IslandSettings(
     // Home / Finder Instant Search Auto-Launch (Zero AccessibilityService, powered by Shizuku)
     val searchAutoLaunchEnabled: Boolean = false,
     val searchAutoLaunchDelayMs: Long = 220L,
-    val searchAutoLaunchMinChars: Int = 2,
+    val searchAutoLaunchMinChars: Int = 1,
     val searchAutoLaunchSkipWhenDeleting: Boolean = true,
     val searchAutoLaunchFeedback: Boolean = true,
 

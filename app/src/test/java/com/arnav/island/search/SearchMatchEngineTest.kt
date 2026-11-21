@@ -11,6 +11,7 @@ class SearchMatchEngineTest {
         AppEntry("ru.zdevs.zarchiver", "ZArchiver"),
         AppEntry("com.facebook.katana", "Facebook"),
         AppEntry("com.VCB", "VCB Digibank"),
+        AppEntry("com.sec.android.gallery3d", "Bộ sưu tập"),
         AppEntry("com.sec.android.app.clockpackage", "Đồng hồ"),
         AppEntry("com.google.android.googlequicksearchbox", "Google"),
         AppEntry("com.android.vending", "Google Play"),
@@ -19,50 +20,34 @@ class SearchMatchEngineTest {
         AppEntry("com.android.settings", "Cài đặt"),
     )
 
-    private fun searchBox(
-        text: String,
-        showingHint: Boolean = false,
-        hint: String = "Tìm kiếm",
-    ) = UiNodeSnapshot(
-        nodeIndex = 0,
-        text = text,
-        contentDesc = "",
-        viewId = "com.sec.android.app.launcher:id/search_src_text",
-        className = "androidx.appcompat.widget.SearchView\$SearchAutoComplete",
-        isFocused = true,
-        isEditable = true,
-        isShowingHint = showingHint,
-        hintText = hint,
-        isClickable = true,
-        isActionable = true,
-        isVisible = true,
-        left = 40,
-        top = 1200,
-        right = 980,
-        bottom = 1300,
-    )
-
-    private fun appNode(
+    private fun box(
         index: Int,
-        label: String,
-        left: Int,
-        top: Int,
-        right: Int,
-        bottom: Int,
-        contentDesc: String = label,
-        clickable: Boolean = true,
+        parent: Int = 0,
+        text: String = "",
+        desc: String = "",
+        id: String = "",
+        cls: String = "android.widget.FrameLayout",
+        focused: Boolean = false,
+        editable: Boolean = false,
+        showingHint: Boolean = false,
+        hint: String = "",
+        clickable: Boolean = false,
         actionable: Boolean = clickable,
-        viewId: String = "com.sec.android.app.launcher:id/icon",
+        left: Int = 0,
+        top: Int = 0,
+        right: Int = 1080,
+        bottom: Int = 2000,
     ) = UiNodeSnapshot(
         nodeIndex = index,
-        text = label,
-        contentDesc = contentDesc,
-        viewId = viewId,
-        className = "android.widget.TextView",
-        isFocused = false,
-        isEditable = false,
-        isShowingHint = false,
-        hintText = "",
+        parentIndex = parent,
+        text = text,
+        contentDesc = desc,
+        viewId = id,
+        className = cls,
+        isFocused = focused,
+        isEditable = editable,
+        isShowingHint = showingHint,
+        hintText = hint,
         isClickable = clickable,
         isActionable = actionable,
         isVisible = true,
@@ -72,89 +57,121 @@ class SearchMatchEngineTest {
         bottom = bottom,
     )
 
+    private fun searchInput(
+        index: Int,
+        parent: Int,
+        text: String,
+        showingHint: Boolean = false,
+    ) = box(
+        index = index,
+        parent = parent,
+        text = text,
+        id = "com.sec.android.app.launcher:id/search_src_text",
+        cls = "androidx.appcompat.widget.SearchView\$SearchAutoComplete",
+        focused = true,
+        editable = true,
+        showingHint = showingHint,
+        hint = "Tìm kiếm",
+        clickable = true,
+        left = 40,
+        top = 1200,
+        right = 980,
+        bottom = 1300,
+    )
+
     @Test
     fun `ignores empty search box showing hint text`() {
         val nodes = listOf(
-            searchBox(text = "Tìm kiếm", showingHint = true),
-            appNode(1, "Zalo", 50, 300, 230, 500),
+            box(0, -1),
+            searchInput(1, 0, "Tìm kiếm", showingHint = true),
+            box(2, 0, text = "Zalo", clickable = true, left = 50, top = 300, right = 230, bottom = 500),
         )
         assertEquals(SearchDecision.EmptyQuery, SearchMatchEngine.evaluateSearchScreen(nodes, apps))
     }
 
     @Test
-    fun `waits when two apps match query`() {
+    fun `opens single app inside Searched Apps card regardless of what user typed (typos, categories, aliases)`() {
+        // User typed "ngan hang" -> Samsung Finder shows 1 app "VCB Digibank" in "Ứng dụng đã tìm kiếm"
         val nodes = listOf(
-            searchBox("za"),
-            appNode(1, "Zalo", 50, 300, 230, 500),
-            appNode(2, "ZArchiver", 280, 300, 460, 500),
+            box(0, -1),
+            searchInput(1, 0, "ngan hang"),
+            // Card 1: Ứng dụng đã tìm kiếm
+            box(2, 0, left = 20, top = 60, right = 1060, bottom = 420),
+            box(3, 2, text = "Ứng dụng đã tìm kiếm", left = 50, top = 80, right = 600, bottom = 140),
+            box(4, 2, desc = "VCB Digibank", clickable = true, left = 60, top = 180, right = 240, bottom = 380),
+            box(5, 4, text = "VCB Digibank", clickable = false, actionable = true, left = 70, top = 330, right = 230, bottom = 380),
+            // Card 2: Settings card below
+            box(6, 0, left = 20, top = 460, right = 1060, bottom = 700),
+            box(7, 6, text = "Cài đặt", clickable = true, left = 60, top = 500, right = 400, bottom = 560),
+        )
+        val decision = SearchMatchEngine.evaluateSearchScreen(nodes, apps)
+        assertTrue(decision is SearchDecision.SingleMatch)
+        val match = (decision as SearchDecision.SingleMatch).match
+        assertEquals("com.VCB", match.packageName)
+        assertEquals(4, match.nodeIndex)
+    }
+
+    @Test
+    fun `opens TikTok on One UI Finder screenshot with TikTok shortcuts card and Settings card below`() {
+        val nodes = listOf(
+            box(0, -1),
+            searchInput(1, 0, "tikotk"), // even with typo!
+            // Card 1: Ứng dụng đã tìm kiếm
+            box(2, 0, left = 20, top = 60, right = 1060, bottom = 420),
+            box(3, 2, text = "Ứng dụng đã tìm kiếm", left = 50, top = 80, right = 600, bottom = 140),
+            box(4, 2, desc = "TikTok", clickable = true, left = 60, top = 180, right = 240, bottom = 380),
+            box(5, 4, text = "TikTok", clickable = false, actionable = true, left = 70, top = 330, right = 230, bottom = 380),
+            // Card 2: App shortcuts card whose header ALSO says "TikTok"
+            box(6, 0, left = 20, top = 460, right = 1060, bottom = 920),
+            box(7, 6, text = "TikTok", clickable = false, left = 60, top = 500, right = 400, bottom = 560),
+            box(8, 6, text = "Thông báo", clickable = true, left = 60, top = 600, right = 800, bottom = 680),
+            box(9, 6, text = "Bắt đầu quay", clickable = true, left = 60, top = 700, right = 800, bottom = 780),
+            // Card 3: Cài đặt
+            box(10, 0, left = 20, top = 960, right = 1060, bottom = 1120),
+            box(11, 10, text = "Cài đặt", clickable = true, left = 60, top = 1000, right = 400, bottom = 1060),
+        )
+        val decision = SearchMatchEngine.evaluateSearchScreen(nodes, apps)
+        assertTrue(decision is SearchDecision.SingleMatch)
+        val match = (decision as SearchDecision.SingleMatch).match
+        assertEquals("com.ss.android.ugc.trill", match.packageName)
+        assertEquals(4, match.nodeIndex)
+    }
+
+    @Test
+    fun `waits when two apps appear inside Searched Apps card`() {
+        val nodes = listOf(
+            box(0, -1),
+            searchInput(1, 0, "za"),
+            box(2, 0, left = 20, top = 60, right = 1060, bottom = 420),
+            box(3, 2, text = "Ứng dụng đã tìm kiếm", left = 50, top = 80, right = 600, bottom = 140),
+            box(4, 2, text = "Zalo", clickable = true, left = 60, top = 180, right = 240, bottom = 380),
+            box(5, 2, text = "ZArchiver", clickable = true, left = 280, top = 180, right = 460, bottom = 380),
         )
         val decision = SearchMatchEngine.evaluateSearchScreen(nodes, apps)
         assertEquals(SearchDecision.MultipleMatches("za", 2), decision)
     }
 
     @Test
-    fun `triggers single match on One UI Finder screen with app shortcuts card repeating app name`() {
+    fun `does not launch when zero apps matched and only Settings or Google footer is shown`() {
         val nodes = listOf(
-            searchBox("tiktok"),
-            // Card 1: "Ứng dụng đã tìm kiếm" -> clickable TikTok icon + inner label
-            appNode(1, "Ứng dụng đã tìm kiếm", 50, 80, 600, 140, clickable = false, actionable = false),
-            UiNodeSnapshot(2, "", "TikTok", "com.sec.android.app.launcher:id/app_icon", "android.widget.FrameLayout", false, false, false, "", true, true, true, 60, 180, 240, 380),
-            appNode(3, "TikTok", 70, 330, 230, 380, clickable = false, actionable = true),
-            // Card 2: App shortcuts card whose header ALSO says "TikTok"
-            appNode(4, "TikTok", 60, 520, 400, 580, clickable = false, actionable = false),
-            appNode(5, "Thông báo", 60, 600, 800, 680, clickable = true, actionable = true),
-            appNode(6, "Bắt đầu quay", 60, 700, 800, 780, clickable = true, actionable = true),
-            appNode(7, "Xóa bộ nhớ đệm", 60, 800, 800, 880, clickable = true, actionable = true),
-            // Card 3: Settings card ("Cài đặt")
-            appNode(8, "Cài đặt", 60, 980, 400, 1040, clickable = true, actionable = true),
+            box(0, -1),
+            searchInput(1, 0, "xyz999"),
+            box(2, 0, text = "Cài đặt", clickable = true, left = 60, top = 600, right = 400, bottom = 660),
+            box(3, 0, text = "Google", clickable = true, left = 60, top = 700, right = 400, bottom = 760),
+            box(4, 0, text = "Google Play", clickable = true, left = 60, top = 800, right = 400, bottom = 860),
+        )
+        assertEquals(SearchDecision.NoMatches("xyz999"), SearchMatchEngine.evaluateSearchScreen(nodes, apps))
+    }
+
+    @Test
+    fun `opens single matching app on flat launcher drawer without Searched Apps header`() {
+        val nodes = listOf(
+            box(0, -1),
+            searchInput(1, 0, "photo"),
+            box(2, 0, text = "Bộ sưu tập", clickable = true, left = 60, top = 260, right = 240, bottom = 460),
         )
         val decision = SearchMatchEngine.evaluateSearchScreen(nodes, apps)
         assertTrue(decision is SearchDecision.SingleMatch)
-        val match = (decision as SearchDecision.SingleMatch).match
-        assertEquals("com.ss.android.ugc.trill", match.app.packageName)
-        assertEquals(2, match.nodeIndex)
-    }
-
-    @Test
-    fun `merges Card 2 clickable header repeating same app vertically below Card 1`() {
-        val nodes = listOf(
-            searchBox("tiktok"),
-            appNode(1, "TikTok", 60, 180, 240, 380, clickable = true, actionable = true),
-            // Even if Card 2 header were clickable, it's vertically stacked below Card 1
-            appNode(2, "TikTok", 60, 540, 400, 600, clickable = true, actionable = true),
-        )
-        val decision = SearchMatchEngine.evaluateSearchScreen(nodes, apps)
-        assertTrue(decision is SearchDecision.SingleMatch)
-        assertEquals(1, (decision as SearchDecision.SingleMatch).match.nodeIndex)
-    }
-
-    @Test
-    fun `supports Vietnamese diacritic-free and acronym queries`() {
-        val vnNodes = listOf(
-            searchBox("dong ho"),
-            appNode(1, "Đồng hồ", 50, 300, 230, 500),
-        )
-        val vnDecision = SearchMatchEngine.evaluateSearchScreen(vnNodes, apps)
-        assertTrue(vnDecision is SearchDecision.SingleMatch)
-        assertEquals("com.sec.android.app.clockpackage", (vnDecision as SearchDecision.SingleMatch).match.app.packageName)
-
-        val fbNodes = listOf(
-            searchBox("fb"),
-            appNode(1, "Facebook", 50, 300, 230, 500),
-        )
-        val fbDecision = SearchMatchEngine.evaluateSearchScreen(fbNodes, apps)
-        assertTrue(fbDecision is SearchDecision.SingleMatch)
-        assertEquals("com.facebook.katana", (fbDecision as SearchDecision.SingleMatch).match.app.packageName)
-    }
-
-    @Test
-    fun `does not auto-launch when Dual Messenger shows two side-by-side Zalo icons`() {
-        val nodes = listOf(
-            searchBox("zalo"),
-            appNode(1, "Zalo", 50, 300, 230, 500),
-            appNode(2, "Zalo", 300, 300, 480, 500),
-        )
-        val decision = SearchMatchEngine.evaluateSearchScreen(nodes, apps)
-        assertEquals(SearchDecision.MultipleMatches("zalo", 2), decision)
+        assertEquals("com.sec.android.gallery3d", (decision as SearchDecision.SingleMatch).match.packageName)
     }
 }

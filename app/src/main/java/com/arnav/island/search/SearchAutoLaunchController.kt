@@ -116,10 +116,10 @@ class SearchAutoLaunchController(
 
     private val remoteCallback = object : ISearchAutoLaunchCallback.Stub() {
         override fun onAppAutoLaunched(packageName: String?, appLabel: String?, query: String?, clickedByNode: Boolean) {
-            val pkg = packageName ?: return
-            val label = appLabel ?: apps.label(pkg)
+            val pkg = packageName.orEmpty()
+            val label = appLabel?.takeIf { it.isNotBlank() } ?: if (pkg.isNotBlank()) apps.label(pkg) else "App"
             val q = query.orEmpty()
-            currentForegroundPkg = pkg
+            if (pkg.isNotBlank()) currentForegroundPkg = pkg
             launchCooldownUntilElapsed = SystemClock.elapsedRealtime() + 800L
             mainHandler.post {
                 _state.update {
@@ -129,7 +129,7 @@ class SearchAutoLaunchController(
                         watchingLauncher = false,
                     )
                 }
-                if (!clickedByNode) {
+                if (!clickedByNode && pkg.isNotBlank()) {
                     Launch.openApp(app, pkg)
                 }
                 val s = settings.state.value
@@ -534,8 +534,8 @@ class SearchAutoLaunchController(
 
     private fun postFeedbackPill(pkg: String, label: String) {
         scope.launch {
-            val iconKey = "app:$pkg@96"
-            if (!images.contains(iconKey)) {
+            val iconKey = if (pkg.isNotBlank()) "app:$pkg@96" else ""
+            if (iconKey.isNotEmpty() && !images.contains(iconKey)) {
                 val bmp = apps.icon(pkg, 96)
                 if (bmp != null) images.put(iconKey, bmp)
             }
@@ -550,7 +550,7 @@ class SearchAutoLaunchController(
                     title = label,
                     subtitle = "Mở nhanh từ Tìm kiếm",
                     icon = Glyph.OPEN,
-                    iconImage = if (images.contains(iconKey)) ImageRef(iconKey) else null,
+                    iconImage = if (iconKey.isNotEmpty() && images.contains(iconKey)) ImageRef(iconKey) else null,
                     animation = EntranceAnimation.MORPH,
                     colors = EventColors(accent = 0xFF38BDF8.toInt()),
                 )
