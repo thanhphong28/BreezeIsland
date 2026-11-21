@@ -100,6 +100,7 @@ class SearchAutoLaunchController(
     private var lastAppsPushElapsed = 0L
     private var currentForegroundPkg: String? = null
     private var lastUsageQueryTime = 0L
+    private var lastSeenUsageEventTs = 0L
     @Volatile
     private var launchCooldownUntilElapsed = 0L
 
@@ -119,7 +120,7 @@ class SearchAutoLaunchController(
             val label = appLabel ?: apps.label(pkg)
             val q = query.orEmpty()
             currentForegroundPkg = pkg
-            launchCooldownUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
+            launchCooldownUntilElapsed = SystemClock.elapsedRealtime() + 800L
             mainHandler.post {
                 _state.update {
                     it.copy(
@@ -142,7 +143,10 @@ class SearchAutoLaunchController(
         override fun onStatusChanged(status: String?) {
             val st = status.orEmpty()
             if (st.startsWith("idle:app_switched:")) {
-                currentForegroundPkg = st.substringAfter("idle:app_switched:")
+                val switchedPkg = st.substringAfter("idle:app_switched:")
+                if (switchedPkg.isNotBlank() && switchedPkg != app.packageName) {
+                    currentForegroundPkg = switchedPkg
+                }
             }
             mainHandler.post {
                 _state.update {
@@ -188,6 +192,8 @@ class SearchAutoLaunchController(
                 }
                 Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> {
                     isScreenInteractive = true
+                    lastUsageQueryTime = 0L
+                    lastSeenUsageEventTs = 0L
                     if (settings.state.value.searchAutoLaunchEnabled) {
                         startPollingIfEnabled()
                     }
@@ -349,7 +355,9 @@ class SearchAutoLaunchController(
                     isLauncherOrFinder(currentForegroundPkg)
                 if (shouldWatch) {
                     val svc = remoteService
-                    if (svc == null) {
+                    if (svc == null || !svc.asBinder().isBinderAlive) {
+                        if (svc != null) remoteService = null
+                        lastWatching = false
                         ensureServiceBound()
                     } else if (!lastWatching || !runCatching { svc.isConnected }.getOrDefault(false)) {
                         syncServiceConfiguration(svc, forceApps = false)
@@ -417,18 +425,41 @@ class SearchAutoLaunchController(
 
         val now = SystemClock.elapsedRealtime()
         if (forceApps || now - lastAppsPushElapsed > 60_000L) {
-            val installed = apps.launchableApps()
-            val pkgs = Array(installed.size) { installed[it].packageName }
-            val lbls = Array(installed.size) { installed[it].label }
+            val pairs = withContext(Dispatchers.Default) { queryAllLauncherLabels() }
+            val pkgs = Array(pairs.size) { pairs[it].first }
+            val lbls = Array(pairs.size) { pairs[it].second }
             runCatching { svc.setInstalledApps(pkgs, lbls) }
             lastAppsPushElapsed = now
         }
     }
 
+    /**
+     * Collects BOTH the launcher icon label (`ResolveInfo.loadLabel`) shown by One UI Home / Finder
+     * and the Application label (`getApplicationLabel`) so localized Samsung/Google apps always match.
+     */
+    private fun queryAllLauncherLabels(): List<Pair<String, String>> {
+        val pm = app.packageManager
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val seen = LinkedHashSet<Pair<String, String>>()
+        val resolved = runCatching { pm.queryIntentActivities(intent, 0) }.getOrNull().orEmpty()
+        for (ri in resolved) {
+            val pkg = ri.activityInfo?.packageName ?: continue
+            if (pkg == app.packageName) continue
+            val actLabel = runCatching { ri.loadLabel(pm).toString().trim() }.getOrNull().orEmpty()
+            if (actLabel.isNotEmpty()) seen.add(pkg to actLabel)
+            val appInfo = ri.activityInfo?.applicationInfo
+            val appLabel = if (appInfo != null) {
+                runCatching { pm.getApplicationLabel(appInfo).toString().trim() }.getOrNull().orEmpty()
+            } else ""
+            if (appLabel.isNotEmpty()) seen.add(pkg to appLabel)
+        }
+        return seen.toList()
+    }
+
     private fun queryLatestForegroundPackage(): String? {
         val mgr = usageStats ?: return null
         val now = System.currentTimeMillis()
-        val from = if (lastUsageQueryTime == 0L) now - 60_000L else (lastUsageQueryTime - 1_500L)
+        val from = if (lastUsageQueryTime == 0L) now - 300_000L else (lastUsageQueryTime - 2_000L)
         lastUsageQueryTime = now
         val iter = try {
             mgr.queryEvents(from, now)
@@ -438,13 +469,16 @@ class SearchAutoLaunchController(
 
         val ev = UsageEvents.Event()
         var latestPkg: String? = null
-        var latestTs = 0L
+        var latestTs = lastSeenUsageEventTs
         while (iter.hasNextEvent()) {
             iter.getNextEvent(ev)
-            if (ev.eventType == UsageEvents.Event.ACTIVITY_RESUMED && ev.timeStamp >= latestTs) {
+            if (ev.eventType == UsageEvents.Event.ACTIVITY_RESUMED && ev.timeStamp > latestTs) {
                 latestTs = ev.timeStamp
                 latestPkg = ev.packageName
             }
+        }
+        if (latestTs > lastSeenUsageEventTs) {
+            lastSeenUsageEventTs = latestTs
         }
         return latestPkg
     }

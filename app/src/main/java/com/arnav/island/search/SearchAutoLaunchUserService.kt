@@ -20,9 +20,9 @@ import kotlin.system.exitProcess
  * Shizuku UserService (runs in UID 2000 shell process, ZERO AccessibilityService in Manifest,
  * ZERO entry in Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).
  *
- * IMPORTANT threading invariant:
+ * Threading invariant:
  *  - [callbackThread] supplies the [Looper] exclusively to [UiAutomation] so `UiAutomation.connect()`
- *    can complete its Binder `IAccessibilityServiceClient.init()` handshake without ever deadlocking.
+ *    can complete its Binder `IAccessibilityServiceClient.init()` handshake without deadlocking.
  *  - [workerThread] runs `connect()`, `disconnect()`, and UI-tree evaluation off [callbackThread].
  */
 class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
@@ -63,7 +63,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
     private var connected: Boolean = false
 
     // Typing / launch state accessed exclusively on workerThread
-    private var lastNormQuery: String = ""
+    private var lastRawQuery: String = ""
     private var isDeleting: Boolean = false
     private var pendingQuery: String = ""
     private var pendingPkg: String = ""
@@ -71,6 +71,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
     private var lastLaunchElapsed: Long = 0L
 
     private val evalRunnable = Runnable { evaluateWindow(confirmPending = false) }
+    private val followUpEvalRunnable = Runnable { evaluateWindow(confirmPending = false) }
     private val confirmLaunchRunnable = Runnable { evaluateWindow(confirmPending = true) }
     private val postLaunchDisconnectRunnable = Runnable {
         synchronized(lock) {
@@ -152,7 +153,6 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         if (connected && uiAutomation != null) return
         handler.removeCallbacks(postLaunchDisconnectRunnable)
         try {
-            // Pass callbackThread.looper while connect() executes on workerThread -> zero deadlock!
             val uiAuto = createUiAutomation(callbackThread.looper)
             invokeConnect(uiAuto)
 
@@ -164,7 +164,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
             info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
                 AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
                 AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
-            info.notificationTimeout = 35L
+            info.notificationTimeout = 30L
             info.packageNames = null
             runCatching { uiAuto.serviceInfo = info }
 
@@ -176,7 +176,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
             connected = true
             resetTypingState()
             updateStatus("watching")
-            handler.postDelayed(evalRunnable, 60L)
+            handler.postDelayed(evalRunnable, 50L)
         } catch (t: Throwable) {
             connected = false
             uiAutomation = null
@@ -187,6 +187,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
 
     private fun disconnectLocked(reason: String) {
         handler.removeCallbacks(evalRunnable)
+        handler.removeCallbacks(followUpEvalRunnable)
         handler.removeCallbacks(confirmLaunchRunnable)
         handler.removeCallbacks(postLaunchDisconnectRunnable)
         val uiAuto = uiAutomation
@@ -201,7 +202,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
     }
 
     private fun resetTypingState() {
-        lastNormQuery = ""
+        lastRawQuery = ""
         isDeleting = false
         pendingQuery = ""
         pendingPkg = ""
@@ -211,12 +212,21 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         if (event == null || !watching || !connected) return
         val pkg = event.packageName?.toString() ?: return
 
-        // Safety gate: immediately disconnect if foreground window switched to a non-launcher app
+        // Safety gate: immediately disconnect ONLY when the user genuinely switches away from
+        // Home/Finder to a full-screen non-launcher app (ignoring BreezeIsland pills, Edge Panel,
+        // Samsung Keyboard, clipboard popups, and system toasts while the launcher is still visible).
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (!isTargetLauncher(pkg) && !isImeOrSystemChrome(pkg)) {
+            if (!isTargetLauncher(pkg) && !isImeOrOverlayPackage(pkg)) {
+                val isFullScreenEvent = event.isFullScreen
                 handler.post {
                     synchronized(lock) {
-                        if (connected) disconnectLocked("app_switched:$pkg")
+                        val uiAuto = uiAutomation
+                        if (connected && uiAuto != null) {
+                            val launcherStillVisible = !isFullScreenEvent && findLauncherRoots(uiAuto).isNotEmpty()
+                            if (!launcherStillVisible) {
+                                disconnectLocked("app_switched:$pkg")
+                            }
+                        }
                     }
                 }
                 return
@@ -226,8 +236,15 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         if (!isTargetLauncher(pkg)) return
 
         handler.removeCallbacks(evalRunnable)
-        val coalesceMs = if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) 25L else 55L
+        val coalesceMs = if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) 25L else 50L
         handler.postDelayed(evalRunnable, coalesceMs)
+
+        // Samsung Finder updates its search RecyclerView asynchronously (~120–350ms after typing);
+        // schedule follow-up checks so async result loads are never missed.
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
+            handler.removeCallbacks(followUpEvalRunnable)
+            handler.postDelayed(followUpEvalRunnable, 220L)
+        }
     }
 
     private fun evaluateWindow(confirmPending: Boolean) {
@@ -242,9 +259,9 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         var bestLiveNodes: List<AccessibilityNodeInfo> = emptyList()
 
         for (root in roots) {
-            val liveNodes = ArrayList<AccessibilityNodeInfo>(128)
-            val snapshots = ArrayList<UiNodeSnapshot>(128)
-            flattenTree(root, ancestorClickable = false, liveNodes, snapshots, maxNodes = 520)
+            val liveNodes = ArrayList<AccessibilityNodeInfo>(192)
+            val snapshots = ArrayList<UiNodeSnapshot>(192)
+            flattenTree(root, depth = 0, ancestorClickable = false, liveNodes, snapshots, maxNodes = 1_200)
 
             val candidate = SearchMatchEngine.evaluateSearchScreen(
                 nodes = snapshots,
@@ -267,10 +284,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
             }
             is SearchDecision.QueryTooShort -> {
                 handler.removeCallbacks(confirmLaunchRunnable)
-                val norm = SearchMatchEngine.normalize(decision.query)
-                if (norm.length < lastNormQuery.length) isDeleting = true
-                else if (norm.length > lastNormQuery.length) isDeleting = false
-                lastNormQuery = norm
+                updateDeletingState(decision.query)
                 pendingQuery = ""
                 pendingPkg = ""
             }
@@ -281,22 +295,14 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
                     is SearchDecision.MultipleMatches -> decision.query
                     else -> ""
                 }
-                val norm = SearchMatchEngine.normalize(q)
-                if (norm.length < lastNormQuery.length) isDeleting = true
-                else if (norm.length > lastNormQuery.length) isDeleting = false
-                lastNormQuery = norm
+                updateDeletingState(q)
                 pendingQuery = ""
                 pendingPkg = ""
             }
             is SearchDecision.SingleMatch -> {
                 val query = decision.query
                 val norm = SearchMatchEngine.normalize(query)
-                if (norm.length < lastNormQuery.length) {
-                    isDeleting = true
-                } else if (norm.length > lastNormQuery.length) {
-                    isDeleting = false
-                }
-                lastNormQuery = norm
+                updateDeletingState(query)
 
                 if (skipWhenDeleting && isDeleting) {
                     handler.removeCallbacks(confirmLaunchRunnable)
@@ -320,6 +326,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
                 }
 
                 handler.removeCallbacks(confirmLaunchRunnable)
+                handler.removeCallbacks(followUpEvalRunnable)
                 pendingQuery = ""
                 pendingPkg = ""
                 lastLaunchedQuery = norm
@@ -338,6 +345,21 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
                 handler.postDelayed(postLaunchDisconnectRunnable, 140L)
             }
         }
+    }
+
+    /**
+     * Distinguishes true Backspace deletion (`"tiktok"` -> `"tikto"`, strict prefix) from
+     * Vietnamese Telex/VNI IME composition (`"caif"` -> `"cài"`, `"dd"` -> `"đ"`, `"dongg"` -> `"đồng"`),
+     * where string length shrinks by 1 character without being a prefix of the previous text.
+     */
+    private fun updateDeletingState(rawQuery: String) {
+        val clean = rawQuery.trim()
+        if (clean.length < lastRawQuery.length && lastRawQuery.startsWith(clean, ignoreCase = true)) {
+            isDeleting = true
+        } else if (clean != lastRawQuery) {
+            isDeleting = false
+        }
+        lastRawQuery = clean
     }
 
     private fun performClickOnMatch(node: AccessibilityNodeInfo?): Boolean {
@@ -391,12 +413,18 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
 
     private fun flattenTree(
         node: AccessibilityNodeInfo,
+        depth: Int,
         ancestorClickable: Boolean,
         liveOut: MutableList<AccessibilityNodeInfo>,
         snapOut: MutableList<UiNodeSnapshot>,
         maxNodes: Int,
     ) {
         if (liveOut.size >= maxNodes) return
+        val visible = node.isVisibleToUser
+        // Prune invisible off-screen Home Screen pages & hidden drawer pages so they never
+        // exhaust the node budget before reaching the visible Finder search results.
+        if (depth >= 2 && !visible && !node.isFocused && !node.isEditable) return
+
         val rect = Rect()
         runCatching { node.getBoundsInScreen(rect) }
         val nodeClickable = node.isClickable
@@ -416,7 +444,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
                 hintText = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) node.hintText?.toString().orEmpty() else "",
                 isClickable = nodeClickable,
                 isActionable = actionable,
-                isVisible = node.isVisibleToUser,
+                isVisible = visible,
                 left = rect.left,
                 top = rect.top,
                 right = rect.right,
@@ -427,7 +455,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         for (i in 0 until childCount) {
             if (liveOut.size >= maxNodes) break
             val child = runCatching { node.getChild(i) }.getOrNull() ?: continue
-            flattenTree(child, actionable, liveOut, snapOut, maxNodes)
+            flattenTree(child, depth + 1, actionable, liveOut, snapOut, maxNodes)
         }
     }
 
@@ -437,17 +465,23 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         return p.contains("galaxyfinder") || (p.startsWith("com.samsung.") && p.contains("finder"))
     }
 
-    private fun isImeOrSystemChrome(pkg: String): Boolean {
+    private fun isImeOrOverlayPackage(pkg: String): Boolean {
         val p = pkg.lowercase(Locale.ROOT)
         return p == "android" ||
             p == "com.android.systemui" ||
+            p == "com.breeze.island" ||
             p.contains("honeyboard") ||
             p.contains("inputmethod") ||
             p.contains("keyboard") ||
             p.contains("gboard") ||
             p.contains("swiftkey") ||
             p.contains("labankey") ||
-            p.contains("unikey")
+            p.contains("unikey") ||
+            p.contains("cocktailbar") ||
+            p.contains("clipboard") ||
+            p.contains("smartsuggestions") ||
+            p.contains("goodlock") ||
+            p.contains("onehand")
     }
 
     private fun createUiAutomation(looper: Looper): UiAutomation {
@@ -491,8 +525,8 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
     }
 
     companion object {
-        private const val LAUNCH_COOLDOWN_MS = 1_600L
-        private const val SAME_QUERY_COOLDOWN_MS = 2_800L
+        private const val LAUNCH_COOLDOWN_MS = 1_200L
+        private const val SAME_QUERY_COOLDOWN_MS = 2_400L
 
         private val DEFAULT_LAUNCHERS = setOf(
             "com.sec.android.app.launcher",
