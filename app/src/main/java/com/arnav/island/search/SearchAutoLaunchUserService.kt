@@ -20,14 +20,16 @@ import kotlin.system.exitProcess
  * Shizuku UserService (runs in UID 2000 shell process, ZERO AccessibilityService in Manifest,
  * ZERO entry in Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).
  *
- * Connects [UiAutomation] ONLY while the user is actively on a supported Home Launcher / Samsung
- * Finder, and disconnects immediately (< 2ms) the moment any other app comes to the foreground
- * (keeping banking apps & VNeID 100% untouched).
+ * IMPORTANT threading invariant:
+ *  - [callbackThread] supplies the [Looper] exclusively to [UiAutomation] so `UiAutomation.connect()`
+ *    can complete its Binder `IAccessibilityServiceClient.init()` handshake without ever deadlocking.
+ *  - [workerThread] runs `connect()`, `disconnect()`, and UI-tree evaluation off [callbackThread].
  */
 class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
 
     private val lock = Any()
-    private val workerThread = HandlerThread("BreezeSearchUiAuto").apply { start() }
+    private val callbackThread = HandlerThread("BreezeUiAutoCb").apply { start() }
+    private val workerThread = HandlerThread("BreezeSearchWorker").apply { start() }
     private val handler = Handler(workerThread.looper)
 
     @Volatile
@@ -71,7 +73,9 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
     private val evalRunnable = Runnable { evaluateWindow(confirmPending = false) }
     private val confirmLaunchRunnable = Runnable { evaluateWindow(confirmPending = true) }
     private val postLaunchDisconnectRunnable = Runnable {
-        disconnectLocked("auto_launched")
+        synchronized(lock) {
+            disconnectLocked("auto_launched")
+        }
     }
 
     init {
@@ -87,6 +91,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
                 disconnectLocked("destroyed")
             }
             workerThread.quitSafely()
+            callbackThread.quitSafely()
             exitProcess(0)
         }
     }
@@ -147,7 +152,8 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         if (connected && uiAutomation != null) return
         handler.removeCallbacks(postLaunchDisconnectRunnable)
         try {
-            val uiAuto = createUiAutomation(workerThread.looper)
+            // Pass callbackThread.looper while connect() executes on workerThread -> zero deadlock!
+            val uiAuto = createUiAutomation(callbackThread.looper)
             invokeConnect(uiAuto)
 
             val info = runCatching { uiAuto.serviceInfo }.getOrNull() ?: AccessibilityServiceInfo()
@@ -159,7 +165,7 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
                 AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
                 AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
             info.notificationTimeout = 35L
-            info.packageNames = null // Receive window-state exit immediately so we self-disconnect in < 2ms
+            info.packageNames = null
             runCatching { uiAuto.serviceInfo = info }
 
             uiAuto.setOnAccessibilityEventListener { event ->
@@ -170,10 +176,12 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
             connected = true
             resetTypingState()
             updateStatus("watching")
+            handler.postDelayed(evalRunnable, 60L)
         } catch (t: Throwable) {
             connected = false
             uiAutomation = null
-            updateStatus("error:${t.javaClass.simpleName}:${t.message.orEmpty().take(80)}")
+            val cause = t.cause ?: t
+            updateStatus("error:${cause.javaClass.simpleName}:${cause.message.orEmpty().take(90)}")
         }
     }
 
@@ -204,7 +212,6 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         val pkg = event.packageName?.toString() ?: return
 
         // Safety gate: immediately disconnect if foreground window switched to a non-launcher app
-        // (e.g., VNeID, Banking app, or any launched app) before the host poll even fires.
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             if (!isTargetLauncher(pkg) && !isImeOrSystemChrome(pkg)) {
                 handler.post {
@@ -218,7 +225,6 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
 
         if (!isTargetLauncher(pkg)) return
 
-        // Coalesce burst accessibility events onto workerThread
         handler.removeCallbacks(evalRunnable)
         val coalesceMs = if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) 25L else 55L
         handler.postDelayed(evalRunnable, coalesceMs)
@@ -229,17 +235,29 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         val apps = installedApps
         if (apps.isEmpty()) return
 
-        val root = findLauncherRoot(uiAuto) ?: return
-        val liveNodes = ArrayList<AccessibilityNodeInfo>(128)
-        val snapshots = ArrayList<UiNodeSnapshot>(128)
-        flattenTree(root, liveNodes, snapshots, maxNodes = 480)
+        val roots = findLauncherRoots(uiAuto)
+        if (roots.isEmpty()) return
 
-        val decision = SearchMatchEngine.evaluateSearchScreen(
-            nodes = snapshots,
-            installedApps = apps,
-            labelIndex = labelIndex,
-            minChars = minChars,
-        )
+        var decision: SearchDecision = SearchDecision.NoSearchActive
+        var bestLiveNodes: List<AccessibilityNodeInfo> = emptyList()
+
+        for (root in roots) {
+            val liveNodes = ArrayList<AccessibilityNodeInfo>(128)
+            val snapshots = ArrayList<UiNodeSnapshot>(128)
+            flattenTree(root, ancestorClickable = false, liveNodes, snapshots, maxNodes = 520)
+
+            val candidate = SearchMatchEngine.evaluateSearchScreen(
+                nodes = snapshots,
+                installedApps = apps,
+                labelIndex = labelIndex,
+                minChars = minChars,
+            )
+            if (candidate != SearchDecision.NoSearchActive) {
+                decision = candidate
+                bestLiveNodes = liveNodes
+                break
+            }
+        }
 
         when (decision) {
             SearchDecision.NoSearchActive, SearchDecision.EmptyQuery -> {
@@ -301,20 +319,21 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
                     return
                 }
 
-                // Confirmed single match after debounce -> launch now!
                 handler.removeCallbacks(confirmLaunchRunnable)
                 pendingQuery = ""
                 pendingPkg = ""
                 lastLaunchedQuery = norm
                 lastLaunchElapsed = now
 
-                val clicked = performClickOnMatch(liveNodes.getOrNull(matched.nodeIndex))
+                val clicked = performClickOnMatch(bestLiveNodes.getOrNull(matched.nodeIndex))
+                if (!clicked) {
+                    launchViaShell(matched.app.packageName)
+                }
                 updateStatus("launched:${matched.app.label}")
                 runCatching {
                     callback?.onAppAutoLaunched(matched.app.packageName, matched.app.label, query, clicked)
                 }
 
-                // Immediately schedule disconnect once launch kicks off
                 handler.removeCallbacks(postLaunchDisconnectRunnable)
                 handler.postDelayed(postLaunchDisconnectRunnable, 140L)
             }
@@ -336,26 +355,43 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         return false
     }
 
-    private fun findLauncherRoot(uiAuto: UiAutomation): AccessibilityNodeInfo? {
-        // Prefer TYPE_APPLICATION window belonging to Launcher / Samsung Finder so open IME doesn't shadow it
-        val windows = runCatching { uiAuto.windows }.getOrNull()
-        if (windows != null) {
-            for (w in windows) {
-                if (w.type != AccessibilityWindowInfo.TYPE_APPLICATION) continue
-                val root = runCatching { w.root }.getOrNull() ?: continue
-                val pkg = root.packageName?.toString()
-                if (pkg != null && isTargetLauncher(pkg)) {
-                    return root
-                }
+    private fun launchViaShell(packageName: String) {
+        runCatching {
+            Runtime.getRuntime().exec(
+                arrayOf("monkey", "-p", packageName, "-c", "android.intent.category.LAUNCHER", "1")
+            )
+        }
+    }
+
+    /**
+     * Returns launcher/finder window roots ordered topmost-first so an open Samsung Finder popup
+     * window is always inspected before the underlying Home Screen window.
+     */
+    private fun findLauncherRoots(uiAuto: UiAutomation): List<AccessibilityNodeInfo> {
+        val result = ArrayList<AccessibilityNodeInfo>(3)
+        val active = runCatching { uiAuto.rootInActiveWindow }.getOrNull()
+        val activePkg = active?.packageName?.toString()
+        if (active != null && activePkg != null && isTargetLauncher(activePkg)) {
+            result.add(active)
+        }
+
+        val windows = runCatching { uiAuto.windows }.getOrNull().orEmpty()
+            .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+            .sortedByDescending { it.layer }
+
+        for (w in windows) {
+            val root = runCatching { w.root }.getOrNull() ?: continue
+            val pkg = root.packageName?.toString() ?: continue
+            if (isTargetLauncher(pkg) && result.none { it == root }) {
+                result.add(root)
             }
         }
-        val active = runCatching { uiAuto.rootInActiveWindow }.getOrNull() ?: return null
-        val pkg = active.packageName?.toString()
-        return if (pkg != null && isTargetLauncher(pkg)) active else null
+        return result
     }
 
     private fun flattenTree(
         node: AccessibilityNodeInfo,
+        ancestorClickable: Boolean,
         liveOut: MutableList<AccessibilityNodeInfo>,
         snapOut: MutableList<UiNodeSnapshot>,
         maxNodes: Int,
@@ -363,6 +399,8 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         if (liveOut.size >= maxNodes) return
         val rect = Rect()
         runCatching { node.getBoundsInScreen(rect) }
+        val nodeClickable = node.isClickable
+        val actionable = nodeClickable || ancestorClickable
         val idx = liveOut.size
         liveOut.add(node)
         snapOut.add(
@@ -376,7 +414,8 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
                 isEditable = node.isEditable,
                 isShowingHint = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) node.isShowingHintText else false,
                 hintText = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) node.hintText?.toString().orEmpty() else "",
-                isClickable = node.isClickable,
+                isClickable = nodeClickable,
+                isActionable = actionable,
                 isVisible = node.isVisibleToUser,
                 left = rect.left,
                 top = rect.top,
@@ -388,11 +427,15 @@ class SearchAutoLaunchUserService : ISearchAutoLaunchService.Stub() {
         for (i in 0 until childCount) {
             if (liveOut.size >= maxNodes) break
             val child = runCatching { node.getChild(i) }.getOrNull() ?: continue
-            flattenTree(child, liveOut, snapOut, maxNodes)
+            flattenTree(child, actionable, liveOut, snapOut, maxNodes)
         }
     }
 
-    private fun isTargetLauncher(pkg: String): Boolean = pkg in targetLaunchers
+    private fun isTargetLauncher(pkg: String): Boolean {
+        if (pkg in targetLaunchers) return true
+        val p = pkg.lowercase(Locale.ROOT)
+        return p.contains("galaxyfinder") || (p.startsWith("com.samsung.") && p.contains("finder"))
+    }
 
     private fun isImeOrSystemChrome(pkg: String): Boolean {
         val p = pkg.lowercase(Locale.ROOT)

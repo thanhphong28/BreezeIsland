@@ -469,7 +469,8 @@ class SearchAutoLaunchController(
         if (pkg.isNullOrBlank()) return false
         return pkg in resolveLauncherPackages() ||
             pkg.contains("launcher", ignoreCase = true) ||
-            pkg.contains("galaxyfinder", ignoreCase = true)
+            pkg.contains("galaxyfinder", ignoreCase = true) ||
+            (pkg.startsWith("com.samsung.", ignoreCase = true) && pkg.contains("finder", ignoreCase = true))
     }
 
     private fun isInteractiveUnlocked(): Boolean {

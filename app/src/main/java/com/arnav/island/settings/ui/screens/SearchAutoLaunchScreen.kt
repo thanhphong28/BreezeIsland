@@ -99,11 +99,13 @@ fun SearchAutoLaunchScreen(s: IslandSettings, ui: Ui) {
                 },
             ) {
                 val shizukuSubtitle = when {
+                    status.remoteStatus.startsWith("error:") || status.remoteStatus.startsWith("bind_error:") ->
+                        if (vi) "Lỗi kết nối: ${status.remoteStatus}" else "Bridge error: ${status.remoteStatus}"
                     status.shizukuPermitted -> if (vi) {
-                        if (status.serviceBound) "Đã kết nối trực tiếp với One UI Home & Finder"
+                        if (status.serviceBound) "Đã kết nối trực tiếp với One UI Home & Finder (${status.remoteStatus})"
                         else "Đã cấp quyền · Tự kích hoạt ngay khi bạn về Màn hình chính"
                     } else {
-                        if (status.serviceBound) "Connected directly to One UI Home & Finder"
+                        if (status.serviceBound) "Connected to One UI Home & Finder (${status.remoteStatus})"
                         else "Granted · Activates automatically on Home Screen"
                     }
                     status.shizukuRunning -> if (vi) "Shizuku đang chạy · Bấm để cho phép 1 chạm" else "Shizuku running · Tap to allow"
