@@ -11,8 +11,8 @@ android {
         applicationId = "com.breeze.island"
         minSdk = 29
         targetSdk = 35
-        versionCode = 63
-        versionName = "2.5.3"
+        versionCode = 64
+        versionName = "2.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -76,6 +76,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
+    implementation(libs.libadb.android)
+    implementation(libs.conscrypt.android)
+    implementation(libs.sun.security.android)
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:4.3")
 
     debugImplementation(libs.androidx.compose.ui.tooling)

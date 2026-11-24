@@ -14,6 +14,7 @@
 
     <!-- In-app Check for Updates & one-tap APK update installation from GitHub Releases -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Optional event sources: each is explained in-app and degrades gracefully if not granted -->
@@ -94,6 +95,14 @@
             android:theme="@style/Theme.Island.Reply"
             android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
 
+        <!-- Fullscreen interactive viewer for on-device Samsung DeX (LocalDeX) -->
+        <activity
+            android:name=".dex.DexViewerActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Island" />
+
         <!-- FileProvider for in-app APK self-update -->
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -152,6 +161,49 @@
             android:exported="true"
             android:icon="@drawable/ic_stat_island"
             android:label="@string/tile_timer_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- On-device Samsung DeX (LocalDeX) foreground session & Wireless ADB pairing -->
+        <service
+            android:name=".dex.DexService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:label="@string/dex_service_label">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-initiated on-device Samsung DeX virtual display session and controller." />
+        </service>
+
+        <service
+            android:name=".dex.DexPairingService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:label="@string/dex_pairing_service_label">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-initiated Wireless Debugging pairing notification for on-device Samsung DeX." />
+        </service>
+
+        <receiver
+            android:name=".dex.DexPairingReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.arnav.island.dex.PAIRING_INPUT" />
+                <action android:name="com.arnav.island.dex.PAIRING_CANCEL" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".dex.DexToggleTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_island"
+            android:label="@string/tile_dex_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />

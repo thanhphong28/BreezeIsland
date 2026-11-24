@@ -1,6 +1,7 @@
 package com.arnav.island.core
 
 import android.app.Application
+import com.arnav.island.dex.DexController
 import com.arnav.island.events.EventEngine
 import com.arnav.island.events.media.MediaSessionMonitor
 import com.arnav.island.events.notification.NotificationProcessor
@@ -68,11 +69,15 @@ class AppGraph(val app: Application) {
     val weather = WeatherMonitor(app, events, scope, currentSettings)
     val testEvents = TestEvents(events, images, scope)
     val searchAutoLaunch = SearchAutoLaunchController(app, events, images, apps, settings, scope)
+    val localDex = DexController(app, events, settings, scope)
 
     val runtime = MutableStateFlow(RuntimeStatus(deviceProfile = DeviceProfiles.detect().displayName))
 
     /** True while the calibration screen is open: keeps the island visible with guides. */
     val calibrating = MutableStateFlow(false)
+
+    /** True while the fullscreen on-device Samsung DeX viewer is in the foreground. */
+    val dexViewerVisible = MutableStateFlow(false)
 
     /** UI → overlay requests, handled by the running overlay (no-op when it is off). */
     val commands = MutableSharedFlow<IslandCommand>(extraBufferCapacity = 8)
