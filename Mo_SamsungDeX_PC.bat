@@ -1,14 +1,12 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-chcp 65001 >nul
-title BreezeIsland — Mở Samsung DeX trên Laptop (Galaxy Z Flip 5)
+title BreezeIsland - Mo Samsung DeX tren Laptop (Galaxy Z Flip 5)
 
 set "DEX_PORT=8765"
 set "DEX_URL=http://127.0.0.1:%DEX_PORT%"
 set "WATCH_MODE=0"
 if /I "%~1"=="--watch" set "WATCH_MODE=1"
 
-:: Tìm đường dẫn adb.exe tự động
 set "ADB_EXE="
 if exist "C:\Android\Sdk\platform-tools\adb.exe" set "ADB_EXE=C:\Android\Sdk\platform-tools\adb.exe"
 if not defined ADB_EXE if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" set "ADB_EXE=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe"
@@ -19,9 +17,9 @@ if not defined ADB_EXE (
 
 if not defined ADB_EXE (
     echo ============================================================================
-    echo  KHÔNG TÌM THẤY ADB (Android Platform-Tools)!
-    echo  Hãy cài Android Platform-Tools vào C:\Android\Sdk\platform-tools\
-    echo  hoặc thêm adb.exe vào biến môi trường PATH.
+    echo  KHONG TIM THAY ADB ^(Android Platform-Tools^)!
+    echo  Hay cai Android Platform-Tools vao C:\Android\Sdk\platform-tools\
+    echo  hoac them adb.exe vao bien moi truong PATH.
     echo ============================================================================
     pause
     exit /b 1
@@ -30,63 +28,63 @@ if not defined ADB_EXE (
 :MAIN_LOOP
 cls
 echo ============================================================================
-echo        BREEZE ISLAND — SAMSUNG DeX FOR PC (GALAXY Z FLIP 5)
-echo   Cắm cáp USB-C to C / USB-C to A vào Laptop là tự mở Samsung DeX!
+echo         BREEZE ISLAND - SAMSUNG DeX FOR PC ^(GALAXY Z FLIP 5^)
+echo    Cam cap USB-C to C / USB-C to A vao Laptop la tu mo Samsung DeX!
 echo ============================================================================
 echo.
 
-echo [1/4] Đang chờ kết nối Galaxy Z Flip 5 qua dây USB...
-echo       (Nếu chưa cắm cáp, hãy cắm vào ngay — mở khóa điện thoại ^& bật Gỡ lỗi USB)
+echo [1/4] Dang cho ket noi Galaxy Z Flip 5 qua day USB...
+echo       ^(Neu chua cam cap, hay cam vao ngay - mo khoa DT va bat Go loi USB^)
 "%ADB_EXE%" wait-for-device >nul 2>&1
 if errorlevel 1 (
-    echo [LỖI] Không thể kết nối với ADB. Hãy kiểm tra lại dây cáp USB!
+    echo [LOI] Khong the ket noi ADB. Hay kiem tra lai day cap USB!
     pause
     exit /b 1
 )
 
-echo       -^> Đã nhận Galaxy Z Flip 5 qua USB!
+echo       -^> Da nhan Galaxy Z Flip 5 qua USB!
 echo.
 
-echo [2/4] Đang thiết lập đường truyền tốc độ cao qua dây USB (port %DEX_PORT%)...
+echo [2/4] Dang thiet lap duong truyen USB toc do cao ^(port %DEX_PORT%^)...
 "%ADB_EXE%" forward tcp:%DEX_PORT% tcp:%DEX_PORT% >nul 2>&1
 if errorlevel 1 (
-    echo [LỖI] Không thể chuyển tiếp cổng USB tcp:%DEX_PORT%.
-    echo       Hãy kiểm tra thông báo "Cho phép Gỡ lỗi USB" trên màn hình điện thoại!
+    echo [LOI] Khong the chuyen tiep cong USB tcp:%DEX_PORT%.
+    echo       Hay bam "Cho phep Go loi USB" tren man hinh dien thoai!
     pause
     exit /b 1
 )
-echo       -^> Đường truyền USB đã sẵn sàng (%DEX_URL%).
+echo       -^> Duong truyen USB da san sang ^(%DEX_URL%^).
 echo.
 
-echo [3/4] Đang kiểm tra Samsung DeX trên điện thoại...
+echo [3/4] Dang kiem tra Samsung DeX tren dien thoai...
 call :CHECK_DEX_LIVE
-if "!DEX_LIVE!"=="1" goto :OPEN_BROWSER
+if "!DEX_LIVE!"=="1" goto OPEN_BROWSER
 
-echo       -^> Samsung DeX chưa bật. Đang tự mở sẵn màn hình Samsung DeX trên Z Flip 5...
+echo       -^> Samsung DeX chua bat. Dang tu mo man hinh Samsung DeX tren Z Flip 5...
 "%ADB_EXE%" shell am start -n com.breeze.island/com.arnav.island.settings.MainActivity --es destination local_dex >nul 2>&1
-echo       -^> Hãy gạt nút [Bật Samsung DeX] trên điện thoại của bạn!
-echo          (Đang tự động chờ Samsung DeX khởi động...)
+echo       -^> Hay gat nut [Bat Samsung DeX] tren dien thoai cua ban!
+echo          ^(Dang tu dong cho Samsung DeX khoi dong...^)
 
 set /a WAIT_SEC=0
 :WAIT_DEX_LOOP
 timeout /t 1 /nobreak >nul
 call :CHECK_DEX_LIVE
-if "!DEX_LIVE!"=="1" goto :OPEN_BROWSER
+if "!DEX_LIVE!"=="1" goto OPEN_BROWSER
 set /a WAIT_SEC+=1
 if !WAIT_SEC! GEQ 90 (
     echo.
-    echo [CẢNH BÁO] Quá 90 giây chưa thấy Samsung DeX phản hồi trên cổng %DEX_PORT%.
-    echo Hãy kiểm tra app BreezeIsland trên điện thoại đã cập nhật lên v2.7.0+ và đã bật DeX chưa.
+    echo [CANH BAO] Qua 90 giay chua thay Samsung DeX phan hoi tren cong %DEX_PORT%.
+    echo Hay kiem tra BreezeIsland tren DT da cap nhat len v2.7.0+ va da bat DeX chua.
     pause
     exit /b 1
 )
-goto :WAIT_DEX_LOOP
+goto WAIT_DEX_LOOP
 
 :OPEN_BROWSER
 echo.
-echo [4/4] Samsung DeX đã sẵn sàng! Đang mở cửa sổ Samsung DeX trên Laptop...
-echo       - Chuột trái/phải, kéo thả cửa sổ, cuộn chuột ^& bàn phím hoạt động trực tiếp.
-echo       - Nhấn F11 hoặc bấm nút Fullscreen ở thanh trên cùng để phóng toàn màn hình.
+echo [4/4] Samsung DeX da san sang! Dang mo cua so Samsung DeX tren Laptop...
+echo       - Chuot trai/phai, keo tha cua so, cuon chuot va ban phim hoat dong truc tiep.
+echo       - Nhan F11 hoac bam nut Fullscreen o thanh tren cung de phong toan man hinh.
 echo.
 
 set "BROWSER_EXE="
@@ -102,10 +100,10 @@ if defined BROWSER_EXE (
 )
 
 if "%WATCH_MODE%"=="1" (
-    echo [CHẾ ĐỘ TỰ ĐỘNG] Đang chờ bạn rút cáp rồi cắm lại lần sau...
+    echo [CHE DO TU DONG] Dang cho ban rut cap roi cam lai lan sau...
     "%ADB_EXE%" wait-for-disconnect >nul 2>&1
     timeout /t 2 /nobreak >nul
-    goto :MAIN_LOOP
+    goto MAIN_LOOP
 )
 
 timeout /t 3 /nobreak >nul
