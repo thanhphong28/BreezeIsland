@@ -184,7 +184,7 @@ class DexViewerActivity : ComponentActivity() {
             override fun surfaceDestroyed(holder: SurfaceHolder) {
                 surfaceReady = false
                 surfaceGivenToDecoder = false
-                session?.videoDecoder?.clearSurface()
+                session?.videoDecoder?.clearSurface(holder.surface)
             }
         })
 

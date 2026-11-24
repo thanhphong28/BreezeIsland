@@ -1,5 +1,7 @@
 package com.arnav.island.settings.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.provider.Settings
 import android.widget.Toast
@@ -10,26 +12,28 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Computer
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DesktopWindows
 import androidx.compose.material.icons.rounded.DeveloperMode
+import androidx.compose.material.icons.rounded.Mouse
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PhonelinkSetup
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ScreenRotation
 import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -47,6 +51,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.arnav.island.dex.DexConnectionMode
 import com.arnav.island.dex.DexDisplaySpec
+import com.arnav.island.dex.DexOutputMode
 import com.arnav.island.dex.DexTransport
 import com.arnav.island.settings.ui.Ui
 import com.arnav.island.settings.ui.components.ChipsRow
@@ -68,6 +73,16 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
 
     var customSpec by remember(s.dexDisplaySpec) { mutableStateOf(s.dexDisplaySpec) }
 
+    fun copyText(label: String, text: String) {
+        val cm = context.getSystemService(ClipboardManager::class.java)
+        cm?.setPrimaryClip(ClipData.newPlainText(label, text))
+        Toast.makeText(
+            context,
+            if (vi) "Đã sao chép: $text" else "Copied: $text",
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
+
     LaunchedEffect(Unit) {
         ui.graph.localDex.refreshStatus(forceAdbCheck = true)
     }
@@ -79,39 +94,46 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
     val active = dexState.running || dexState.starting
     val readyTransport = dexState.bestReadyTransport(s.dexConnectionMode)
     val isReady = readyTransport != null
+    val extDetected = dexState.detectedExternalDisplay
 
     SettingsPage(
-        title = if (vi) "Samsung DeX nội bộ" else "Local Samsung DeX",
+        title = if (vi) "Samsung DeX (Màn hình ngoài / PC)" else "Samsung DeX (Monitor / PC)",
         onBack = ui::back,
     ) {
-        // 1. Master On/Off Switch + Live Viewer Actions
+        // 1. Master On/Off Switch + Live Output Status (Monitor / Projector / PC)
         item {
             Group(
-                title = if (vi) "Bật / Tắt Samsung DeX ngay trên Z Flip" else "On-Device Samsung DeX",
+                title = if (vi) "Bật / Tắt Samsung DeX cho Galaxy Z Flip" else "Samsung DeX Control",
                 footer = if (vi) {
-                    "Chạy Samsung DeX toàn màn hình trực tiếp trên máy (tích hợp từ sam1am/localdex) — không cần cáp HDMI, không cần máy tính, không cần Root và hoàn toàn không dùng Trợ năng."
+                    "Khi cắm cáp USB-C → HDMI ra màn hình rời / TV / máy chiếu (hoặc kết nối Smart View), Samsung DeX tự động xuất toàn màn hình ra màn hình ngoài và điện thoại biến thành Bàn rê chuột (Touchpad). Khi dùng với máy tính, chỉ cần mở địa chỉ DeX for PC trên Chrome/Edge."
                 } else {
-                    "Run Samsung DeX fullscreen right on your phone (powered by sam1am/localdex) — no dock, no cable, no PC, no root, and zero AccessibilityService."
+                    "Plug into an HDMI monitor, TV, or projector (or connect Smart View) to display Samsung DeX fullscreen externally while your phone acts as a Touchpad. On a PC, simply open the DeX for PC URL in Chrome or Edge."
                 },
             ) {
                 val subtitle = when {
-                    dexState.running -> {
-                        val via = if (dexState.activeTransport == DexTransport.SHIZUKU) "Shizuku" else "Wireless ADB"
-                        val idSuffix = if (dexState.displayId >= 0) " · #${dexState.displayId}" else ""
-                        if (vi) "Đang bật ($via$idSuffix) · Gạt tắt để đóng màn hình ảo"
-                        else "Running ($via$idSuffix) · Toggle off to end virtual display"
-                    }
+                    dexState.running && !dexState.externalDisplayName.isNullOrBlank() ->
+                        if (vi) "Đang xuất lên: ${dexState.externalDisplayName}"
+                        else "Outputting to: ${dexState.externalDisplayName}"
+                    dexState.running && dexState.pcClientCount > 0 ->
+                        if (vi) "Đang chiếu lên máy tính (${dexState.pcClientCount} trình duyệt) · ${dexState.pcWebUrl.orEmpty()}"
+                        else "Streaming to PC (${dexState.pcClientCount} connected) · ${dexState.pcWebUrl.orEmpty()}"
+                    dexState.running ->
+                        if (vi) "Đang chạy nền · Sẵn sàng xuất ra màn hình ngoài hoặc mở trên PC"
+                        else "Running · Ready for external monitor or PC browser"
                     dexState.starting -> dexState.statusMessage.ifEmpty {
                         if (vi) "Đang khởi động Samsung DeX…" else "Starting Samsung DeX…"
                     }
+                    extDetected != null && isReady ->
+                        if (vi) "Đã nhận ${extDetected.label} · Gạt bật để xuất Samsung DeX ngay"
+                        else "Detected ${extDetected.label} · Toggle on to launch DeX externally"
                     isReady -> {
                         val via = if (readyTransport == DexTransport.SHIZUKU) "Shizuku" else "Wireless ADB"
-                        if (vi) "Sẵn sàng ($via) · Gạt bật để mở Samsung DeX ngay"
-                        else "Ready ($via) · Toggle on to launch Samsung DeX"
+                        if (vi) "Sẵn sàng ($via) · Gạt bật cho màn hình ngoài hoặc PC"
+                        else "Ready ($via) · Toggle on for external monitor or PC"
                     }
                     dexState.checkingConnection -> if (vi) "Đang kiểm tra kết nối…" else "Checking connection…"
                     else -> if (vi) "Cần cấp quyền Shizuku hoặc ghép nối ADB không dây bên dưới"
-                    else "Allow Shizuku or pair Wireless ADB below to start"
+                    else "Allow Shizuku or pair Wireless ADB below first"
                 }
 
                 SwitchRow(
@@ -121,7 +143,7 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
                         if (!enable) {
                             ui.graph.localDex.stopDex(context)
                         } else {
-                            val ok = ui.graph.localDex.startDex(context, openViewer = true)
+                            val ok = ui.graph.localDex.startDex(context, forcePhoneViewer = false)
                             if (!ok) {
                                 Toast.makeText(
                                     context,
@@ -137,20 +159,100 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
                     iconColor = if (active) BadgeColors.Green else BadgeColors.Blue,
                 )
 
+                // Live External Monitor / Projector / Smart View status
+                SettingRow(
+                    title = if (extDetected != null) {
+                        if (vi) "Màn hình ngoài: ${extDetected.label}" else "External Display: ${extDetected.label}"
+                    } else {
+                        if (vi) "Chưa cắm màn hình rời (HDMI / Máy chiếu / Smart View)"
+                        else "No external monitor detected (HDMI / Projector / Smart View)"
+                    },
+                    subtitle = if (extDetected != null) {
+                        if (!dexState.externalDisplayName.isNullOrBlank()) {
+                            if (vi) "Đang hiển thị Samsung DeX toàn màn hình trên màn hình ngoài · Có thể dùng điện thoại song song"
+                            else "Samsung DeX is live fullscreen on the external display · Phone stays free to use"
+                        } else {
+                            if (vi) "Bật Samsung DeX để xuất toàn màn hình lên màn hình này"
+                            else "Turn on Samsung DeX to project fullscreen onto this display"
+                        }
+                    } else {
+                        if (vi) "Cắm cáp USB-C → HDMI hoặc bật Smart View tới TV/Máy chiếu/Windows để tự xuất DeX ngay"
+                        else "Plug in USB-C → HDMI or connect Smart View to a TV/Projector/Windows PC — auto-attaches live"
+                    },
+                    icon = if (extDetected != null) Icons.Rounded.CastConnected else Icons.Rounded.Tv,
+                    iconColor = if (extDetected != null) BadgeColors.Green else BadgeColors.Graphite,
+                    onClick = { ui.graph.localDex.refreshStatus(forceAdbCheck = false) },
+                )
+
+                // Live controls while DeX is running
                 if (active) {
                     SettingRow(
-                        title = if (vi) "Mở lại màn hình Samsung DeX" else "Open Samsung DeX Viewer",
-                        subtitle = if (dexState.displayId >= 0) {
-                            if (vi) "Màn hình ảo #${dexState.displayId} · Có thể xem từ PC: scrcpy --display-id=${dexState.displayId}"
-                            else "Virtual display #${dexState.displayId} · PC command: scrcpy --display-id=${dexState.displayId}"
-                        } else {
-                            if (vi) "Chạm để quay lại cửa sổ DeX toàn màn hình"
-                            else "Tap to return to fullscreen DeX desktop"
-                        },
-                        icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                        title = if (vi) "Mở Bàn rê chuột & Bàn phím DeX (Touchpad)" else "Open DeX Touchpad & Keyboard",
+                        subtitle = if (vi) "Biến màn hình Z Flip thành bàn rê chuột (click trái/phải, kéo cửa sổ, cuộn, gõ chữ) cho màn hình ngoài"
+                        else "Use your Z Flip screen as a trackpad & keyboard for the external DeX screen",
+                        icon = Icons.Rounded.Mouse,
                         iconColor = BadgeColors.Cyan,
-                        onClick = { ui.graph.localDex.openViewer(context) },
+                        onClick = { ui.graph.localDex.openTouchpad(context) },
                     )
+
+                    SettingRow(
+                        title = if (vi) "Xem thử trực tiếp trên màn hình điện thoại" else "Preview on Phone Screen",
+                        subtitle = if (vi) "Tùy chọn mở cửa sổ DeX ngay trên Z Flip nếu bạn chưa có màn hình ngoài"
+                        else "Optional: open the DeX desktop directly on your phone screen",
+                        icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                        iconColor = BadgeColors.Violet,
+                        onClick = { ui.graph.localDex.openPhoneViewer(context) },
+                    )
+                }
+            }
+        }
+
+        // 2. DeX for PC Card (Live Browser URL + USB Cable command when running!)
+        if (active) {
+            item {
+                val pcUrl = dexState.pcWebUrl ?: "http://<phone-ip>:${dexState.pcWebPort}"
+                val usbCmd = "adb forward tcp:${dexState.pcWebPort} tcp:${dexState.pcWebPort}"
+                Group(
+                    title = if (vi) "Chiếu Samsung DeX lên Máy tính (Windows / Mac)" else "Samsung DeX for PC (Windows / Mac)",
+                    footer = if (vi) {
+                        "Không cần cài phần mềm lên máy tính! Mở Chrome hoặc Edge trên PC và truy cập địa chỉ trên (cùng Wi-Fi) — hỗ trợ đầy đủ chuột thật (click trái/phải, kéo thả, cuộn) và bàn phím máy tính. Nếu cắm dây USB không có Wi-Fi, chạy lệnh adb forward rồi mở http://localhost:${dexState.pcWebPort}."
+                    } else {
+                        "Zero PC software needed! Open Chrome or Edge on your computer at the URL above (same Wi-Fi) for 60fps DeX with real PC mouse & keyboard. Over USB cable, run the adb forward command and open http://localhost:${dexState.pcWebPort}."
+                    },
+                ) {
+                    SettingRow(
+                        title = if (vi) "Mở trên trình duyệt PC: $pcUrl" else "Open on PC browser: $pcUrl",
+                        subtitle = if (dexState.pcClientCount > 0) {
+                            if (vi) "Đang kết nối ${dexState.pcClientCount} máy tính · Chạm để sao chép link"
+                            else "${dexState.pcClientCount} PC browser connected · Tap to copy URL"
+                        } else {
+                            if (vi) "Chạm để sao chép · Gõ link này vào Chrome / Edge trên máy tính"
+                            else "Tap to copy · Open in Chrome or Edge on Windows / Mac"
+                        },
+                        icon = Icons.Rounded.Computer,
+                        iconColor = if (dexState.pcClientCount > 0) BadgeColors.Green else BadgeColors.Blue,
+                        onClick = { copyText("DeX URL", pcUrl) },
+                    )
+
+                    SettingRow(
+                        title = if (vi) "Cắm cáp USB vào PC (độ trễ siêu thấp)" else "USB Cable to PC (ultra-low latency)",
+                        subtitle = if (vi) "Chạy trên PC: $usbCmd → mở http://localhost:${dexState.pcWebPort} (chạm để chép)"
+                        else "Run on PC: $usbCmd → open http://localhost:${dexState.pcWebPort} (tap to copy)",
+                        icon = Icons.Rounded.ContentCopy,
+                        iconColor = BadgeColors.Indigo,
+                        onClick = { copyText("ADB Forward", usbCmd) },
+                    )
+
+                    if (dexState.displayId >= 0) {
+                        val scrcpyCmd = "scrcpy --display-id=${dexState.displayId}"
+                        SettingRow(
+                            title = if (vi) "Hoặc mở bằng scrcpy trên PC" else "Or open with desktop scrcpy",
+                            subtitle = "$scrcpyCmd" + if (vi) " (chạm để sao chép)" else " (tap to copy)",
+                            icon = Icons.Rounded.PhoneAndroid,
+                            iconColor = BadgeColors.Teal,
+                            onClick = { copyText("scrcpy", scrcpyCmd) },
+                        )
+                    }
                 }
             }
         }
@@ -170,14 +272,34 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
             }
         }
 
-        // 2. Dual-Engine Connection Setup (Shizuku + Wireless ADB)
+        // 3. Output Target Mode
         item {
             Group(
-                title = if (vi) "Cầu kết nối trên máy (Không cần PC)" else "On-Phone Connection Bridge",
+                title = if (vi) "Chế độ xuất màn hình Samsung DeX" else "DeX Output Target",
                 footer = if (vi) {
-                    "Mẹo: Nếu đã bật Shizuku trên máy, DeX sẽ mở tức thì chỉ với 1 chạm và chạy được cả khi dùng 4G/5G. Hoặc dùng ADB không dây (LocalDex gốc) nếu bạn không cài Shizuku (yêu cầu Wi-Fi)."
+                    "Mặc định (Tự động): Nếu đang cắm dây HDMI/máy chiếu hoặc nối Smart View sẽ xuất thẳng lên màn hình ngoài & mở Touchpad trên ĐT; nếu không cắm màn hình sẽ bật DeX for PC để bạn mở trên máy tính mà không chiếm màn hình điện thoại."
                 } else {
-                    "Tip: With Shizuku active, DeX launches instantly in 1 tap and even works on mobile data. Alternatively, use built-in Wireless ADB (stock LocalDex flow, requires Wi-Fi)."
+                    "Auto (Default): Outputs fullscreen to an external HDMI/Smart View monitor + phone Touchpad when connected; otherwise runs DeX for PC in background without taking over your phone screen."
+                },
+            ) {
+                ChipsRow(
+                    title = if (vi) "Khi bật Samsung DeX sẽ hiển thị ở đâu?" else "Where should DeX appear?",
+                    options = DexOutputMode.entries,
+                    selected = s.dexOutputMode,
+                    label = { if (vi) it.labelVi else it.labelEn },
+                    onSelect = { mode -> ui.update { it.copy(dexOutputMode = mode) } },
+                )
+            }
+        }
+
+        // 4. Dual-Engine Connection Setup (Shizuku + Wireless ADB)
+        item {
+            Group(
+                title = if (vi) "Cầu kết nối trên máy (Không Root · Không Trợ năng)" else "On-Phone Bridge (Zero Root · Zero Accessibility)",
+                footer = if (vi) {
+                    "Ưu tiên Shizuku (chỉ cần 1 chạm và hoạt động cả khi dùng 4G/5G hoặc cắm dây HDMI không cần Wi-Fi). Hoặc ghép nối ADB không dây (LocalDex gốc) nếu không dùng Shizuku."
+                } else {
+                    "Shizuku is recommended (1-tap setup and works offline over HDMI without Wi-Fi). Alternatively, pair Wireless ADB directly."
                 },
             ) {
                 ChipsRow(
@@ -189,7 +311,7 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
                 )
 
                 val shizukuSub = when {
-                    dexState.shizukuPermitted -> if (vi) "Đã sẵn sàng · Chạy DeX 1 chạm không cần Wi-Fi" else "Ready · 1-tap DeX launch without Wi-Fi"
+                    dexState.shizukuPermitted -> if (vi) "Đã sẵn sàng · Bật DeX 1 chạm không cần Wi-Fi" else "Ready · 1-tap DeX launch without Wi-Fi"
                     dexState.shizukuRunning -> if (vi) "Shizuku đang chạy · Bấm để cấp quyền 1 chạm" else "Shizuku running · Tap to allow"
                     dexState.shizukuInstalled -> if (vi) "Mở app Shizuku và bấm Khởi động (Start)" else "Open Shizuku and tap Start"
                     else -> if (vi) "Chưa cài Shizuku · Tùy chọn cài từ Play Store hoặc dùng ADB không dây" else "Not installed · Optional (or use Wireless ADB below)"
@@ -267,11 +389,12 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
                 }
 
                 SettingRow(
-                    title = if (vi) "Kiểm tra lại trạng thái kết nối" else "Refresh connection status",
+                    title = if (vi) "Quét lại màn hình ngoài & kết nối" else "Refresh external display & bridge",
                     subtitle = if (dexState.checkingConnection) {
-                        if (vi) "Đang kiểm tra Shizuku & ADB không dây…" else "Checking Shizuku & Wireless ADB…"
+                        if (vi) "Đang kiểm tra màn hình ngoài, Shizuku & ADB…" else "Checking external displays, Shizuku & ADB…"
                     } else {
-                        if (vi) "Làm mới trạng thái Shizuku và Gỡ lỗi không dây ngay" else "Re-check Shizuku and Wireless ADB right now"
+                        if (vi) "Làm mới danh sách màn hình HDMI/Smart View và trạng thái kết nối"
+                        else "Re-scan HDMI/Smart View displays and bridge status"
                     },
                     icon = Icons.Rounded.Refresh,
                     iconColor = BadgeColors.Graphite,
@@ -280,14 +403,14 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
             }
         }
 
-        // 3. Resolution & DPI (Z Flip 5 optimized)
+        // 5. Resolution & DPI (Monitor / Projector / PC optimized)
         item {
             Group(
-                title = if (vi) "Độ phân giải & DPI màn hình DeX" else "DeX Display Resolution & DPI",
+                title = if (vi) "Độ phân giải & DPI màn hình DeX" else "DeX Resolution & DPI",
                 footer = if (vi) {
-                    "DPI thấp = không gian làm việc rộng hơn (nhiều cửa sổ hơn); DPI cao = chữ & nút bấm to dễ chạm hơn. Thay đổi sẽ áp dụng cho lần bật DeX tiếp theo."
+                    "Màn hình máy tính & máy chiếu nên dùng 1920x1080/160 (rộng rãi chuẩn desktop). Nếu chiếu lên TV xa, chọn 1920x1080/240 để chữ to rõ hơn."
                 } else {
-                    "Lower DPI = more desktop workspace; higher DPI = larger UI elements. Changes apply the next time DeX starts."
+                    "For monitors & projectors, 1920x1080/160 gives a crisp desktop layout. For distant TVs, choose 1920x1080/240 for larger UI."
                 },
             ) {
                 ChipsRow(
@@ -339,7 +462,7 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
                                     ui.update { it.copy(dexDisplaySpec = clean) }
                                     Toast.makeText(
                                         context,
-                                        if (vi) "Đã lưu cấu hình màn hình DeX: $clean" else "Saved DeX display spec: $clean",
+                                        if (vi) "Đã lưu độ phân giải DeX: $clean" else "Saved DeX spec: $clean",
                                         Toast.LENGTH_SHORT,
                                     ).show()
                                 },
@@ -361,54 +484,46 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
             }
         }
 
-        // 4. Viewer & Dynamic Island behavior
+        // 6. Viewer & Dynamic Island behavior
         item {
             Group(
-                title = if (vi) "Trải nghiệm màn hình & Dynamic Island" else "Viewer & Island Behavior",
+                title = if (vi) "Tùy chọn hiển thị & Dynamic Island" else "Viewer & Island Behavior",
             ) {
                 SwitchRow(
-                    title = if (vi) "Khóa xoay ngang khi dùng Samsung DeX" else "Lock landscape orientation for DeX",
+                    title = if (vi) "Khóa xoay ngang khi xem trên ĐT" else "Lock landscape for phone preview",
                     checked = s.dexLandscapeLock,
                     onCheckedChange = { v -> ui.update { it.copy(dexLandscapeLock = v) } },
-                    subtitle = if (vi) {
-                        "Tối ưu cho màn hình rộng Galaxy Z Flip 5 — có thể đổi nhanh ngay trong nút ✕"
-                    } else {
-                        "Ideal for Galaxy Z Flip 5's wide screen — toggle anytime from the floating ✕ menu"
-                    },
+                    subtitle = if (vi) "Áp dụng khi mở chế độ Xem thử trực tiếp trên điện thoại"
+                    else "Applies when using the optional on-phone DeX preview",
                     icon = Icons.Rounded.ScreenRotation,
                     iconColor = BadgeColors.Teal,
                 )
                 SwitchRow(
-                    title = if (vi) "Báo trạng thái DeX trên Dynamic Island" else "Show DeX status pill on Dynamic Island",
+                    title = if (vi) "Báo trạng thái DeX trên Dynamic Island" else "Show DeX pill on Dynamic Island",
                     checked = s.dexShowIslandPill,
                     onCheckedChange = { v -> ui.update { it.copy(dexShowIslandPill = v) } },
-                    subtitle = if (vi) {
-                        "Dynamic Island sẽ tự ẩn gọn khi ở trong màn hình DeX và hiện xác nhận khi bật/tắt"
-                    } else {
-                        "Dynamic Island hides automatically inside DeX and confirms start/stop cleanly"
-                    },
+                    subtitle = if (vi) "Hiển thị xác nhận gọn trên Dynamic Island khi bật/tắt Samsung DeX"
+                    else "Shows a brief confirmation pill on Dynamic Island when DeX starts or stops",
                     icon = Icons.Rounded.PhonelinkSetup,
                     iconColor = BadgeColors.Violet,
                 )
             }
         }
 
-        // 5. Gesture Guide + Banking/VNeID Safety Card
+        // 7. Quick Connection Guide + Banking/VNeID Safety Card
         item {
             InfoCard(
-                title = if (vi) "Cách điều khiển chuột ảo trong DeX" else "Virtual Mouse Controls in DeX",
+                title = if (vi) "3 cách dùng Samsung DeX trên màn hình lớn với Z Flip 5" else "3 Ways to Run DeX on a Big Screen",
                 body = if (vi) {
-                    "• 1 ngón tay: Click chuột & kéo thả thanh tiêu đề cửa sổ, chỉnh kích thước cửa sổ tự do (Freeform).\n" +
-                        "• 2 ngón tay: Cuộn trang (bánh xe chuột).\n" +
-                        "• Vuốt Quay lại (Back): Gửi phím Back trực tiếp vào ứng dụng DeX.\n" +
-                        "• Nút ✕ nổi góc phải: Chạm để mở menu (Tắt DeX / Thu nhỏ chạy nền / Home / Đa nhiệm), nhấn giữ để kéo sang vị trí khác."
+                    "1. Cắm cáp USB-C → HDMI (Màn hình / TV / Máy chiếu): Cắm cáp vào Z Flip 5 rồi gạt Bật Samsung DeX — DeX hiện toàn màn hình bên màn hình rời, điện thoại thành Touchpad hoặc dùng song song.\n" +
+                        "2. Không dây (Smart View / Miracast): Bật Smart View tới TV hoặc Windows (Chiếu lên PC này), rồi gạt Bật Samsung DeX.\n" +
+                        "3. Trình duyệt PC (Windows / Mac — không cần cài app): Bật DeX rồi mở link http://<IP>:8765 trên Chrome/Edge (hoặc qua dây USB với adb forward) để dùng chuột & bàn phím máy tính thật."
                 } else {
-                    "• 1 finger: Mouse click & drag window title handles / resize edges.\n" +
-                        "• 2 fingers: Scroll wheel.\n" +
-                        "• System Back gesture: Forwarded as Back inside DeX.\n" +
-                        "• Floating ✕ button: Tap for quick menu (Stop DeX / Background / Home / Recents), long-press to drag anywhere."
+                    "1. USB-C → HDMI (Monitor / TV / Projector): Plug in and toggle DeX ON — DeX appears fullscreen externally while your phone becomes a Touchpad.\n" +
+                        "2. Wireless (Smart View / Miracast): Connect Smart View to a TV or Windows PC, then toggle DeX ON.\n" +
+                        "3. PC Browser (Chrome / Edge — zero install): Toggle DeX ON and open http://<IP>:8765 (or USB adb forward) with real PC mouse & keyboard."
                 },
-                icon = Icons.Rounded.TouchApp,
+                icon = Icons.Rounded.Tv,
                 color = BadgeColors.Blue,
             )
         }
@@ -417,9 +532,9 @@ fun LocalDexScreen(s: IslandSettings, ui: Ui) {
             InfoCard(
                 title = if (vi) "Tuân thủ chuẩn BreezeIsland · An toàn VNeID & Ngân hàng" else "BreezeIsland Rules · 100% VNeID & Banking Safe",
                 body = if (vi) {
-                    "Không cần Root, không cần máy tính, không khai báo Dịch vụ Trợ năng (Accessibility Service) và không sửa cài đặt overlay hiển thị toàn cục. Khi bạn tắt DeX, màn hình ảo được giải phóng sạch sẽ ngay lập tức."
+                    "Không cần Root, không khai báo Dịch vụ Trợ năng (Accessibility Service), không sửa overlay hiển thị toàn cục. Khi bạn tắt DeX, màn hình ảo và máy chủ PC tự đóng sạch sẽ tức thì."
                 } else {
-                    "Zero root, zero PC, zero AccessibilityService, and no global overlay_display_devices hacks. Stopping DeX tears down the virtual display cleanly."
+                    "Zero root, zero AccessibilityService, and no global overlay hacks. Stopping DeX closes the virtual display and PC streamer cleanly."
                 },
                 icon = Icons.Rounded.Security,
                 color = BadgeColors.Green,

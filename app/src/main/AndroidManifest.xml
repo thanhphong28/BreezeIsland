@@ -103,6 +103,15 @@
             android:launchMode="singleTask"
             android:theme="@style/Theme.Island" />
 
+        <!-- Phone Touchpad & Keyboard controller while Samsung DeX runs on external monitor / projector / PC -->
+        <activity
+            android:name=".dex.DexTouchpadActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Island"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- FileProvider for in-app APK self-update -->
         <provider
             android:name="androidx.core.content.FileProvider"

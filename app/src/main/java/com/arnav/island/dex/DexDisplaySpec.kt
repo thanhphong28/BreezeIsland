@@ -7,6 +7,14 @@ enum class DexConnectionMode(val labelEn: String, val labelVi: String) {
     WIRELESS_ADB("Wireless ADB", "ADB không dây"),
 }
 
+/** Where the Samsung DeX desktop should be displayed when turned on. */
+enum class DexOutputMode(val labelEn: String, val labelVi: String) {
+    AUTO_EXTERNAL_OR_PC("Auto (Monitor / PC)", "Tự động (Màn hình ngoài / PC)"),
+    EXTERNAL_DISPLAY("External Monitor / TV", "Màn hình ngoài / Máy chiếu"),
+    PC_BROWSER("PC Browser / USB", "Máy tính (Trình duyệt / USB)"),
+    PHONE_SCREEN("Phone Screen", "Màn hình điện thoại"),
+}
+
 data class DexDisplayPreset(
     val spec: String,
     val labelEn: String,
@@ -16,40 +24,40 @@ data class DexDisplayPreset(
 )
 
 object DexDisplaySpec {
-    /** Default display spec optimized for Galaxy Z Flip 5 wide inner screen in landscape. */
-    const val DEFAULT_SPEC = "2200x1080/240"
+    /** Default Full HD 16:9 desktop spec tailored for external monitors, TVs, projectors & PCs. */
+    const val DEFAULT_SPEC = "1920x1080/160"
 
     private val SPEC_PATTERN = Regex("^(\\d{3,4})x(\\d{3,4})/(\\d{2,3})$")
     private val DISPLAY_ID_PATTERN = Regex("New display: .*\\(id=(\\d+)\\)")
 
     val PRESETS = listOf(
         DexDisplayPreset(
-            spec = "2200x1080/240",
-            labelEn = "Z Flip 5 Wide",
-            labelVi = "Chuẩn Z Flip 5",
-            noteEn = "2200×1080 · 240 DPI (fills Z Flip 5 landscape)",
-            noteVi = "2200×1080 · 240 DPI (tràn màn hình ngang Z Flip 5)",
+            spec = "1920x1080/160",
+            labelEn = "Monitor / Projector 1080p",
+            labelVi = "Màn hình / Máy chiếu 1080p",
+            noteEn = "1920×1080 · 160 DPI (sharp desktop workspace for monitors, TVs, projectors & PCs)",
+            noteVi = "1920×1080 · 160 DPI (chuẩn máy tính, rộng rãi cho màn hình rời, TV, máy chiếu & PC)",
         ),
         DexDisplayPreset(
             spec = "1920x1080/240",
-            labelEn = "Full HD 16:9",
-            labelVi = "Full HD 16:9",
-            noteEn = "1920×1080 · 240 DPI (classic monitor ratio)",
-            noteVi = "1920×1080 · 240 DPI (tỷ lệ màn hình máy tính chuẩn)",
+            labelEn = "1080p Large UI",
+            labelVi = "1080p Chữ lớn",
+            noteEn = "1920×1080 · 240 DPI (larger text & icons for TVs or projectors viewed from afar)",
+            noteVi = "1920×1080 · 240 DPI (chữ & icon lớn, dễ nhìn khi chiếu lên TV hoặc máy chiếu xa)",
         ),
         DexDisplayPreset(
-            spec = "1920x1440/240",
-            labelEn = "LocalDex 4:3",
-            labelVi = "LocalDex 4:3",
-            noteEn = "1920×1440 · 240 DPI (tall multitasking space)",
-            noteVi = "1920×1440 · 240 DPI (không gian đa nhiệm cao)",
+            spec = "2560x1440/213",
+            labelEn = "2K QHD Monitor",
+            labelVi = "Màn hình 2K QHD",
+            noteEn = "2560×1440 · 213 DPI (high-res desktop for 2K/4K monitors & laptops)",
+            noteVi = "2560×1440 · 213 DPI (siêu nét cho màn hình 2K/4K và laptop)",
         ),
         DexDisplayPreset(
-            spec = "2560x1080/260",
-            labelEn = "Ultrawide 21:9",
-            labelVi = "Siêu rộng 21:9",
-            noteEn = "2560×1080 · 260 DPI (side-by-side desktop apps)",
-            noteVi = "2560×1080 · 260 DPI (mở nhiều cửa sổ song song)",
+            spec = "2200x1080/240",
+            labelEn = "Z Flip 5 Screen",
+            labelVi = "Màn hình Z Flip 5",
+            noteEn = "2200×1080 · 240 DPI (for viewing DeX directly on the Z Flip 5 phone screen)",
+            noteVi = "2200×1080 · 240 DPI (dành riêng khi muốn xem DeX trực tiếp trên Z Flip 5)",
         ),
     )
 

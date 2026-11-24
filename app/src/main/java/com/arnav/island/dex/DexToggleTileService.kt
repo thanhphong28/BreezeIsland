@@ -9,7 +9,7 @@ import com.arnav.island.IslandApp
 import com.arnav.island.settings.MainActivity
 
 /**
- * One UI Quick Settings tile for toggling on-device Samsung DeX (LocalDeX) with a single tap
+ * One UI Quick Settings tile for toggling Samsung DeX (External Monitor / PC) with a single tap
  * from the Quick Panel.
  */
 class DexToggleTileService : TileService() {
@@ -27,14 +27,17 @@ class DexToggleTileService : TileService() {
             graph.localDex.stopDex(this)
             syncTile()
         } else {
-            val started = graph.localDex.startDex(this, openViewer = false)
-            val targetIntent = if (started) {
-                Intent(this, DexViewerActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            } else {
-                Intent(this, MainActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val started = graph.localDex.startDex(this, forcePhoneViewer = false)
+            val extConnected = ExternalDisplayFinder.findExternalDisplays(this).isNotEmpty()
+            val targetIntent = when {
+                !started -> Intent(this, MainActivity::class.java)
                     .putExtra(MainActivity.EXTRA_DESTINATION, "local_dex")
-            }
+                extConnected -> Intent(this, DexTouchpadActivity::class.java)
+                graph.settings.state.value.dexOutputMode == DexOutputMode.PHONE_SCREEN ->
+                    Intent(this, DexViewerActivity::class.java)
+                else -> Intent(this, MainActivity::class.java)
+                    .putExtra(MainActivity.EXTRA_DESTINATION, "local_dex")
+            }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             launchFromTile(targetIntent)
             syncTile()
         }
@@ -60,11 +63,12 @@ class DexToggleTileService : TileService() {
         val session = DexSession.current
         tile.state = if (session != null) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val id = session?.displayId ?: -1
+            val ext = (application as? IslandApp)?.graph?.localDex?.state?.value?.externalDisplayName
             tile.subtitle = when {
                 session == null -> "Off"
-                id >= 0 -> "Display #$id"
-                else -> "Starting…"
+                !ext.isNullOrBlank() -> "External"
+                session.webServer?.url?.value != null -> "PC Ready"
+                else -> "Running"
             }
         }
         tile.updateTile()

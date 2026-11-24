@@ -50,6 +50,7 @@ class DexSession(
     private val context: Context,
     val displaySpec: String,
     val transport: DexTransport,
+    val outputMode: DexOutputMode = DexOutputMode.AUTO_EXTERNAL_OR_PC,
 ) {
     sealed class State {
         data class Starting(val message: String) : State()
@@ -102,6 +103,8 @@ class DexSession(
     var videoDecoder: DexVideoDecoder? = null
         private set
     var controller: DexInputController? = null
+        private set
+    var webServer: DexWebServer? = null
         private set
 
     @Volatile
@@ -303,6 +306,7 @@ class DexSession(
         val command = "CLASSPATH=$SERVER_REMOTE_PATH app_process / com.genymobile.scrcpy.Server " +
             "$SERVER_VERSION scid=$scidHex log_level=info " +
             "video=true audio=false control=true video_codec=h264 " +
+            "video_codec_options=i-frame-interval:int=2 " +
             "tunnel_forward=true send_device_meta=false send_dummy_byte=false " +
             "new_display=$displaySpec"
 
@@ -332,21 +336,44 @@ class DexSession(
         ctrlOut: java.io.OutputStream,
         ctrlIn: java.io.InputStream,
     ) {
+        val ctrl = DexInputController(ctrlOut, ctrlIn)
+        controller = ctrl
+        ctrl.start()
+
+        val ws = DexWebServer(
+            controllerProvider = { controller },
+            videoInfoProvider = {
+                val dec = videoDecoder
+                Triple(
+                    dec?.videoWidth ?: videoWidth,
+                    dec?.videoHeight ?: videoHeight,
+                    dec?.codecString ?: "avc1.64002a",
+                )
+            },
+            cachedInitProvider = {
+                val dec = videoDecoder
+                dec?.lastConfigPacket to dec?.lastKeyFramePacket
+            },
+        )
+        ws.start()
+        webServer = ws
+
         val decoder = DexVideoDecoder(
             input = videoIn,
             onVideoSize = { w, h ->
                 videoWidth = w
                 videoHeight = h
+                ws.onVideoSizeChanged(w, h, videoDecoder?.codecString ?: "avc1.64002a")
                 _state.value = State.Running(w, h, displayId, transport)
+            },
+            onEncodedPacket = { isConfig, isKeyFrame, ptsUs, data ->
+                ws.onEncodedPacket(isConfig, isKeyFrame, ptsUs, data)
             },
             onError = { msg -> stop(msg) },
         )
         videoDecoder = decoder
         decoder.start()
 
-        val ctrl = DexInputController(ctrlOut, ctrlIn)
-        controller = ctrl
-        ctrl.start()
         setStarting(if (isVi) "Đang dựng hình màn hình DeX…" else "Rendering DeX display…")
     }
 
@@ -432,6 +459,8 @@ class DexSession(
         if (!stopped.compareAndSet(false, true)) return
 
         scope.launch {
+            runCatching { webServer?.stop() }
+            webServer = null
             runCatching { videoDecoder?.stop() }
             runCatching { controller?.stop() }
 

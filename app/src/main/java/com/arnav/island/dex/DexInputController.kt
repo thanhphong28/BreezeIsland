@@ -10,13 +10,11 @@ import java.nio.ByteBuffer
 import java.util.concurrent.LinkedBlockingQueue
 
 /**
- * Translates touch gestures and navigation keys into scrcpy v4.1 control protocol messages.
+ * Translates touch gestures, external-monitor trackpad gestures, PC mouse/keyboard events,
+ * and navigation keys into scrcpy v4.1 control protocol messages.
  *
  * Uses scrcpy's virtual mouse model (`pointerId = -1`, hover-before-press, button state) so
- * One UI 8.5/9 freeform window caption dragging works smoothly without SystemUI NPEs:
- *  - 1 finger: mouse click & drag (window handles, sliders, buttons)
- *  - 2 fingers: scroll wheel (horizontal & vertical)
- *  - Back / Home / Recents: forwarded directly to the DeX display
+ * One UI 8.5/9 freeform window caption dragging works smoothly without SystemUI NPEs.
  */
 class DexInputController(
     private val output: OutputStream,
@@ -25,10 +23,15 @@ class DexInputController(
     companion object {
         private const val TAG = "DexInputController"
         private const val TYPE_INJECT_KEYCODE = 0
+        private const val TYPE_INJECT_TEXT = 1
         private const val TYPE_INJECT_TOUCH_EVENT = 2
         private const val TYPE_INJECT_SCROLL_EVENT = 3
         private const val POINTER_ID_MOUSE = -1L
-        private const val BUTTON_PRIMARY = 1
+
+        const val BUTTON_PRIMARY = 1
+        const val BUTTON_SECONDARY = 2
+        const val BUTTON_TERTIARY = 4
+
         private const val SCROLL_PX_PER_TICK = 64f
 
         internal fun pressureToU16FixedPoint(pressure: Float): Short {
@@ -43,6 +46,15 @@ class DexInputController(
             } else {
                 (clamped * 0x8000).toInt().coerceIn(-0x8000, 0x7fff).toShort()
             }
+        }
+
+        internal fun encodeInjectText(text: String): ByteArray {
+            val utf8 = text.toByteArray(Charsets.UTF_8)
+            val buffer = ByteBuffer.allocate(5 + utf8.size)
+            buffer.put(TYPE_INJECT_TEXT.toByte())
+            buffer.putInt(utf8.size)
+            buffer.put(utf8)
+            return buffer.array()
         }
     }
 
@@ -86,19 +98,83 @@ class DexInputController(
         runCatching { input.close() }
     }
 
-    fun sendKeyPress(keycode: Int) {
-        sendKey(KeyEvent.ACTION_DOWN, keycode)
-        sendKey(KeyEvent.ACTION_UP, keycode)
+    /** Sends a full key press (down + up) to the DeX display's focused window. */
+    fun sendKeyPress(keycode: Int, metaState: Int = 0) {
+        sendKey(KeyEvent.ACTION_DOWN, keycode, metaState)
+        sendKey(KeyEvent.ACTION_UP, keycode, metaState)
     }
 
-    private fun sendKey(action: Int, keycode: Int) {
+    fun sendKey(action: Int, keycode: Int, metaState: Int = 0) {
         val buffer = ByteBuffer.allocate(14)
         buffer.put(TYPE_INJECT_KEYCODE.toByte())
         buffer.put(action.toByte())
         buffer.putInt(keycode)
         buffer.putInt(0)
-        buffer.putInt(0)
+        buffer.putInt(metaState)
         queue.offer(buffer.array())
+    }
+
+    /** Injects UTF-8 text directly into the currently focused field inside Samsung DeX. */
+    fun sendText(text: String) {
+        if (text.isEmpty()) return
+        queue.offer(encodeInjectText(text))
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Explicit Desktop Mouse API (used by External Monitor Touchpad & PC Web Browser)
+    // ---------------------------------------------------------------------------------------------
+
+    fun sendHoverMove(x: Int, y: Int, videoWidth: Int, videoHeight: Int) {
+        if (videoWidth <= 0 || videoHeight <= 0) return
+        sendMouse(
+            action = MotionEvent.ACTION_HOVER_MOVE,
+            x = x.coerceIn(0, videoWidth - 1),
+            y = y.coerceIn(0, videoHeight - 1),
+            videoWidth = videoWidth,
+            videoHeight = videoHeight,
+            pressure = 0f,
+            actionButton = 0,
+            buttons = 0,
+        )
+    }
+
+    fun sendMouseDown(x: Int, y: Int, videoWidth: Int, videoHeight: Int, button: Int = BUTTON_PRIMARY, buttonsMask: Int = button) {
+        if (videoWidth <= 0 || videoHeight <= 0) return
+        val cx = x.coerceIn(0, videoWidth - 1)
+        val cy = y.coerceIn(0, videoHeight - 1)
+        sendMouse(MotionEvent.ACTION_HOVER_MOVE, cx, cy, videoWidth, videoHeight, 0f, 0, 0)
+        sendMouse(MotionEvent.ACTION_DOWN, cx, cy, videoWidth, videoHeight, 1f, button, buttonsMask)
+    }
+
+    fun sendMouseDrag(x: Int, y: Int, videoWidth: Int, videoHeight: Int, buttonsMask: Int = BUTTON_PRIMARY) {
+        if (videoWidth <= 0 || videoHeight <= 0) return
+        val cx = x.coerceIn(0, videoWidth - 1)
+        val cy = y.coerceIn(0, videoHeight - 1)
+        sendMouse(MotionEvent.ACTION_MOVE, cx, cy, videoWidth, videoHeight, 1f, 0, buttonsMask)
+    }
+
+    fun sendMouseUp(x: Int, y: Int, videoWidth: Int, videoHeight: Int, button: Int = BUTTON_PRIMARY, remainingButtons: Int = 0) {
+        if (videoWidth <= 0 || videoHeight <= 0) return
+        val cx = x.coerceIn(0, videoWidth - 1)
+        val cy = y.coerceIn(0, videoHeight - 1)
+        sendMouse(MotionEvent.ACTION_UP, cx, cy, videoWidth, videoHeight, 0f, button, remainingButtons)
+    }
+
+    fun sendClick(x: Int, y: Int, videoWidth: Int, videoHeight: Int, button: Int = BUTTON_PRIMARY) {
+        sendMouseDown(x, y, videoWidth, videoHeight, button, button)
+        sendMouseUp(x, y, videoWidth, videoHeight, button, 0)
+    }
+
+    fun sendScrollAt(x: Int, y: Int, videoWidth: Int, videoHeight: Int, hScroll: Float, vScroll: Float) {
+        if (videoWidth <= 0 || videoHeight <= 0) return
+        sendScroll(
+            x = x.coerceIn(0, videoWidth - 1),
+            y = y.coerceIn(0, videoHeight - 1),
+            videoWidth = videoWidth,
+            videoHeight = videoHeight,
+            hScroll = hScroll,
+            vScroll = vScroll,
+        )
     }
 
     private fun sendMouse(
@@ -144,6 +220,10 @@ class DexInputController(
         buffer.putInt(0)
         queue.offer(buffer.array())
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // Direct On-Phone Viewer Touch Translation
+    // ---------------------------------------------------------------------------------------------
 
     private enum class Gesture { NONE, MOUSE, SCROLL, DONE }
 

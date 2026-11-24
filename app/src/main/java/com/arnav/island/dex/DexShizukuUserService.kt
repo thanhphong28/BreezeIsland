@@ -144,6 +144,7 @@ class DexShizukuUserService : IDexUserService.Stub() {
             val cmd = "CLASSPATH=$SERVER_REMOTE_PATH app_process / com.genymobile.scrcpy.Server " +
                 "$SERVER_VERSION scid=$scidHex log_level=info " +
                 "video=true audio=false control=true video_codec=h264 " +
+                "video_codec_options=i-frame-interval:int=2 " +
                 "tunnel_forward=true send_device_meta=false send_dummy_byte=false " +
                 "new_display=$displaySpec"
 

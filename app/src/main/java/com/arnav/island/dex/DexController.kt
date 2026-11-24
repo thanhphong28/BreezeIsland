@@ -36,6 +36,15 @@ data class LocalDexState(
     val statusMessage: String = "",
     val displayId: Int = -1,
     val activeTransport: DexTransport? = null,
+    val activeOutputMode: DexOutputMode = DexOutputMode.AUTO_EXTERNAL_OR_PC,
+    /** External HDMI / USB-C monitor, TV, projector, or Smart View display currently plugged in. */
+    val detectedExternalDisplay: ExternalDisplayInfo? = null,
+    /** Name of the external display currently rendering Samsung DeX fullscreen. */
+    val externalDisplayName: String? = null,
+    /** Built-in DeX for PC browser URL (e.g. http://192.168.1.20:8765). */
+    val pcWebUrl: String? = null,
+    val pcWebPort: Int = DexWebServer.DEFAULT_PORT,
+    val pcClientCount: Int = 0,
     val shizukuInstalled: Boolean = false,
     val shizukuRunning: Boolean = false,
     val shizukuPermitted: Boolean = false,
@@ -59,11 +68,12 @@ data class LocalDexState(
 }
 
 /**
- * Coordinates the on-device Samsung DeX (LocalDeX) lifecycle inside BreezeIsland:
- *  - Detects both Shizuku (zero-Wi-Fi 1-tap bridge) and Wireless ADB (full sam1am/localdex engine)
- *  - Auto-enables Wireless Debugging via WRITE_SECURE_SETTINGS when previously paired
- *  - Lets the user toggle Samsung DeX ON/OFF from HomeScreen, LocalDexScreen, or Quick Settings
- *  - Posts optional Dynamic Island status pills when DeX starts or stops
+ * Coordinates the Samsung DeX lifecycle inside BreezeIsland:
+ *  - Outputs fullscreen Samsung DeX directly to external HDMI / USB-C monitors, TVs, projectors,
+ *    or Smart View / Miracast screens (with the phone acting as a true DeX Touchpad + Keyboard)
+ *  - Streams Samsung DeX to any Windows / Mac PC browser (`http://<ip>:8765` or USB `adb forward`)
+ *    without taking over the phone screen
+ *  - Optionally supports on-phone preview whenever explicitly chosen
  */
 class DexController(
     private val app: Application,
@@ -90,6 +100,9 @@ class DexController(
         val notifEnabled = NotificationManagerCompat.from(app).areNotificationsEnabled()
         val wirelessOn = DexWirelessDebugging.isEnabled(app)
         val canToggle = DexWirelessDebugging.canToggle(app)
+        val extDisplay = ExternalDisplayFinder.findExternalDisplays(app, currentSession?.displayId ?: -1)
+            .firstOrNull()
+            ?.let(ExternalDisplayFinder::toInfo)
 
         _state.update {
             it.copy(
@@ -97,6 +110,11 @@ class DexController(
                 starting = currentSession != null && currentSession.state.value is DexSession.State.Starting,
                 displayId = currentSession?.displayId ?: -1,
                 activeTransport = currentSession?.transport,
+                activeOutputMode = currentSession?.outputMode ?: settings.state.value.dexOutputMode,
+                detectedExternalDisplay = extDisplay,
+                pcWebUrl = currentSession?.webServer?.url?.value,
+                pcWebPort = currentSession?.webServer?.port ?: DexWebServer.DEFAULT_PORT,
+                pcClientCount = currentSession?.webServer?.clientCount?.value ?: 0,
                 shizukuInstalled = shizukuInstalled,
                 shizukuRunning = shizukuRunning,
                 shizukuPermitted = shizukuPermitted,
@@ -115,7 +133,6 @@ class DexController(
                 DexAdb.getConnectionStatus(app, forceCheck = forceAdbCheck)
             }
 
-            // If previously paired and we hold WRITE_SECURE_SETTINGS, auto-re-enable Wireless Debugging.
             if (adbStatus != DexAdb.ConnectionStatus.CONNECTED &&
                 settings.state.value.dexHasPairedBefore &&
                 !DexWirelessDebugging.isEnabled(app) &&
@@ -154,25 +171,19 @@ class DexController(
         }
     }
 
-    /**
-     * Toggles Samsung DeX on or off immediately.
-     * Returns true if the requested transition started; false if setup/permission is still needed.
-     */
-    fun setDexEnabled(context: Context, enable: Boolean, openViewer: Boolean = true): Boolean {
-        if (!enable) {
-            stopDex(context)
-            return true
-        }
-        return startDex(context, openViewer = openViewer)
-    }
-
-    fun startDex(context: Context, openViewer: Boolean = true): Boolean {
-        if (DexSession.current != null) {
-            if (openViewer) openViewer(context)
+    fun startDex(context: Context, forcePhoneViewer: Boolean = false): Boolean {
+        val existing = DexSession.current
+        if (existing != null) {
+            if (forcePhoneViewer) {
+                openPhoneViewer(context)
+            } else if (_state.value.externalDisplayName != null) {
+                openTouchpad(context)
+            }
             return true
         }
 
         val s = settings.state.value
+        val outputMode = if (forcePhoneViewer) DexOutputMode.PHONE_SCREEN else s.dexOutputMode
         val shizukuReady = OnPhoneGranter.canUseShizuku()
         val mode = s.dexConnectionMode
 
@@ -187,7 +198,6 @@ class DexController(
         }
 
         if (chosenTransport == null) {
-            // Try a quick live check for Wireless ADB if user opted for AUTO or WIRELESS_ADB and previously paired.
             if (mode != DexConnectionMode.SHIZUKU && s.dexHasPairedBefore) {
                 scope.launch {
                     _state.update {
@@ -205,7 +215,7 @@ class DexController(
                     }
                     if (status == DexAdb.ConnectionStatus.CONNECTED) {
                         _state.update { it.copy(adbConnected = true) }
-                        launchSessionNow(context, s.dexDisplaySpec, DexTransport.WIRELESS_ADB, openViewer)
+                        launchSessionNow(context, s.dexDisplaySpec, DexTransport.WIRELESS_ADB, outputMode)
                     } else {
                         _state.update {
                             it.copy(
@@ -226,7 +236,7 @@ class DexController(
             return false
         }
 
-        launchSessionNow(context, s.dexDisplaySpec, chosenTransport, openViewer)
+        launchSessionNow(context, s.dexDisplaySpec, chosenTransport, outputMode)
         return true
     }
 
@@ -234,23 +244,49 @@ class DexController(
         context: Context,
         displaySpec: String,
         transport: DexTransport,
-        openViewer: Boolean,
+        outputMode: DexOutputMode,
     ) {
+        val extDisplay = ExternalDisplayFinder.findExternalDisplays(app).firstOrNull()
         val spec = DexDisplaySpec.normalize(displaySpec)
+
         _state.update {
             it.copy(
                 starting = true,
                 running = false,
                 activeTransport = transport,
+                activeOutputMode = outputMode,
+                detectedExternalDisplay = extDisplay?.let(ExternalDisplayFinder::toInfo),
                 lastError = null,
                 statusMessage = if (isVi) "Đang khởi động Samsung DeX…" else "Starting Samsung DeX…",
             )
         }
-        DexService.start(context, spec, transport)
-        if (openViewer) openViewer(context)
+
+        DexService.start(context, spec, transport, outputMode)
+
+        // Choose what appears on the PHONE screen:
+        //  - External Monitor connected -> open DeX Touchpad on phone (DeX renders fullscreen on the monitor!)
+        //  - PC Browser / Auto without HDMI -> DO NOT hijack phone screen; stay in app showing PC URL & hot-plug status!
+        //  - Phone Screen mode -> open fullscreen phone viewer explicitly.
+        when (outputMode) {
+            DexOutputMode.PHONE_SCREEN -> openPhoneViewer(context)
+            DexOutputMode.EXTERNAL_DISPLAY,
+            DexOutputMode.AUTO_EXTERNAL_OR_PC -> {
+                if (extDisplay != null) {
+                    openTouchpad(context)
+                }
+            }
+            DexOutputMode.PC_BROWSER -> Unit
+        }
     }
 
-    fun openViewer(context: Context) {
+    fun openTouchpad(context: Context) {
+        if (DexSession.current == null) return
+        val intent = Intent(context, DexTouchpadActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }
+    }
+
+    fun openPhoneViewer(context: Context) {
         if (DexSession.current == null) return
         val intent = Intent(context, DexViewerActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -329,6 +365,27 @@ class DexController(
             }
     }
 
+    internal fun onExternalDisplayChanged(info: ExternalDisplayInfo?) {
+        _state.update {
+            it.copy(
+                detectedExternalDisplay = info ?: ExternalDisplayFinder.findExternalDisplays(app, DexSession.current?.displayId ?: -1)
+                    .firstOrNull()
+                    ?.let(ExternalDisplayFinder::toInfo),
+                externalDisplayName = info?.label,
+            )
+        }
+    }
+
+    internal fun onWebServerChanged(url: String?, port: Int, clientCount: Int) {
+        _state.update {
+            it.copy(
+                pcWebUrl = url,
+                pcWebPort = port,
+                pcClientCount = clientCount,
+            )
+        }
+    }
+
     internal fun onSessionStateChanged(sessionState: DexSession.State) {
         when (sessionState) {
             is DexSession.State.Starting -> {
@@ -343,6 +400,8 @@ class DexController(
             }
             is DexSession.State.Running -> {
                 val curSession = DexSession.current
+                val extName = _state.value.externalDisplayName
+                val pcUrl = curSession?.webServer?.url?.value
                 val shouldPostPill = curSession != null &&
                     notifiedStartForSession !== curSession &&
                     settings.state.value.dexShowIslandPill
@@ -350,11 +409,10 @@ class DexController(
                     notifiedStartForSession = curSession
                     postIslandPill(
                         title = "Samsung DeX",
-                        subtitle = if (sessionState.displayId >= 0) {
-                            if (isVi) "Đang chạy · Màn hình #${sessionState.displayId}"
-                            else "Active · Display #${sessionState.displayId}"
-                        } else {
-                            if (isVi) "Đang chạy trên thiết bị" else "Running on-device"
+                        subtitle = when {
+                            !extName.isNullOrBlank() -> if (isVi) "Đang xuất ra $extName" else "Output: $extName"
+                            !pcUrl.isNullOrBlank() -> if (isVi) "Sẵn sàng cho PC: $pcUrl" else "PC Ready: $pcUrl"
+                            else -> if (isVi) "Đang chạy · Màn hình #${sessionState.displayId}" else "Active · Display #${sessionState.displayId}"
                         },
                         accent = 0xFF38BDF8.toInt(),
                     )
@@ -365,6 +423,8 @@ class DexController(
                         running = true,
                         displayId = sessionState.displayId,
                         activeTransport = sessionState.transport,
+                        pcWebUrl = pcUrl,
+                        pcWebPort = curSession?.webServer?.port ?: DexWebServer.DEFAULT_PORT,
                         statusMessage = "",
                         lastError = null,
                     )
@@ -378,12 +438,17 @@ class DexController(
 
     internal fun onSessionStopped(error: String?) {
         notifiedStartForSession = null
+        val ext = ExternalDisplayFinder.findExternalDisplays(app).firstOrNull()?.let(ExternalDisplayFinder::toInfo)
         _state.update {
             it.copy(
                 running = false,
                 starting = false,
                 displayId = -1,
                 activeTransport = null,
+                externalDisplayName = null,
+                detectedExternalDisplay = ext,
+                pcWebUrl = null,
+                pcClientCount = 0,
                 statusMessage = "",
                 lastError = error,
             )
@@ -398,7 +463,7 @@ class DexController(
                 type = EventType.CONFIRM,
                 timestamp = System.currentTimeMillis(),
                 persistent = false,
-                durationMs = 2_000L,
+                durationMs = 2_400L,
                 title = title,
                 subtitle = subtitle,
                 icon = Glyph.OPEN,

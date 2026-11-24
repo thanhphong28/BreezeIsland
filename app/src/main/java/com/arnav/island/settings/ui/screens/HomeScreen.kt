@@ -250,20 +250,32 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
             Group(title = "Island") {
                 val dexActive = dexState.running || dexState.starting
                 SettingRow(
-                    title = tr("Samsung DeX (LocalDeX)", "Samsung DeX (Nội bộ Z Flip)"),
+                    title = tr("Samsung DeX (Monitor / PC)", "Samsung DeX (Màn hình ngoài / PC)"),
                     subtitle = when {
+                        dexState.running && !dexState.externalDisplayName.isNullOrBlank() -> tr(
+                            "Outputting to ${dexState.externalDisplayName} · Tap for Touchpad",
+                            "Đang xuất lên ${dexState.externalDisplayName} · Chạm mở Bàn rê chuột",
+                        )
+                        dexState.running && !dexState.pcWebUrl.isNullOrBlank() -> tr(
+                            "PC ready: ${dexState.pcWebUrl} · Tap to manage or toggle off",
+                            "Sẵn sàng cho PC: ${dexState.pcWebUrl} · Chạm để xem hoặc gạt tắt",
+                        )
                         dexState.running -> tr(
                             "Running · Display #${dexState.displayId} · Tap to manage or toggle off",
                             "Đang chạy · Màn hình #${dexState.displayId} · Chạm để mở hoặc gạt tắt",
                         )
                         dexState.starting -> tr("Starting Samsung DeX…", "Đang khởi động Samsung DeX…")
+                        dexState.detectedExternalDisplay != null -> tr(
+                            "Detected ${dexState.detectedExternalDisplay!!.label} · Toggle on to project DeX",
+                            "Đã nhận ${dexState.detectedExternalDisplay!!.label} · Gạt bật xuất DeX ngay",
+                        )
                         dexState.bestReadyTransport(settings.dexConnectionMode) != null -> tr(
-                            "Ready · Toggle on to run Samsung DeX right on your phone",
-                            "Sẵn sàng · Gạt bật Samsung DeX ngay trên máy (không cần cáp/PC)",
+                            "Ready · Project Samsung DeX to HDMI monitor, projector, TV or PC",
+                            "Sẵn sàng · Xuất Samsung DeX ra màn hình rời, máy chiếu, TV hoặc PC",
                         )
                         else -> tr(
-                            "Run Samsung DeX on Z Flip — no dock, no PC, no root",
-                            "Chạy Samsung DeX ngay trên Z Flip · Bấm để thiết lập 1 chạm",
+                            "Samsung DeX for external monitor, projector & PC — zero root",
+                            "Xuất Samsung DeX ra màn hình ngoài, máy chiếu & PC · Chạm để thiết lập",
                         )
                     },
                     icon = Icons.Rounded.DesktopWindows,
@@ -276,8 +288,10 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
                                 if (!on) {
                                     ui.graph.localDex.stopDex(context)
                                 } else {
-                                    val started = ui.graph.localDex.startDex(context, openViewer = true)
-                                    if (!started) ui.go(Dest.LOCAL_DEX)
+                                    val started = ui.graph.localDex.startDex(context, forcePhoneViewer = false)
+                                    if (!started || (dexState.detectedExternalDisplay == null && settings.dexOutputMode != com.arnav.island.dex.DexOutputMode.PHONE_SCREEN)) {
+                                        ui.go(Dest.LOCAL_DEX)
+                                    }
                                 }
                             },
                         )

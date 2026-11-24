@@ -17,6 +17,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.arnav.island.animation.MotionPreset
 import com.arnav.island.dex.DexConnectionMode
 import com.arnav.island.dex.DexDisplaySpec
+import com.arnav.island.dex.DexOutputMode
 import com.arnav.island.events.MascotMood
 import com.arnav.island.events.NotificationPrivacy
 import com.arnav.island.util.Diagnostics
@@ -239,8 +240,9 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val searchAutoLaunchSkipWhenDeleting = booleanPreferencesKey("search_auto_launch_skip_when_deleting")
         val searchAutoLaunchFeedback = booleanPreferencesKey("search_auto_launch_feedback")
 
-        val dexDisplaySpec = stringPreferencesKey("dex_display_spec")
+        val dexDisplaySpec = stringPreferencesKey("dex_display_spec_v2")
         val dexConnectionMode = stringPreferencesKey("dex_connection_mode")
+        val dexOutputMode = stringPreferencesKey("dex_output_mode")
         val dexLandscapeLock = booleanPreferencesKey("dex_landscape_lock")
         val dexShowIslandPill = booleanPreferencesKey("dex_show_island_pill")
         val dexHasPairedBefore = booleanPreferencesKey("dex_has_paired_before")
@@ -468,6 +470,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             searchAutoLaunchFeedback = p[K.searchAutoLaunchFeedback] ?: d.searchAutoLaunchFeedback,
             dexDisplaySpec = DexDisplaySpec.normalize(p[K.dexDisplaySpec] ?: d.dexDisplaySpec),
             dexConnectionMode = p.enum(K.dexConnectionMode, d.dexConnectionMode),
+            dexOutputMode = p.enum(K.dexOutputMode, d.dexOutputMode),
             dexLandscapeLock = p[K.dexLandscapeLock] ?: d.dexLandscapeLock,
             dexShowIslandPill = p[K.dexShowIslandPill] ?: d.dexShowIslandPill,
             dexHasPairedBefore = p[K.dexHasPairedBefore] ?: d.dexHasPairedBefore,
@@ -549,6 +552,7 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.searchAutoLaunchFeedback] = s.searchAutoLaunchFeedback
         p[K.dexDisplaySpec] = s.dexDisplaySpec
         p[K.dexConnectionMode] = s.dexConnectionMode.name
+        p[K.dexOutputMode] = s.dexOutputMode.name
         p[K.dexLandscapeLock] = s.dexLandscapeLock
         p[K.dexShowIslandPill] = s.dexShowIslandPill
         p[K.dexHasPairedBefore] = s.dexHasPairedBefore
