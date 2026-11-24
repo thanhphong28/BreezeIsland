@@ -5,9 +5,6 @@
     <string name="notification_listener_label">BreezeIsland live activities</string>
     <string name="tile_island_label">BreezeIsland</string>
     <string name="tile_timer_label">BreezeIsland timer</string>
-    <string name="tile_dex_label">Samsung DeX</string>
-    <string name="dex_service_label">BreezeIsland Samsung DeX</string>
-    <string name="dex_pairing_service_label">BreezeIsland DeX Pairing</string>
 
     <string name="channel_service_name">BreezeIsland service</string>
     <string name="channel_service_desc">Keeps the BreezeIsland Dynamic Island overlay active</string>

@@ -207,9 +207,6 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
                 .collect { updateVisibility() }
         }
         scope.launch {
-            graph.dexViewerVisible.collect { updateVisibility() }
-        }
-        scope.launch {
             foreground.current.collect {
                 if (settings.appRules.values.any { r -> r.motionPreset != null }) applyRenderSettings()
             }
@@ -518,7 +515,6 @@ class OverlayRuntime(private val service: Service, private val graph: AppGraph) 
 
         val reason = when {
             !st.interactive -> "Screen off"
-            graph.dexViewerVisible.value -> "Samsung DeX"
             st.locked && !settings.showOnLockScreen -> "Locked"
             !g.screen.isPortrait && !settings.showInLandscape -> "Landscape"
             calibrating -> null

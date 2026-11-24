@@ -2,9 +2,6 @@ package com.arnav.island.storage
 
 import com.arnav.island.animation.MotionPreset
 import com.arnav.island.animation.MotionProfile
-import com.arnav.island.dex.DexConnectionMode
-import com.arnav.island.dex.DexDisplaySpec
-import com.arnav.island.dex.DexOutputMode
 import com.arnav.island.events.ChargingTheme
 import com.arnav.island.events.MascotMood
 import com.arnav.island.events.NotificationPrivacy
@@ -261,14 +258,6 @@ data class IslandSettings(
     val searchAutoLaunchMinChars: Int = 1,
     val searchAutoLaunchSkipWhenDeleting: Boolean = true,
     val searchAutoLaunchFeedback: Boolean = true,
-
-    // On-device / External Samsung DeX (Zero Root, Zero PC install, Zero AccessibilityService)
-    val dexDisplaySpec: String = DexDisplaySpec.DEFAULT_SPEC,
-    val dexConnectionMode: DexConnectionMode = DexConnectionMode.AUTO,
-    val dexOutputMode: DexOutputMode = DexOutputMode.AUTO_EXTERNAL_OR_PC,
-    val dexLandscapeLock: Boolean = true,
-    val dexShowIslandPill: Boolean = true,
-    val dexHasPairedBefore: Boolean = false,
 
     /** versionCode whose "What's new" was last shown. */
     val lastSeenVersion: Int = 0,

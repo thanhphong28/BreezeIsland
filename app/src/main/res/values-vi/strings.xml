@@ -5,9 +5,6 @@
     <string name="notification_listener_label">BreezeIsland (Nhạc &amp; Thông báo)</string>
     <string name="tile_island_label">BreezeIsland</string>
     <string name="tile_timer_label">Hẹn giờ BreezeIsland</string>
-    <string name="tile_dex_label">Samsung DeX</string>
-    <string name="dex_service_label">BreezeIsland Samsung DeX</string>
-    <string name="dex_pairing_service_label">Ghép nối DeX BreezeIsland</string>
 
     <string name="channel_service_name">Dịch vụ BreezeIsland</string>
     <string name="channel_service_desc">Giữ cho lớp phủ Dynamic Island luôn hoạt động quanh camera</string>

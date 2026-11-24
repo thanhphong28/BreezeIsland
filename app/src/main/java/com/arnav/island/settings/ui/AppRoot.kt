@@ -64,7 +64,6 @@ import com.arnav.island.settings.ui.screens.StatusBarScreen
 import com.arnav.island.settings.ui.screens.TimersScreen
 import com.arnav.island.settings.ui.screens.UnlockScreen
 import com.arnav.island.settings.ui.screens.MascotScreen
-import com.arnav.island.settings.ui.screens.LocalDexScreen
 import com.arnav.island.settings.ui.screens.SearchAutoLaunchScreen
 import com.arnav.island.settings.ui.screens.WeatherScreen
 import com.arnav.island.settings.ui.screens.WhatsNewScreen
@@ -74,7 +73,7 @@ import kotlinx.coroutines.launch
 enum class Dest {
     HOME, ISLAND, CALIBRATION, EVENTS, APPS, MEDIA, NOTIFICATIONS, BATTERY, CHARGING, BLUETOOTH, TIMERS,
     GESTURES, APPEARANCE, PERFORMANCE, PRIVACY, ADVANCED, DEVELOPER, ABOUT,
-    STUDIO, WHATS_NEW, STATUS_BAR, BLEND, GALLERY, DIAGNOSTICS, UNLOCK, MASCOT, WEATHER, SEARCH_AUTO_LAUNCH, LOCAL_DEX,
+    STUDIO, WHATS_NEW, STATUS_BAR, BLEND, GALLERY, DIAGNOSTICS, UNLOCK, MASCOT, WEATHER, SEARCH_AUTO_LAUNCH,
 }
 
 /** Everything a screen needs besides the settings snapshot. */
@@ -253,7 +252,6 @@ fun IslandRoot(graph: AppGraph, initial: Dest?, sharedSetup: String? = null, onS
                 Dest.MASCOT -> MascotScreen(settings, ui)
                 Dest.WEATHER -> WeatherScreen(settings, ui)
                 Dest.SEARCH_AUTO_LAUNCH -> SearchAutoLaunchScreen(settings, ui)
-                Dest.LOCAL_DEX -> LocalDexScreen(settings, ui)
             }
         }
     }

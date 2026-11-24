@@ -33,7 +33,6 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CenterFocusStrong
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Crop169
-import androidx.compose.material.icons.rounded.DesktopWindows
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.GridView
@@ -78,7 +77,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.arnav.island.BuildConfig
 import com.arnav.island.R
@@ -93,7 +91,6 @@ import com.arnav.island.settings.ui.components.InfoCard
 import com.arnav.island.settings.ui.components.NavRow
 import com.arnav.island.settings.ui.components.OneUiSwitch
 import com.arnav.island.settings.ui.components.SegmentedRow
-import com.arnav.island.settings.ui.components.SettingRow
 import com.arnav.island.settings.ui.preview.IslandPreview
 import com.arnav.island.settings.ui.preview.PreviewIsland
 import com.arnav.island.settings.ui.theme.BadgeColors
@@ -109,15 +106,9 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
     val context = LocalContext.current
     val running by IslandOverlayService.running.collectAsStateWithLifecycle()
     val runtime by ui.graph.runtime.collectAsStateWithLifecycle()
-    val dexState by ui.graph.localDex.state.collectAsStateWithLifecycle()
     var preview by remember { mutableStateOf<PreviewIsland?>(null) }
     var demo by remember { mutableStateOf(true) }
     var showUpdateDialog by remember { mutableStateOf(false) }
-
-    LifecycleResumeEffect(Unit) {
-        ui.graph.localDex.refreshStatus(forceAdbCheck = false)
-        onPauseOrDispose { }
-    }
 
     if (showUpdateDialog) {
         UpdateDialog(onDismiss = { showUpdateDialog = false })
@@ -248,55 +239,6 @@ fun HomeScreen(settings: IslandSettings, permissions: PermissionSnapshot, ui: Ui
 
         item {
             Group(title = "Island") {
-                val dexActive = dexState.running || dexState.starting
-                SettingRow(
-                    title = tr("Samsung DeX (Monitor / PC)", "Samsung DeX (Màn hình ngoài / PC)"),
-                    subtitle = when {
-                        dexState.running && !dexState.externalDisplayName.isNullOrBlank() -> tr(
-                            "Outputting to ${dexState.externalDisplayName} · Tap for Touchpad",
-                            "Đang xuất lên ${dexState.externalDisplayName} · Chạm mở Bàn rê chuột",
-                        )
-                        dexState.running && !dexState.pcWebUrl.isNullOrBlank() -> tr(
-                            "PC ready: ${dexState.pcWebUrl} · Tap to manage or toggle off",
-                            "Sẵn sàng cho PC: ${dexState.pcWebUrl} · Chạm để xem hoặc gạt tắt",
-                        )
-                        dexState.running -> tr(
-                            "Running · Display #${dexState.displayId} · Tap to manage or toggle off",
-                            "Đang chạy · Màn hình #${dexState.displayId} · Chạm để mở hoặc gạt tắt",
-                        )
-                        dexState.starting -> tr("Starting Samsung DeX…", "Đang khởi động Samsung DeX…")
-                        dexState.detectedExternalDisplay != null -> tr(
-                            "Detected ${dexState.detectedExternalDisplay!!.label} · Toggle on to project DeX",
-                            "Đã nhận ${dexState.detectedExternalDisplay!!.label} · Gạt bật xuất DeX ngay",
-                        )
-                        dexState.bestReadyTransport(settings.dexConnectionMode) != null -> tr(
-                            "Ready · Project Samsung DeX to HDMI monitor, projector, TV or PC",
-                            "Sẵn sàng · Xuất Samsung DeX ra màn hình rời, máy chiếu, TV hoặc PC",
-                        )
-                        else -> tr(
-                            "Samsung DeX for external monitor, projector & PC — zero root",
-                            "Xuất Samsung DeX ra màn hình ngoài, máy chiếu & PC · Chạm để thiết lập",
-                        )
-                    },
-                    icon = Icons.Rounded.DesktopWindows,
-                    iconColor = if (dexActive) BadgeColors.Green else BadgeColors.Indigo,
-                    onClick = { ui.go(Dest.LOCAL_DEX) },
-                    trailing = {
-                        OneUiSwitch(
-                            checked = dexActive,
-                            onCheckedChange = { on ->
-                                if (!on) {
-                                    ui.graph.localDex.stopDex(context)
-                                } else {
-                                    val started = ui.graph.localDex.startDex(context, forcePhoneViewer = false)
-                                    if (!started || (dexState.detectedExternalDisplay == null && settings.dexOutputMode != com.arnav.island.dex.DexOutputMode.PHONE_SCREEN)) {
-                                        ui.go(Dest.LOCAL_DEX)
-                                    }
-                                }
-                            },
-                        )
-                    },
-                )
                 NavRow(
                     tr("Instant Search Launch", "Mở nhanh khi tìm App"),
                     if (settings.searchAutoLaunchEnabled) {

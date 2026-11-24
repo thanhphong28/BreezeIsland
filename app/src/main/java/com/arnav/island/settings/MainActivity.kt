@@ -70,7 +70,6 @@ class MainActivity : ComponentActivity() {
         "blend" -> Dest.BLEND
         "gallery" -> Dest.GALLERY
         "diagnostics" -> Dest.DIAGNOSTICS
-        "local_dex" -> Dest.LOCAL_DEX
         else -> null
     }
 

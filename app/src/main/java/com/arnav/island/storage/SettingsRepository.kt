@@ -15,9 +15,6 @@ import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.arnav.island.animation.MotionPreset
-import com.arnav.island.dex.DexConnectionMode
-import com.arnav.island.dex.DexDisplaySpec
-import com.arnav.island.dex.DexOutputMode
 import com.arnav.island.events.MascotMood
 import com.arnav.island.events.NotificationPrivacy
 import com.arnav.island.util.Diagnostics
@@ -240,13 +237,6 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         val searchAutoLaunchSkipWhenDeleting = booleanPreferencesKey("search_auto_launch_skip_when_deleting")
         val searchAutoLaunchFeedback = booleanPreferencesKey("search_auto_launch_feedback")
 
-        val dexDisplaySpec = stringPreferencesKey("dex_display_spec_v2")
-        val dexConnectionMode = stringPreferencesKey("dex_connection_mode")
-        val dexOutputMode = stringPreferencesKey("dex_output_mode")
-        val dexLandscapeLock = booleanPreferencesKey("dex_landscape_lock")
-        val dexShowIslandPill = booleanPreferencesKey("dex_show_island_pill")
-        val dexHasPairedBefore = booleanPreferencesKey("dex_has_paired_before")
-
         val haptics = booleanPreferencesKey("haptics")
         val tapAction = stringPreferencesKey("tap_action")
         val swipeToDismiss = booleanPreferencesKey("swipe_to_dismiss")
@@ -468,12 +458,6 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             searchAutoLaunchMinChars = (p[K.searchAutoLaunchMinChars] ?: d.searchAutoLaunchMinChars).coerceIn(1, 4),
             searchAutoLaunchSkipWhenDeleting = p[K.searchAutoLaunchSkipWhenDeleting] ?: d.searchAutoLaunchSkipWhenDeleting,
             searchAutoLaunchFeedback = p[K.searchAutoLaunchFeedback] ?: d.searchAutoLaunchFeedback,
-            dexDisplaySpec = DexDisplaySpec.normalize(p[K.dexDisplaySpec] ?: d.dexDisplaySpec),
-            dexConnectionMode = p.enum(K.dexConnectionMode, d.dexConnectionMode),
-            dexOutputMode = p.enum(K.dexOutputMode, d.dexOutputMode),
-            dexLandscapeLock = p[K.dexLandscapeLock] ?: d.dexLandscapeLock,
-            dexShowIslandPill = p[K.dexShowIslandPill] ?: d.dexShowIslandPill,
-            dexHasPairedBefore = p[K.dexHasPairedBefore] ?: d.dexHasPairedBefore,
             monitorTemperature = p[K.monitorTemp] ?: d.monitorTemperature,
             monitorFps = p[K.monitorFps] ?: d.monitorFps,
         )
@@ -550,12 +534,6 @@ class SettingsRepository(private val context: Context, private val scope: Corout
         p[K.searchAutoLaunchMinChars] = s.searchAutoLaunchMinChars
         p[K.searchAutoLaunchSkipWhenDeleting] = s.searchAutoLaunchSkipWhenDeleting
         p[K.searchAutoLaunchFeedback] = s.searchAutoLaunchFeedback
-        p[K.dexDisplaySpec] = s.dexDisplaySpec
-        p[K.dexConnectionMode] = s.dexConnectionMode.name
-        p[K.dexOutputMode] = s.dexOutputMode.name
-        p[K.dexLandscapeLock] = s.dexLandscapeLock
-        p[K.dexShowIslandPill] = s.dexShowIslandPill
-        p[K.dexHasPairedBefore] = s.dexHasPairedBefore
         p[K.haptics] = s.haptics
         p[K.tapAction] = s.tapAction.name
         p[K.swipeToDismiss] = s.swipeToDismiss
@@ -633,7 +611,6 @@ class SettingsRepository(private val context: Context, private val scope: Corout
             "manual_camera_r", "offset_x", "offset_y", "camera_padding_dp", "status_bar_cleanup", "status_bar_icons",
             "status_bar_backup", "last_seen_version", "replace_system_popups", "heads_up_backup", "app_rules_json",
             "debug_hud", "local_api", "calendar_enabled", "screenshot_preview", "monitor_enabled",
-            "dex_has_paired_before",
         )
 
         private fun tag(value: Any): String = when (value) {
